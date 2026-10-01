@@ -1,6 +1,6 @@
 # Snippet Searcher Infra
 
-Configuración del entorno local compartido de Snippet Searcher. Este repositorio coordina los contenedores; cada servicio conserva su código, Dockerfile y Compose independiente.
+Configuración del entorno local de Snippet Searcher. Este repositorio contiene el único Compose del proyecto y permite levantar todo el entorno o seleccionar un servicio con sus dependencias. Cada servicio conserva su código y Dockerfile en su propio repositorio.
 
 ## Alcance actual
 
@@ -73,7 +73,7 @@ No hay que cargar estas variables manualmente en PowerShell para usar Compose. S
 
 ## Construir e iniciar
 
-Antes de levantar infra, detener cualquier Compose individual o contenedor que publique `8080`, `8081`, `5432` o `5433`. Por ejemplo, ejecutar `docker compose down` desde `snippets-service` para detener su entorno independiente conservando sus datos.
+Los puertos configurados deben estar disponibles en la computadora. Por defecto se publican `8080`, `8081`, `5432` y `5433`; el último puede cambiarse mediante `PERMISSIONS_DB_PORT`.
 
 Desde este repositorio:
 
@@ -91,7 +91,36 @@ docker compose up --build -d
 
 Cada aplicación espera a que su propia base esté saludable. No se agrega una dependencia de arranque entre aplicaciones, porque todavía no hay un contrato que la requiera.
 
-El proyecto se llama `snippet-searcher-infra`. Sus volúmenes son independientes de los de los Compose individuales: los datos creados en el entorno de snippets no aparecen automáticamente en este entorno.
+El proyecto se llama `snippet-searcher-infra`. Tanto el arranque completo como el individual usan los mismos volúmenes de este proyecto. Las bases creadas anteriormente con otros nombres de proyecto no se importan automáticamente.
+
+### Levantar un servicio con su base
+
+Desde este mismo repositorio, para trabajar solo con snippets:
+
+```bash
+docker compose up -d snippets-service
+```
+
+Para trabajar solo con permisos:
+
+```bash
+docker compose up -d permissions-service
+```
+
+Compose levanta también la base correspondiente, declarada en `depends_on`. No hace falta definir perfiles ni mantener otro Compose en los repositorios de los servicios. Si se cambió el código y hay que reconstruir, agregar `--build`, por ejemplo:
+
+```bash
+docker compose up --build -d snippets-service
+```
+
+Seleccionar un servicio no detiene otros contenedores que ya estén ejecutándose. Para pasar del entorno completo a solo snippets:
+
+```bash
+docker compose down
+docker compose up -d snippets-service
+```
+
+`down` conserva los datos mientras no se use `--volumes`. El `.env` de infra debe estar completo, incluso al seleccionar un servicio, porque Compose procesa la configuración del archivo entero.
 
 ## Logs y comprobaciones
 
