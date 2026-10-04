@@ -2,6 +2,10 @@
 
 Configuración del entorno local de Snippet Searcher. Este repositorio contiene el único Compose del proyecto y permite levantar todo el entorno o seleccionar un servicio con sus dependencias. Cada servicio conserva su código y Dockerfile en su propio repositorio.
 
+## Documentación de arquitectura
+
+[Componentes y flujos en Mermaid](./docs/architecture/README.md): diagramas editables del diseño de servicios, permisos, tests, formatting, linting y revalidación. Las dependencias y capacidades futuras están marcadas; estos diagramas no describen únicamente lo que ya está configurado en Compose.
+
 ## Alcance actual
 
 | Contenedor | Función | Acceso desde la computadora |
