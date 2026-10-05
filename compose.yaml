@@ -1,5 +1,9 @@
 name: snippet-searcher-infra
 
+x-http-destinations: &http-destinations
+  PERMISSIONS_BASE_URL: ${PERMISSIONS_BASE_URL:-http://permissions-service:8080}
+  PRINTSCRIPT_BASE_URL: ${PRINTSCRIPT_BASE_URL:-http://printscript-service:8080}
+
 services:
   snippets-service:
     build:
@@ -8,6 +12,7 @@ services:
         - github_actor
         - github_token
     environment:
+      <<: *http-destinations
       SPRING_DATASOURCE_URL: jdbc:postgresql://snippets-db:5432/snippets
       SPRING_DATASOURCE_USERNAME: snippets
       SPRING_DATASOURCE_PASSWORD: ${SNIPPETS_DB_PASSWORD:?Definir SNIPPETS_DB_PASSWORD en .env}
@@ -24,7 +29,7 @@ services:
       POSTGRES_USER: snippets
       POSTGRES_PASSWORD: ${SNIPPETS_DB_PASSWORD:?Definir SNIPPETS_DB_PASSWORD en .env}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${SNIPPETS_DB_PORT:-5432}:5432"
     volumes:
       - snippets_data:/var/lib/postgresql
     healthcheck:
@@ -66,6 +71,30 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+
+  printscript-service:
+    build:
+      context: ../printscript-service
+      secrets:
+        - github_actor
+        - github_token
+    ports:
+      - "127.0.0.1:8082:8080"
+
+  smoke-tests:
+    image: python:3.13-alpine
+    profiles: [verification]
+    environment: *http-destinations
+    volumes:
+      - ./scripts:/verification:ro
+    command: ["python", "-B", "/verification/smoke_tests.py"]
+    depends_on:
+      snippets-service:
+        condition: service_started
+      permissions-service:
+        condition: service_started
+      printscript-service:
+        condition: service_started
 
 secrets:
   github_actor:
