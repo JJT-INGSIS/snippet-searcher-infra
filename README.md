@@ -11,26 +11,28 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 | Contenedor | Función | Acceso desde la computadora |
 | --- | --- | --- |
 | `snippets-service` | Aplicación de snippets | `http://localhost:8080` |
-| `snippets-db` | PostgreSQL de snippets | `localhost:5432` |
+| `snippets-db` | PostgreSQL de snippets | `localhost:5432` por defecto |
 | `permissions-service` | Aplicación de permisos | `http://localhost:8081` |
 | `permissions-db` | PostgreSQL de permisos | `localhost:5433` por defecto |
+| `printscript-service` | Validación de PrintScript 1.0 y 1.1 | `http://localhost:8082` |
 
 Ambas bases usan `postgres:18.6-bookworm`, con contraseñas y volúmenes independientes. Los puertos se publican solo en `127.0.0.1`.
 
-El servicio de PrintScript se incorporará cuando tenga su Dockerfile. Este entorno todavía no configura contratos HTTP entre aplicaciones ni representa un despliegue de producción.
+PrintScript no necesita base de datos ni variables de runtime. Snippets recibe los destinos HTTP internos de Permissions y PrintScript mediante configuración externa. Los clientes de negocio que consumirán esas variables se implementan en SNI-7/SNI-9; configurar los destinos no significa que Snippets ya realice esas llamadas. Este entorno es de desarrollo local.
 
 ## Requisitos y repositorios
 
 - Docker Desktop iniciado con contenedores Linux y Buildx.
-- Docker Compose 5.3.1 como versión de referencia: su implementación permite leer los secretos de build desde `.env`.
-- Acceso de lectura a `gradle-conventions` en GitHub Packages.
+- Docker Compose 5.1.1 como versión verificada: su implementación permite leer los secretos de build desde `.env`.
+- Acceso de lectura a `gradle-conventions` y a `io.github.jjt-ingsis.printscript:printscript-v1:1.1.0` en GitHub Packages.
 - Los servicios clonados y actualizados como carpetas hermanas:
 
 ```text
 snippet-searcher/
 ├── snippet-searcher-infra/
 ├── snippets-service/
-└── permissions-service/
+├── permissions-service/
+└── printscript-service/
 ```
 
 Desde la carpeta padre, si todavía faltan los servicios:
@@ -38,11 +40,12 @@ Desde la carpeta padre, si todavía faltan los servicios:
 ```bash
 git clone https://github.com/JJT-INGSIS/snippets-service.git
 git clone https://github.com/JJT-INGSIS/permissions-service.git
+git clone https://github.com/JJT-INGSIS/printscript-service.git
 ```
 
-Los contextos de construcción son `../snippets-service` y `../permissions-service`, relativos a este Compose. Docker construye el contenido actual de esos checkouts, incluidos los cambios locales; no descarga automáticamente el código de GitHub.
+Los contextos de construcción son `../snippets-service`, `../permissions-service` y `../printscript-service`, relativos a este Compose. Docker construye el contenido actual de esos checkouts, incluidos los cambios locales; no descarga automáticamente el código de GitHub.
 
-En Windows, el wrapper `gradlew` de cada servicio debe tener saltos de línea LF. Snippets ya lo define mediante `.gitattributes`. Al preparar este entorno, permisos todavía no tenía esa regla y su Dockerfile ejecutaba `./gradlew` directamente: si el checkout tiene CRLF, convertir `gradlew` a LF desde el editor antes del build. La regla compartida debe incorporarse en el repositorio de permisos.
+Los tres servicios garantizan LF para `gradlew` mediante `.gitattributes`. En un checkout anterior de Windows que conserve CRLF, volver a obtener el wrapper desde Git sólo si no hay cambios locales que preservar. Los scripts Python y YAML de infra también se normalizan a LF.
 
 No hace falta instalar Java ni Gradle en la computadora para construir mediante Docker.
 
@@ -63,11 +66,11 @@ cp .env.example .env
 Si `.env` ya existe, editarlo sin sobrescribirlo. Completar:
 
 - `GITHUB_ACTOR`: usuario de GitHub dueño del token.
-- `GITHUB_TOKEN`: PAT con `read:packages` y acceso a las convenciones publicadas.
+- `GITHUB_TOKEN`: PAT con `read:packages` y acceso a las convenciones y a la biblioteca PrintScript publicadas.
 - `SNIPPETS_DB_PASSWORD`: contraseña elegida para la base de snippets.
 - `PERMISSIONS_DB_PASSWORD`: contraseña elegida para la base de permisos.
 
-Si Windows u otro proceso impide publicar el puerto `5433`, definir `PERMISSIONS_DB_PORT=15433` en `.env`, o elegir otro puerto disponible. Usar ese puerto para conectarse desde IntelliJ o DBeaver. Dentro de Docker, permisos sigue usando `permissions-db:5432`.
+Si otro proceso ocupa `5432` o `5433`, definir `SNIPPETS_DB_PORT=15432` o `PERMISSIONS_DB_PORT=15433` en `.env`, respectivamente, o elegir otros puertos disponibles. Usar esos puertos para conectarse desde IntelliJ o DBeaver. Dentro de Docker, las bases siguen usando `snippets-db:5432` y `permissions-db:5432`.
 
 Este `.env` pertenece a infra. Compose no toma automáticamente los `.env` de los servicios. Cada integrante prepara su archivo; está ignorado por Git y contiene credenciales locales en texto plano que no deben compartirse.
 
@@ -75,25 +78,40 @@ Compose entrega las credenciales de GitHub como secretos de BuildKit únicamente
 
 No hay que cargar estas variables manualmente en PowerShell para usar Compose. Si existen variables con los mismos nombres en la sesión, sus valores tienen prioridad sobre `.env`. Actualizar el token cuando venza o se revoque.
 
+Destinos HTTP opcionales, compartidos por Snippets y la verificación:
+
+| Variable | Default dentro de Docker |
+| --- | --- |
+| `PERMISSIONS_BASE_URL` | `http://permissions-service:8080` |
+| `PRINTSCRIPT_BASE_URL` | `http://printscript-service:8080` |
+
+Usar nombres de servicio y puertos internos. `localhost` dentro de Snippets apunta al mismo contenedor, no a Permissions o PrintScript. Para un futuro cliente ejecutado en el host, los destinos serán `http://localhost:8081` y `http://localhost:8082`; esos valores no sirven para las llamadas entre contenedores. Las URLs deben ser HTTP/HTTPS sin credenciales, query ni fragmento.
+
 ## Construir e iniciar
 
-Los puertos configurados deben estar disponibles en la computadora. Por defecto se publican `8080`, `8081`, `5432` y `5433`; el último puede cambiarse mediante `PERMISSIONS_DB_PORT`.
+Los puertos configurados deben estar disponibles en la computadora. Por defecto se publican `8080`, `8081`, `8082`, `5432` y `5433`; los dos últimos pueden cambiarse mediante `SNIPPETS_DB_PORT` y `PERMISSIONS_DB_PORT`.
 
 Desde este repositorio:
 
 ```bash
 docker compose config --quiet
+docker compose build printscript-service
+docker compose build snippets-service
+docker compose build permissions-service
 docker compose up -d
 docker compose ps
 ```
 
-La primera ejecución construye las imágenes. Para incorporar cambios del código o de los Dockerfiles:
+Construir cada imagen por separado evita que Snippets y PrintScript compitan por la misma caché de Gradle de BuildKit (`/root/.gradle`), lo que puede causar un timeout de bloqueo al construir en paralelo. Para incorporar cambios del código o de los Dockerfiles, repetir:
 
 ```bash
-docker compose up --build -d
+docker compose build printscript-service
+docker compose build snippets-service
+docker compose build permissions-service
+docker compose up -d
 ```
 
-Cada aplicación espera a que su propia base esté saludable. No se agrega una dependencia de arranque entre aplicaciones, porque todavía no hay un contrato que la requiera.
+Snippets y Permissions esperan a que su propia base esté saludable. PrintScript arranca sin base. No se agregan dependencias de arranque entre las aplicaciones: la disponibilidad HTTP se comprueba en la verificación. `smoke-tests` tiene un perfil opcional y no arranca con el entorno habitual.
 
 El proyecto se llama `snippet-searcher-infra`. Tanto el arranque completo como el individual usan los mismos volúmenes de este proyecto. Las bases creadas anteriormente con otros nombres de proyecto no se importan automáticamente.
 
@@ -111,7 +129,13 @@ Para trabajar solo con permisos:
 docker compose up -d permissions-service
 ```
 
-Compose levanta también la base correspondiente, declarada en `depends_on`. No hace falta definir perfiles ni mantener otro Compose en los repositorios de los servicios. Si se cambió el código y hay que reconstruir, agregar `--build`, por ejemplo:
+Para trabajar sólo con PrintScript:
+
+```bash
+docker compose up --build -d printscript-service
+```
+
+Al seleccionar Snippets o Permissions, Compose levanta también su base, declarada en `depends_on`; PrintScript no necesita una. El uso cotidiano no requiere activar el perfil `verification` ni mantener otro Compose. Si se cambió el código y hay que reconstruir, agregar `--build`, por ejemplo:
 
 ```bash
 docker compose up --build -d snippets-service
@@ -129,7 +153,7 @@ docker compose up -d snippets-service
 ## Logs y comprobaciones
 
 ```bash
-docker compose logs -f snippets-service permissions-service
+docker compose logs -f snippets-service permissions-service printscript-service
 ```
 
 `Ctrl+C` deja de seguir los logs y mantiene los contenedores en ejecución. Revisar que Spring haya arrancado y que las dos bases aparezcan como `healthy` en `docker compose ps`.
@@ -157,7 +181,42 @@ docker compose exec permissions-db psql -U permissions -d permissions
 
 Desde IntelliJ o DBeaver, usar los puertos de la tabla, los nombres de base y usuario `snippets` o `permissions`, y la contraseña correspondiente de `.env`.
 
-Dentro de la red de Compose, las aplicaciones usan `snippets-db:5432` y `permissions-db:5432`. Las direcciones internas de las aplicaciones son `http://snippets-service:8080` y `http://permissions-service:8080`; el puerto local `8081` no se usa entre contenedores.
+Dentro de la red de Compose, las aplicaciones usan `snippets-db:5432` y `permissions-db:5432`. Las direcciones internas son `http://snippets-service:8080`, `http://permissions-service:8080` y `http://printscript-service:8080`. Los puertos publicados `8081` y `8082` se usan desde el host.
+
+## Verificación HTTP automatizada
+
+Después de preparar `.env`, reconstruir el entorno y ejecutar:
+
+```bash
+docker compose config --quiet
+docker compose build printscript-service
+docker compose build snippets-service
+docker compose build permissions-service
+docker compose up -d
+docker compose --profile verification run --rm smoke-tests
+docker compose ps
+```
+
+El perfil agrega únicamente un contenedor temporal `python:3.13-alpine`, con `scripts/` montado como sólo lectura y las mismas URLs que Snippets. No recibe credenciales de Packages ni contraseñas de las bases. Su comando levanta las aplicaciones y sus dependencias si todavía no están iniciadas. No presupone que las imágenes de las aplicaciones tengan curl, Python o shell de diagnóstico.
+
+El runner espera hasta 60 segundos por cada servicio HTTP, reintentando conexiones fallidas y respuestas `5xx`. Una respuesta de cliente inesperada o un contrato inválido falla la comprobación. Revisa ambos servicios, informa `PASS`/`FAIL` para cada uno y termina con código `0` sólo si los dos pasan.
+
+- **PrintScript:** valida versiones 1.0 y 1.1; comprueba `200` con código inválido y sus diagnósticos; y verifica `422` con `supportedVersions`. No compara la redacción de mensajes.
+- **Permissions:** comprueba relación inexistente, registro, reintento idempotente, consulta, permiso permitido/denegado y conflicto conservando el owner original. También verifica `/actuator/health` con estado `UP`.
+
+Cada ejecución genera un UUID nuevo y deja una relación de prueba con owner `infra-smoke-test` en la base de Permissions. El UUID se muestra en la salida. No se borra información ni se recrean bases o volúmenes para verificar el entorno.
+
+La comprobación ocurre desde la red interna de Compose. No demuestra que Snippets ya tenga implementados los clientes o casos de uso; revisar su arranque en los logs y las dos bases saludables en `docker compose ps`. Un `404` en `/` de Snippets no demuestra conexión a PostgreSQL. PrintScript no tiene endpoint de salud; se comprueba mediante su endpoint funcional `/validate`.
+
+Contratos: [PrintScript](https://github.com/JJT-INGSIS/printscript-service/blob/main/docs/validation.md) y [Permissions](https://github.com/JJT-INGSIS/permissions-service/blob/main/docs/ownership.md). También están disponibles en `docs/` de los clones hermanos.
+
+Los tests del runner se pueden ejecutar sin Docker ni credenciales, con Python 3.10 o superior:
+
+```bash
+python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
+```
+
+Estas pruebas usan respuestas simuladas y verifican reintentos, timeouts, errores de contrato, idempotencia y códigos de salida. No sustituyen la ejecución integrada contra las aplicaciones reales.
 
 ## Detener y conservar los datos
 
@@ -175,8 +234,7 @@ Las variables `POSTGRES_*` inicializan un volumen vacío. Cambiar la contraseña
 
 ## Evolución
 
-- Incorporar PrintScript cuando tenga Dockerfile.
-- Configurar las llamadas entre servicios cuando sus contratos estén definidos.
+- Implementar en Snippets los clientes que consumen `PERMISSIONS_BASE_URL` y `PRINTSCRIPT_BASE_URL` (SNI-7/SNI-9).
 - Al publicar imágenes, definir cómo consumir versiones desde el registro y cómo desplegar por ambiente.
 
 Las verificaciones de código siguen en los repositorios de los servicios y en sus workflows de CI.
