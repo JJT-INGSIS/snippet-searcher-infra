@@ -1,0 +1,39 @@
+name: Infrastructure CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate infrastructure
+    runs-on: ubuntu-24.04
+    env:
+      SNIPPETS_DB_PASSWORD: unused-compose-validation
+      PERMISSIONS_DB_PASSWORD: unused-compose-validation
+      GITHUB_ACTOR: compose-validation
+      GITHUB_TOKEN: unused-compose-validation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v2
+        with:
+          version: v5.1.1
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Test the existing HTTP verification runner
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py' -v

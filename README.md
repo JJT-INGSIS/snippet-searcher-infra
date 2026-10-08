@@ -238,3 +238,57 @@ Las variables `POSTGRES_*` inicializan un volumen vacío. Cambiar la contraseña
 - Al publicar imágenes, definir cómo consumir versiones desde el registro y cómo desplegar por ambiente.
 
 Las verificaciones de código siguen en los repositorios de los servicios y en sus workflows de CI.
+
+## Branches, CI y ambientes — SNI-23
+
+Infra también usa ramas cortas desde `dev`, PR a dev y promoción mediante PR `dev` → `main`. La branch dev versiona cambios destinados al ambiente de desarrollo; main corresponde a producción y sigue siendo la default branch. El Compose existente sigue siendo local: el stack de Swarm y sus recursos se incorporan en SNI-24.
+
+Usar squash para cambios individuales y merge commit para promociones. Si main recibe un cambio propio, incorporarlo a dev mediante PR. Proteger dev/main con PR, check requerido y actualización con la base, sin aprobación humana obligatoria.
+
+`.github/workflows/ci.yml` ejecuta en PRs a dev/main, pushes a ambas y ejecución manual:
+
+1. Instala Docker Compose `v5.1.1`, la versión ya verificada para este entorno.
+2. Ejecuta `docker compose config --quiet` con valores ficticios para resolver variables.
+3. Ejecuta los tests existentes de `scripts/`, sin contenedores ni HTTP real.
+
+El CI no necesita `.env` ni secrets reales; no clona servicios, construye imágenes, levanta bases ni publica paquetes. La validación de Compose no verifica sus Dockerfiles ni la conectividad real: esas comprobaciones siguen en los servicios y en el runner integrado. SNI-24 añadirá la validación de `stack.yaml` cuando exista.
+
+Después de la primera ejecución verde, agregar el check `Validate infrastructure` como requerido en dev/main, confirmando su nombre exacto en GitHub. No seleccionar un check antes de que exista ni exigir jobs de publicación de los servicios en este repo.
+
+Crear GitHub Environments `dev` limitado a la branch dev y `prod` limitado a main, sin revisores obligatorios. Preparar nombres de configuración para la operación remota: variables `SSH_HOST`, `SSH_USER`, `SSH_PORT`; secrets `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`. Los datos reales provienen de SNI-20 y se cargan/verifican con SNI-24/SNI-25. El `.env` local no se usa como configuración de las VMs.
+
+## Imágenes publicadas y entrega a Swarm
+
+Cada servicio publica desde su propio pipeline a GHCR después de CI exitoso en dev:
+
+```text
+ghcr.io/jjt-ingsis/snippets-service
+ghcr.io/jjt-ingsis/permissions-service
+ghcr.io/jjt-ingsis/printscript-service
+```
+
+SNI-23 prepara los callers de la versión central `v0.3.0`; hay que integrar/publicar esa versión y comprobar las primeras imágenes antes de disponer de esos paquetes para el despliegue. El tag `v0.2.0` ya existente pertenece a otro trabajo y se conserva.
+
+Thiago recibe por servicio el `image-ref` exacto (`imagen@sha256:...`), sus plataformas y origen. Antes de usarlo, confirmar la arquitectura de las VMs y la visibilidad/acceso de cada paquete. Las imágenes se configuran al ejecutarse: datasource, URLs internas y demás datos del ambiente siguen fuera de la imagen.
+
+SNI-24 crea redes, bases, volúmenes, secretos y los tres servicios de aplicación en Swarm usando imágenes del registro, sin construir en la VM. Realiza el primer despliegue y comprueba dev antes de usar esos mismos digests en prod. SNI-25 agregará despliegues SSH automáticos que actualizan solo una aplicación por vez y registran la versión vigente; reaplicar infra deberá preservar esas referencias para no revertir aplicaciones.
+
+Para comprobar localmente una imagen descargada por digest, se puede usar un override temporal fuera de Git sobre el Compose local. Ejemplo de su contenido:
+
+```yaml
+services:
+  snippets-service:
+    image: ghcr.io/jjt-ingsis/snippets-service@sha256:<digest-de-actions>
+```
+
+Guardar, por ejemplo, como `../published-images.local.yaml` y, desde infra, ejecutar:
+
+```bash
+docker compose -f compose.yaml -f ../published-images.local.yaml pull snippets-service
+docker compose -f compose.yaml -f ../published-images.local.yaml up --no-build -d snippets-service
+docker compose logs snippets-service
+```
+
+La opción `--no-build` permite usar esa imagen sin reconstruir el checkout local. Cambiar el servicio y digest para probar permisos o PrintScript. El datasource y las dependencias de Compose permanecen configurados como en el entorno local. Después, los comandos habituales sin el override vuelven a usar la construcción local; para recuperar ese entorno, ejecutar su build y `up -d` habituales.
+
+Contrato de publicación, outputs, reglas y orden de integración: [github-workflows](https://github.com/JJT-INGSIS/github-workflows/blob/main/README.md). El despliegue en VMs y la evidencia dev → prod se comprueban en SNI-24/SNI-25; no se consideran hechos por agregar CI o publicar imágenes.
