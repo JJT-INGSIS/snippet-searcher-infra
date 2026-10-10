@@ -18,6 +18,8 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 Ambas bases usan `postgres:18.6-bookworm`, con contraseñas y volúmenes independientes. Los puertos se publican solo en `127.0.0.1`.
 
+Snippets guarda el código de los snippets en archivos, dentro del volumen `snippets_content`, montado en `/var/lib/snippets/content`. La imagen crea ese directorio para el usuario `10001`, que ejecuta el servicio, y ya define `STORAGE_LOCAL_DIRECTORY`; el volumen hereda ese dueño en su primer uso. El contrato está en [`docs/storage.md` de snippets-service](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/storage.md).
+
 PrintScript no necesita base de datos ni variables de runtime. Snippets recibe los destinos HTTP internos de Permissions y PrintScript mediante configuración externa. Los clientes de negocio que consumirán esas variables se implementan en SNI-7/SNI-9; configurar los destinos no significa que Snippets ya realice esas llamadas. Este entorno es de desarrollo local.
 
 ## Requisitos y repositorios
@@ -224,8 +226,7 @@ Estas pruebas usan respuestas simuladas y verifican reintentos, timeouts, errore
 docker compose down
 ```
 
-Las bases conservan sus datos en `snippets_data` y `permissions_data`. Para eliminar **todos los datos de ambas bases de este entorno**:
-
+Las bases conservan sus datos en `snippets_data` y `permissions_data`, y el código de los snippets en `snippets_content`. Recrear o reconstruir un contenedor no los borra. Para eliminar **todos los datos de este entorno, incluido el código de los snippets**:
 ```bash
 docker compose down --volumes
 ```
