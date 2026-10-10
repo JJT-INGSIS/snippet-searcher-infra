@@ -20,7 +20,9 @@ Ambas bases usan `postgres:18.6-bookworm`, con contraseñas y volúmenes indepen
 
 Snippets guarda el código de los snippets en archivos, dentro del volumen `snippets_content`, montado en `/var/lib/snippets/content`. La imagen crea ese directorio para el usuario `10001`, que ejecuta el servicio, y ya define `STORAGE_LOCAL_DIRECTORY`; el volumen hereda ese dueño en su primer uso. El contrato está en [`docs/storage.md` de snippets-service](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/storage.md).
 
-PrintScript no necesita base de datos ni variables de runtime. Snippets recibe los destinos HTTP internos de Permissions y PrintScript mediante configuración externa. Los clientes de negocio que consumirán esas variables se implementan en SNI-7/SNI-9; configurar los destinos no significa que Snippets ya realice esas llamadas. Este entorno es de desarrollo local.
+PrintScript no necesita base de datos ni variables de runtime. Snippets recibe los destinos HTTP internos de Permissions y PrintScript mediante configuración externa y los usa al crear un snippet: valida el código en PrintScript y registra el owner en Permissions.
+
+Este entorno es de desarrollo local. Compose activa en Snippets el perfil Spring `dev` mediante `SPRING_PROFILES_ACTIVE`. Ese perfil habilita la identidad de desarrollo por el header `X-Dev-Actor-Id`; sin él, `POST /snippets` responde `401`. No es autenticación y no debe activarse en producción: el stack de Swarm de SNI-24 debe decidir el perfil de cada ambiente de forma explícita.
 
 ## Requisitos y repositorios
 
@@ -172,7 +174,7 @@ En macOS/Linux:
 curl --fail http://localhost:8081/actuator/health
 ```
 
-Se espera HTTP 200 con `status` igual a `UP`. La salud de permisos incluye su datasource. Snippets todavía no expone un endpoint de salud de base: su arranque y un HTTP 404 en `/` no prueban una consulta real desde Spring a PostgreSQL.
+Se espera HTTP 200 con `status` igual a `UP`. La salud de permisos incluye su datasource. Snippets no expone un endpoint de salud: su arranque y un HTTP 404 en `/` no prueban una consulta real desde Spring a PostgreSQL. [Crear un snippet](#crear-un-snippet) sí la prueba.
 
 Para abrir una sesión SQL:
 
@@ -184,6 +186,28 @@ docker compose exec permissions-db psql -U permissions -d permissions
 Desde IntelliJ o DBeaver, usar los puertos de la tabla, los nombres de base y usuario `snippets` o `permissions`, y la contraseña correspondiente de `.env`.
 
 Dentro de la red de Compose, las aplicaciones usan `snippets-db:5432` y `permissions-db:5432`. Las direcciones internas son `http://snippets-service:8080`, `http://permissions-service:8080` y `http://printscript-service:8080`. Los puertos publicados `8081` y `8082` se usan desde el host.
+
+## Crear un snippet
+
+Con el entorno completo levantado, desde la computadora:
+
+```bash
+curl -i -X POST http://localhost:8080/snippets \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7' \
+  -H 'X-Dev-Actor-Id: dev-local' \
+  -d '{"name":"Example","description":null,"language":"printscript","version":"1.0","code":"println(1);"}'
+```
+
+Se espera `201` con el `id` del snippet. Repetir el mismo pedido responde `200` con el mismo `id`: la `Idempotency-Key` identifica el alta. Para crear otro snippet, usar otro UUID como clave.
+
+El pedido recorre los tres servicios: Snippets valida el código en PrintScript, guarda los metadatos en `snippets-db` y el código en el volumen `snippets_content`, y registra el owner en Permissions. Para ver el owner registrado, con el `id` de la respuesta:
+
+```bash
+curl http://localhost:8081/ownership/<id>
+```
+
+Si Permissions o PrintScript no están disponibles, Snippets responde `502` y el alta queda pendiente; repetir el pedido con la misma clave la completa. Después de reiniciar un contenedor, ese reintento puede tardar unos 10 segundos en funcionar, porque Java recuerda durante ese lapso que el nombre del servicio no se resolvía. El contrato completo está en [`docs/creation.md` de snippets-service](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/creation.md).
 
 ## Verificación HTTP automatizada
 
@@ -208,7 +232,7 @@ El runner espera hasta 60 segundos por cada servicio HTTP, reintentando conexion
 
 Cada ejecución genera un UUID nuevo y deja una relación de prueba con owner `infra-smoke-test` en la base de Permissions. El UUID se muestra en la salida. No se borra información ni se recrean bases o volúmenes para verificar el entorno.
 
-La comprobación ocurre desde la red interna de Compose. No demuestra que Snippets ya tenga implementados los clientes o casos de uso; revisar su arranque en los logs y las dos bases saludables en `docker compose ps`. Un `404` en `/` de Snippets no demuestra conexión a PostgreSQL. PrintScript no tiene endpoint de salud; se comprueba mediante su endpoint funcional `/validate`.
+La comprobación ocurre desde la red interna de Compose. El runner todavía no llama a Snippets: su creación se comprueba con el pedido de [Crear un snippet](#crear-un-snippet) o con `CreationLiveTest` de snippets-service, que usa estos mismos contenedores de Permissions y PrintScript. Un `404` en `/` de Snippets no demuestra conexión a PostgreSQL. PrintScript no tiene endpoint de salud; se comprueba mediante su endpoint funcional `/validate`.
 
 Contratos: [PrintScript](https://github.com/JJT-INGSIS/printscript-service/blob/main/docs/validation.md) y [Permissions](https://github.com/JJT-INGSIS/permissions-service/blob/main/docs/ownership.md). También están disponibles en `docs/` de los clones hermanos.
 
@@ -235,7 +259,7 @@ Las variables `POSTGRES_*` inicializan un volumen vacío. Cambiar la contraseña
 
 ## Evolución
 
-- Implementar en Snippets los clientes que consumen `PERMISSIONS_BASE_URL` y `PRINTSCRIPT_BASE_URL` (SNI-7/SNI-9).
+- Incorporar la creación de snippets al runner de verificación.
 - Al publicar imágenes, definir cómo consumir versiones desde el registro y cómo desplegar por ambiente.
 
 Las verificaciones de código siguen en los repositorios de los servicios y en sus workflows de CI.
