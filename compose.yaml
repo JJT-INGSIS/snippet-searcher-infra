@@ -13,6 +13,7 @@ services:
         - github_token
     environment:
       <<: *http-destinations
+      SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://snippets-db:5432/snippets
       SPRING_DATASOURCE_USERNAME: snippets
       SPRING_DATASOURCE_PASSWORD: ${SNIPPETS_DB_PASSWORD:?Definir SNIPPETS_DB_PASSWORD en .env}
