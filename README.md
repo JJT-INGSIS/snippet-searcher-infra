@@ -209,6 +209,21 @@ curl http://localhost:8081/ownership/<id>
 
 Si Permissions o PrintScript no están disponibles, Snippets responde `502` y el alta queda pendiente; repetir el pedido con la misma clave la completa. Después de reiniciar un contenedor, ese reintento puede tardar unos 10 segundos en funcionar, porque Java recuerda durante ese lapso que el nombre del servicio no se resolvía. El contrato completo está en [`docs/creation.md` de snippets-service](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/creation.md).
 
+## Actualizar un snippet
+
+Con el `id` que devolvió la creación, y la misma identidad que lo creó:
+
+```bash
+curl -i -X PUT http://localhost:8080/snippets/<id> \
+  -H 'Content-Type: application/json' \
+  -H 'X-Dev-Actor-Id: dev-local' \
+  -d '{"name":"Renamed","description":null,"language":"printscript","version":"1.1","code":"println(2);"}'
+```
+
+Se espera `200` con los datos nuevos. El pedido reemplaza todo: el código, el nombre, la descripción, el lenguaje y la versión. No lleva `Idempotency-Key`; repetirlo deja el mismo resultado.
+
+Snippets le pregunta a Permissions si esa identidad es el owner. El mismo pedido con otro valor en `X-Dev-Actor-Id` responde `403` y no cambia nada. Con Permissions detenido responde `502`, no `403`: que el servicio no conteste no dice nada sobre el permiso. Un `id` inexistente responde `404` y un código inválido `422`; en ningún caso se modifica el snippet. El contrato completo está en [`docs/update.md` de snippets-service](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/update.md).
+
 ## Verificación HTTP automatizada
 
 Después de preparar `.env`, reconstruir el entorno y ejecutar:
@@ -232,7 +247,7 @@ El runner espera hasta 60 segundos por cada servicio HTTP, reintentando conexion
 
 Cada ejecución genera un UUID nuevo y deja una relación de prueba con owner `infra-smoke-test` en la base de Permissions. El UUID se muestra en la salida. No se borra información ni se recrean bases o volúmenes para verificar el entorno.
 
-La comprobación ocurre desde la red interna de Compose. El runner todavía no llama a Snippets: su creación se comprueba con el pedido de [Crear un snippet](#crear-un-snippet) o con `CreationLiveTest` de snippets-service, que usa estos mismos contenedores de Permissions y PrintScript. Un `404` en `/` de Snippets no demuestra conexión a PostgreSQL. PrintScript no tiene endpoint de salud; se comprueba mediante su endpoint funcional `/validate`.
+La comprobación ocurre desde la red interna de Compose. El runner todavía no llama a Snippets: su creación y su actualización se comprueban con los pedidos de [Crear un snippet](#crear-un-snippet) y [Actualizar un snippet](#actualizar-un-snippet), o con `CreationLiveTest` y `UpdateLiveTest` de snippets-service, que usan estos mismos contenedores de Permissions y PrintScript. Un `404` en `/` de Snippets no demuestra conexión a PostgreSQL. PrintScript no tiene endpoint de salud; se comprueba mediante su endpoint funcional `/validate`.
 
 Contratos: [PrintScript](https://github.com/JJT-INGSIS/printscript-service/blob/main/docs/validation.md) y [Permissions](https://github.com/JJT-INGSIS/permissions-service/blob/main/docs/ownership.md). También están disponibles en `docs/` de los clones hermanos.
 
@@ -259,7 +274,7 @@ Las variables `POSTGRES_*` inicializan un volumen vacío. Cambiar la contraseña
 
 ## Evolución
 
-- Incorporar la creación de snippets al runner de verificación.
+- Incorporar la creación y la actualización de snippets al runner de verificación.
 - Al publicar imágenes, definir cómo consumir versiones desde el registro y cómo desplegar por ambiente.
 
 Las verificaciones de código siguen en los repositorios de los servicios y en sus workflows de CI.
