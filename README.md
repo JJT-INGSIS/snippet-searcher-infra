@@ -2,6 +2,10 @@
 
 Configuración del entorno local de Snippet Searcher. Este repositorio contiene el único Compose del proyecto y permite levantar todo el entorno o seleccionar un servicio con sus dependencias. Cada servicio conserva su código y Dockerfile en su propio repositorio.
 
+## Acceso a las VMs — SNI-20
+
+[Inventario y acceso SSH de dev/prod](./docs/sni-20-acceso-vms.md): identidades de host verificadas por Azure, configuración para SNI-25, altas y revocación de claves públicas individuales, túneles HTTP y arranque/desasignación. La guía registra las comprobaciones realizadas y las pruebas del equipo pendientes para cerrar SNI-20.
+
 ## Documentación de arquitectura
 
 [Componentes y flujos en Mermaid](./docs/architecture/README.md): diagramas editables del diseño de servicios, permisos, tests, formatting, linting y revalidación. Las dependencias y capacidades futuras están marcadas; estos diagramas no describen únicamente lo que ya está configurado en Compose.
