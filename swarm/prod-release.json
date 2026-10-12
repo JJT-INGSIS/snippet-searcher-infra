@@ -1,0 +1,16 @@
+{
+  "environment": "prod",
+  "images": {
+    "snippets-service": "ghcr.io/jjt-ingsis/snippets-service@sha256:b9863900437d33729ad8006cc289bf54346dd722ccbee1d5bf97cd614b3d66a3",
+    "permissions-service": "ghcr.io/jjt-ingsis/permissions-service@sha256:51a25deb9769e1e17d884a3940e6d877e7a491ca20a80ebab8977b4ee03403d7",
+    "printscript-service": "ghcr.io/jjt-ingsis/printscript-service@sha256:5684c3d7caab2bb50b14fe0c98553b295961fddc076d1869af9a8be3cf5998a6"
+  },
+  "database_image": "postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+  "selected_at": "2026-10-12",
+  "registry_access": "public; anonymous pull verified on VM during bootstrap",
+  "sources": {
+    "snippets-service": "sha-4cfefe7dee404a55ab56074647af7957ab360162",
+    "permissions-service": "SNI-23 verified digest",
+    "printscript-service": "same public digest confirmed in dev"
+  }
+}

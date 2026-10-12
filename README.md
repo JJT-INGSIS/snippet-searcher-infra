@@ -6,6 +6,10 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 [Inventario y acceso SSH de dev/prod](./docs/sni-20-acceso-vms.md): identidades de host verificadas por Azure, configuración para SNI-25, altas y revocación de claves públicas individuales, túneles HTTP y arranque/desasignación. La guía registra las comprobaciones realizadas y las pruebas del equipo pendientes para cerrar SNI-20.
 
+## Stack Swarm y primer despliegue — SNI-24
+
+[Bootstrap y operación de dev/prod](./docs/sni-24-bootstrap.md): imágenes por digest, secretos y volúmenes separados, registro de referencias vigente y actualización independiente. [Evidencia local y remota](./docs/sni-24-evidencia.md). [Decisiones de diseño y descripciones de PR de SNI-20/21/24](./docs/prs-infra-diseno.md).
+
 ## Documentación de arquitectura
 
 [Componentes y flujos en Mermaid](./docs/architecture/README.md): diagramas editables del diseño de servicios, permisos, tests, formatting, linting y revalidación. Las dependencias y capacidades futuras están marcadas; estos diagramas no describen únicamente lo que ya está configurado en Compose.
