@@ -107,6 +107,8 @@ def main():
                     raise RuntimeError("Timeout esperando el bloqueo del ambiente")
                 time.sleep(1)
         try:
+            if (state / 'pending.json').exists():
+                raise RuntimeError('CD tiene una operación pendiente; reconciliarla antes de reaplicar infra')
             previous_path = state / "release.json"
             previous = json.loads(previous_path.read_text()) if previous_path.exists() else None
             selected_manifest = select_release(manifest, previous)

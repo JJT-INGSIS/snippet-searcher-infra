@@ -37,7 +37,7 @@ def select_release(requested, previous):
     if previous['environment'] != requested['environment']:
         raise ValueError('El registro pertenece a otro ambiente')
     # Reapplying infrastructure takes current app AND database references.
-    return {**requested, 'images': {**previous['images']},
+    return {**requested, **previous, 'images': {**previous['images']},
             'database_image': previous['database_image']}
 
 
