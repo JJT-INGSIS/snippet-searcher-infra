@@ -69,9 +69,10 @@ class DeploymentTests(unittest.TestCase):
         write_record(self.state / 'release.json', self.previous)
         self.swarm = FakeSwarm(self.previous)
         self.authorize = lambda value: None
+        self.verify_evidence = lambda value: None
 
     def run_deploy(self, value=None):
-        return deploy_locked(self.state, value or request(), self.swarm, self.authorize)
+        return deploy_locked(self.state, value or request(), self.swarm, self.authorize, self.verify_evidence)
 
     def test_updates_one_app_preserves_others_database_and_source_record(self):
         old = copy.deepcopy(self.previous)
@@ -219,6 +220,17 @@ class DeploymentTests(unittest.TestCase):
             self.run_deploy()
         self.assertEqual(self.swarm.updates, [])
         self.assertFalse((self.state / 'pending.json').exists())
+
+    def test_missing_prod_evidence_rejects_update_under_lock(self):
+        previous = release('prod')
+        write_record(self.state / 'release.json', previous)
+        self.swarm = FakeSwarm(previous)
+        self.verify_evidence = lambda value: (_ for _ in ()).throw(ValueError('No verified dev image'))
+        before = (self.state / 'release.json').read_bytes()
+        with self.assertRaises(ValueError):
+            self.run_deploy(request('prod'))
+        self.assertEqual(self.swarm.updates, [])
+        self.assertEqual((self.state / 'release.json').read_bytes(), before)
 
     def test_new_attempt_verifies_same_digest_without_resubmitting_update(self):
         self.run_deploy()

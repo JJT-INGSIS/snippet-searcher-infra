@@ -1,22 +1,35 @@
 """GitHub evidence and authorization for the three SNI-25 service pipelines."""
 import json
-import os
 import re
 import urllib.request
 from urllib.error import HTTPError
 
-SERVICES = ('snippets-service', 'permissions-service', 'printscript-service')
+from stack_release import SERVICES, DIGEST
+
 TASK = 'sni25:verified'
 SHA = r'[a-f0-9]{40}'
+CHECKS = {'convergence': 'passed', 'sql_and_internal_http': 'passed'}
+ARTIFACT_FIELDS = ('image-ref', 'source-sha', 'source-tree', 'build-run-id', 'build-run-attempt')
+
+
+def validate_repository(repository):
+    service = repository.split('/')[-1]
+    if service not in SERVICES or repository != f'JJT-INGSIS/{service}':
+        raise ValueError('Repositorio fuera del alcance de CD')
+    return service
+
+
+def operation_id(request):
+    return f'{request["service"]}-{request["run-id"]}-{request["run-attempt"]}'
 
 
 def validate_request(request):
     service = request['service']
-    if service not in SERVICES or request['repository'] != f'JJT-INGSIS/{service}':
+    if service != validate_repository(request['repository']):
         raise ValueError('Servicio y repositorio no coinciden')
     if request['environment'] not in ('dev', 'prod'):
         raise ValueError('Ambiente inválido')
-    if not re.fullmatch(rf'ghcr.io/jjt-ingsis/{service}@sha256:[a-f0-9]{{64}}', request['image-ref']):
+    if not re.fullmatch(rf'ghcr.io/jjt-ingsis/{service}@{DIGEST}', request['image-ref']):
         raise ValueError('Se requiere el paquete del servicio por digest')
     for field in ('source-sha', 'source-tree', 'target-sha'):
         if not re.fullmatch(SHA, request[field]):
@@ -29,8 +42,7 @@ def validate_request(request):
 
 class GitHub:
     def __init__(self, repository, token):
-        if repository not in [f'JJT-INGSIS/{service}' for service in SERVICES]:
-            raise ValueError('Repositorio fuera del alcance de CD')
+        validate_repository(repository)
         self.base = f'https://api.github.com/repos/{repository}'
         self.token = token
 
@@ -80,6 +92,10 @@ def require_authorized_head(api, request):
                    and pr['head'].get('repo', {}).get('full_name') == request['repository']
                    for pr in pulls):
             raise ValueError('Prod exige el merge de una PR de dev a main del mismo repositorio')
+
+
+def require_verified_image(api, request):
+    if request['environment'] == 'prod':
         select_evidence(api, request['service'], request['source-tree'], request['image-ref'])
 
 
@@ -94,7 +110,7 @@ def valid_evidence(api, deployment, service, tree):
         return None
     if payload.get('service') != service or payload.get('source-tree') != tree:
         return None
-    if payload.get('checks') != {'convergence': 'passed', 'sql_and_internal_http': 'passed'}:
+    if payload.get('checks') != CHECKS:
         return None
     if payload.get('outcome') != 'verified' or payload.get('actual-image') != payload.get('image-ref'):
         return None
@@ -146,7 +162,7 @@ def record_evidence(api, receipt):
     if receipt.get('outcome') != 'verified' or receipt.get('environment') != 'dev':
         raise ValueError('Sólo un despliegue dev verificado puede emitir evidencia')
     validate_request(receipt)
-    if receipt.get('checks') != {'convergence': 'passed', 'sql_and_internal_http': 'passed'} \
+    if receipt.get('checks') != CHECKS \
             or receipt.get('actual-image') != receipt['image-ref']:
         raise ValueError('El recibo no confirma checks e imagen efectiva')
     payload = {**receipt, 'schema': 1}
@@ -167,7 +183,3 @@ def record_evidence(api, receipt):
         'description': 'Convergencia, SQL y HTTP verificados',
     })
     return deployment['id']
-
-
-def api_for(repository):
-    return GitHub(repository, os.environ.get('GH_TOKEN', ''))

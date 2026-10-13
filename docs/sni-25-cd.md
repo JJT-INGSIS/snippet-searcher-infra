@@ -9,15 +9,17 @@ la promoción; no se agrega otro approval ni se reconstruye en producción.
 
 Esta implementación queda **deshabilitada para despliegues remotos** hasta
 completar la [integración central de SNI-25](https://github.com/JJT-INGSIS/github-workflows/blob/main/docs/sni-25-integration.md).
-Los callers preparados apuntan al futuro `v0.4.0`; no integrarlos antes de publicar
-y comprobar esa versión. El CD contiene `REPLACE_WITH_SNI25_INFRA_COMMIT`: sustituirlo
-por el SHA completo del commit revisado que integre estos scripts. No admite una
-rama ni una revisión arbitraria elegida por el consumidor.
+Los callers ya usan `v0.4.0`. Esta simplificación propone una versión nueva del
+central (`v0.5.0`), sin modificar la publicada. Primero integrar estos scripts y
+sustituir `REPLACE_WITH_SIMPLIFIED_INFRA_COMMIT` del nuevo CD por el SHA completo
+del commit revisado de infra; después probar y versionar el central. No admite
+una rama ni una revisión arbitraria elegida por el consumidor. La revisión anterior
+de infra no implementa los nuevos comandos del runner.
 
 Requisitos operativos:
 
-- Bootstrap SNI-24 confirmado en ambas VMs, con `release.json` y sus checks pasados.
-- VMs Ubuntu 24.04 x64 encendidas, managers `vm-snippet-dev` / `vm-snippet-prod`.
+- Bootstrap SNI-24 confirmado en la VM del ambiente a probar, con `release.json` y sus checks pasados.
+- VM Ubuntu 24.04 x64 encendida para ese ambiente, manager `vm-snippet-dev` / `vm-snippet-prod`.
 - Las tres imágenes públicas en GHCR, incluyendo linux/amd64. No se agrega un PAT a las VMs.
 - Clave dedicada a CD autorizada para `azureuser`, `sudo -n` y acceso SSH desde el runner.
 - En cada servicio, environments `dev` limitado a dev y `prod` limitado a main;
@@ -40,6 +42,42 @@ GitHub Environments y perfiles Spring son configuraciones diferentes. Las
 contraseñas y el perfil de runtime permanecen en el stack de SNI-24; los secretos
 de dependencias Gradle se usan únicamente durante el build.
 
+El acceso, usuario `azureuser`, puerto 22 y autorización de públicas están en
+[SNI-20](sni-20-acceso-vms.md). Consultar también el
+[bootstrap SNI-24](sni-24-bootstrap.md) y su [evidencia](sni-24-evidencia.md).
+
+## Responsabilidades y contrato del runner
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `cd_evidence.py` | Metadata de build, descriptor entre jobs, preparación del pedido, registro y resumen |
+| `github_cd.py` | Cliente GitHub, evidencia histórica, identidad compartida y autorización de rama |
+| `ssh_deploy.py` | SSH estricto, envío del bundle/token, reintento y descarga del journal |
+| `deploy_service.py` | Lock de VM, actualización independiente, reconciliación y rollback |
+
+`cd.yml` conserva solamente `publish`, `select` y `deploy`. Cada productor exporta
+un descriptor JSON interno `artifact` con `image-ref`, `source-sha`, `source-tree`,
+`build-run-id` y `build-run-attempt`. No es un archivo de Actions ni evidencia de
+verificación: es el transporte entre jobs. No se repite en outputs del workflow.
+
+Comandos utilizados por el YAML:
+
+| Comando | Resultado |
+| --- | --- |
+| `cd_evidence.py source` | Validar checkout/paquete/plataformas y exportar imagen, árbol y scope de caché |
+| `cd_evidence.py published` | Exportar el descriptor del digest dev construido |
+| `cd_evidence.py select` | Exportar el descriptor con evidencia histórica del árbol exacto de main |
+| `cd_evidence.py prepare request.json` | Validar descriptor, inspeccionar imagen/etiquetas y escribir el pedido |
+| `ssh_deploy.py request.json receipt.json` | Ejecutar en VM y recuperar su recibo durable |
+| `cd_evidence.py record receipt.json` | Registrar solamente un recibo dev verificado |
+| `cd_evidence.py summary receipt.json` | Mostrar el recibo o indicar que no hay confirmación |
+
+La inspección de imagen se ejecuta una vez en el runner, al preparar el pedido.
+El run/attempt del build permanece en el descriptor al reintentar un job fallido;
+el pedido añade el run/attempt actual de verificación. Un reintento no atribuye
+la imagen a una construcción nueva. Las comprobaciones de autorización sobre la
+rama vigente se ejecutan en la VM, dentro del lock.
+
 ## Operación en la VM
 
 `scripts/deploy_service.py` recibe por stdin un objeto `request` y un token efímero
@@ -51,7 +89,8 @@ Dentro del mismo `deploy.lock` usado por el bootstrap:
 
 1. Reconciliar primero cualquier operación interrumpida.
 2. Validar manager, ambiente, servicio, repositorio y referencia por digest.
-3. Rechazar runs anteriores y comprobar que el commit siga siendo la punta autorizada.
+3. Rechazar runs anteriores y comprobar que el commit siga siendo la punta autorizada;
+   en prod, comprobar también la evidencia histórica del digest antes de modificar Swarm.
 4. Comparar las cinco imágenes reales con el registro y verificar la versión anterior.
 5. Descargar la imagen y revalidar autorización después de las comprobaciones lentas.
 6. Persistir la operación pendiente antes de ejecutar `docker service update --image`.
@@ -99,6 +138,9 @@ el servicio se haya caído porque el cliente perdió la respuesta.
 Una recuperación correcta **mantiene la Action en rojo**. Un nuevo intento puede
 verificar el mismo digest sin reconstruir ni reiniciar innecesariamente la aplicación.
 Si otra ejecución ya reemplazó la imagen, un reintento viejo no puede volver a instalarla.
+El journal es la única fuente del recibo: no se duplica en stdout de SSH. El runner
+conserva también un recibo de recuperación para el resumen, pero no lo registra como
+evidencia de un despliegue exitoso.
 
 Para diagnosticar, en la VM del ambiente:
 
@@ -140,8 +182,10 @@ La selección consulta **todas las páginas**, no solo el Deployment más recien
 Requiere payload verificado del bot de Actions, imagen y servicio correctos,
 Git tree comprobado contra el commit real y run/attempt concluido exitosamente
 en dev. También exige que el run haya ejecutado el pipeline y el CD centrales de
-la misma revisión inmutable. Inspecciona el digest descargado y las etiquetas de
-repositorio, commit, árbol y run/attempt de construcción.
+la misma revisión inmutable. Antes de SSH, la preparación inspecciona el digest
+descargado y las etiquetas de repositorio, commit, árbol y run/attempt de construcción.
+En la VM se confirma de nuevo la evidencia de ese digest bajo el lock, además de
+revalidar la autorización actual antes de la actualización.
 
 Los Deployments genéricos creados por GitHub Environments no cuentan como
 evidencia. Un estado posterior `inactive` no invalida el recibo explícito. No se
