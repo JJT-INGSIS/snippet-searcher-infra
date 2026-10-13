@@ -3,6 +3,7 @@ import json
 import subprocess
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,6 +24,25 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(selected['images'],current['images'])
         self.assertEqual(selected['database_image'],current['database_image'])
         self.assertEqual(current,before)
+
+    def test_reapply_preserves_cd_receipts(self):
+        current = {**manifest(), 'deployments': {'snippets-service': {'run-id': 10, 'outcome': 'verified'}}}
+        self.assertEqual(select_release(manifest(), current)['deployments'], current['deployments'])
+
+    def test_bootstrap_refuses_unresolved_cd_before_any_submission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            state = home / '.local/state/snippet-searcher/dev'
+            state.mkdir(parents=True)
+            write_record(state / 'pending.json', {'operation': 'snippets-service-10-1'})
+            source = home / 'manifest.json'
+            write_record(source, manifest())
+            with patch('bootstrap_swarm.sys.argv', ['bootstrap_swarm.py', 'deploy', str(source)]), \
+                    patch('bootstrap_swarm.pwd.getpwnam', return_value=SimpleNamespace(pw_dir=str(home))), \
+                    patch('bootstrap_swarm.os.geteuid', return_value=1000), \
+                    patch('bootstrap_swarm.execute') as execute, self.assertRaises(RuntimeError):
+                bootstrap_swarm.main()
+            execute.assert_not_called()
 
     def test_update_changes_only_target_and_leaves_input_unchanged(self):
         old=manifest()
