@@ -316,7 +316,7 @@ ghcr.io/jjt-ingsis/permissions-service
 ghcr.io/jjt-ingsis/printscript-service
 ```
 
-SNI-23 publicó y comprobó imágenes con workflows v0.3.1. SNI-25 prepara la promoción del mismo digest desde dev a prod con v0.4.0, pendiente de integración y publicación. Se conservan los tags anteriores.
+SNI-23 publicó y comprobó imágenes con workflows v0.3.1. SNI-25 original está integrado con workflows v0.4.0; su habilitación remota requiere credenciales y pruebas reales. La simplificación actual propone una versión nueva del central (v0.5.0) después de integrar y fijar esta revisión de infra. Se conservan los tags anteriores.
 
 Thiago recibe por servicio el `image-ref` exacto (`imagen@sha256:...`), sus plataformas y origen. Antes de usarlo, confirmar la arquitectura de las VMs y la visibilidad/acceso de cada paquete. Las imágenes se configuran al ejecutarse: datasource, URLs internas y demás datos del ambiente siguen fuera de la imagen.
 
@@ -340,7 +340,7 @@ docker compose logs snippets-service
 
 La opción `--no-build` permite usar esa imagen sin reconstruir el checkout local. Cambiar el servicio y digest para probar permisos o PrintScript. El datasource y las dependencias de Compose permanecen configurados como en el entorno local. Después, los comandos habituales sin el override vuelven a usar la construcción local; para recuperar ese entorno, ejecutar su build y `up -d` habituales.
 
-Contrato de publicación, outputs, reglas y orden de integración: [github-workflows](https://github.com/JJT-INGSIS/github-workflows/blob/main/README.md). El despliegue en VMs y la evidencia dev → prod se comprueban en SNI-24/SNI-25; no se consideran hechos por agregar CI o publicar imágenes.
+Contrato de publicación, reglas y orden de integración: [github-workflows](https://github.com/JJT-INGSIS/github-workflows/blob/main/README.md). El despliegue en VMs y la evidencia dev → prod se comprueban en SNI-24/SNI-25; no se consideran hechos por agregar CI o publicar imágenes.
 
 ## CD por servicio — SNI-25
 
@@ -349,6 +349,12 @@ actualización independiente, bloqueo compartido, journal y reconciliación SSH.
 Los scripts no crean infraestructura y no usan la comparación de stack completo
 para promover una sola aplicación. No se modifican los manifiestos ni los recursos
 Swarm de SNI-24.
+
+El YAML coordina Actions y comandos pequeños. Publicación y selección pasan un
+solo descriptor interno al despliegue; los scripts comparten identidad y contratos,
+inspeccionan la imagen una vez en el runner y conservan el journal como única fuente
+del recibo SSH. Los detalles y comandos están en el manual, sin cambiar el flujo
+de promoción ni las garantías de recuperación.
 
 Las pruebas locales cubren promoción exacta, rechazo sin evidencia, recuperación,
 interrupciones y preservación de las otras imágenes. El 13/10/2026 se activó y se

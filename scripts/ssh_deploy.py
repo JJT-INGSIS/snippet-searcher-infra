@@ -9,7 +9,7 @@ import sys
 import tarfile
 import tempfile
 
-from github_cd import validate_request
+from github_cd import operation_id, validate_request
 
 BUNDLE_SCRIPTS = ('deploy_service.py', 'github_cd.py', 'stack_release.py', 'wait_for_stack.py',
                   'verify_stack.py', 'internal_http.py', 'smoke_tests.py')
@@ -59,14 +59,15 @@ def main():
                     raise ValueError('No se permiten enlaces en el bundle de scripts')
                 archive.add(path, arcname=f'scripts/{path.name}', recursive=False)
         # Serialize bundle installation too: another service can use this revision.
-        uploaded = f'{remote}/{request["service"]}-{request["run-id"]}-{request["run-attempt"]}.tar'
+        identity = operation_id(request)
+        uploaded = f'{remote}/{identity}.tar'
         subprocess.run([*scp, str(bundle), f'{destination}:{uploaded}'], check=True, timeout=60)
         subprocess.run([*ssh, destination,
                         f'flock {remote}/install.lock tar -xf {uploaded} -C {remote} && rm -f {uploaded}'],
                        check=True, timeout=60)
         envelope = json.dumps({'request': request, 'token': os.environ.get('GH_TOKEN', '')})
         command = [*ssh, destination,
-                   f'sudo -n python3 -B {remote}/scripts/deploy_service.py --request-stdin']
+                   f'sudo -n python3 -B {remote}/scripts/deploy_service.py']
         # Retry the same identity after transport loss. The VM journal, not the
         # SSH exit code, determines whether to verify, recover, or submit an update.
         for attempt in range(2):
@@ -77,17 +78,17 @@ def main():
             if result.returncode != 255 or attempt == 1:
                 break
         state = f'/home/{user}/.local/state/snippet-searcher/{request["environment"]}'
-        identity = f'{request["service"]}-{request["run-id"]}-{request["run-attempt"]}'
         operation_file = directory / 'operation.json'
         subprocess.run([*scp, f'{destination}:{state}/operations/{identity}.json', str(operation_file)],
                        check=True, timeout=30)
         operation = json.loads(operation_file.read_text())
-        receipt = operation.get('receipt')
-        if not receipt or operation.get('state') != 'verified' or result.returncode != 0:
-            raise RuntimeError('Despliegue no confirmado; revisar el diario y la recuperación en la VM')
         if operation['request'] != request:
             raise ValueError('El recibo remoto no corresponde a esta ejecución')
-        args.receipt.write_text(json.dumps(receipt, indent=2) + '\n')
+        receipt = operation.get('receipt')
+        if receipt:
+            args.receipt.write_text(json.dumps(receipt, indent=2) + '\n')
+        if not receipt or operation.get('state') != 'verified' or result.returncode != 0:
+            raise RuntimeError('Despliegue no confirmado; revisar el diario y la recuperación en la VM')
         print(f'Despliegue verificado: {request["service"]} en {request["environment"]}, {request["image-ref"]}')
 
 

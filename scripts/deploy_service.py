@@ -1,5 +1,4 @@
 """Update one bootstrapped Swarm app; reconcile interrupted operations under its lock."""
-import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
@@ -11,20 +10,15 @@ import subprocess
 import sys
 import time
 
-from github_cd import GitHub, require_authorized_head, validate_request
+from github_cd import CHECKS, GitHub, operation_id, require_authorized_head, require_verified_image, validate_request
 from stack_release import STACK_SERVICES, DATABASE_SERVICES, update_service, validate_manifest, write_record
 
 ROOT = Path(__file__).resolve().parent.parent
-CHECKS = {'convergence': 'passed', 'sql_and_internal_http': 'passed'}
 FAILURES = (ValueError, RuntimeError, OSError, subprocess.SubprocessError)
 
 
 def now():
     return datetime.now(timezone.utc).isoformat()
-
-
-def operation_id(request):
-    return f'{request["service"]}-{request["run-id"]}-{request["run-attempt"]}'
 
 
 def read_json(path):
@@ -102,6 +96,14 @@ def save_operation(state, operation):
     write_record(operations / f'{operation_id(operation["request"])}.json', operation)
 
 
+def confirm_release(state, identity, release):
+    write_record(state / 'release.json', release)
+    history = state / 'history'
+    history.mkdir(mode=0o700, exist_ok=True)
+    write_record(history / f'sni25-{identity}.json', release)
+    (state / 'pending.json').unlink(missing_ok=True)
+
+
 def finish(state, operation, release, outcome):
     receipt = {**operation['request'], 'outcome': outcome, 'verified-at': now(),
                'checks': CHECKS if outcome in ('verified', 'recovered') else {},
@@ -114,11 +116,7 @@ def finish(state, operation, release, outcome):
     # the release write without resubmitting the Docker update.
     final = {**operation, 'receipt': receipt, 'state': outcome, 'confirmed-release': changed}
     save_operation(state, final)
-    write_record(state / 'release.json', changed)
-    history = state / 'history'
-    history.mkdir(mode=0o700, exist_ok=True)
-    write_record(history / f'sni25-{operation_id(operation["request"])}.json', changed)
-    (state / 'pending.json').unlink(missing_ok=True)
+    confirm_release(state, operation_id(operation['request']), changed)
     return receipt
 
 
@@ -169,16 +167,12 @@ def reconcile(state, swarm):
         release = operation['confirmed-release']
         require_images(swarm, release)
         swarm.verify(release)
-        write_record(state / 'release.json', release)
-        history = state / 'history'
-        history.mkdir(mode=0o700, exist_ok=True)
-        write_record(history / f'sni25-{identity}.json', release)
-        pending.unlink()
+        confirm_release(state, identity, release)
         return operation['receipt']
     return settle(state, operation, swarm)
 
 
-def deploy_locked(state, request, swarm, authorize):
+def deploy_locked(state, request, swarm, authorize, verify_evidence):
     validate_request(request)
     swarm.check_manager()
     pending = state / 'pending.json'
@@ -209,6 +203,7 @@ def deploy_locked(state, request, swarm, authorize):
     if last and (request['run-id'], request['run-attempt']) < (last['run-id'], last['run-attempt']):
         raise ValueError('Ejecución anterior a la última operación registrada')
     authorize(request)
+    verify_evidence(request)  # Historical proof once; current authorization is checked again below.
     require_images(swarm, previous)
     swarm.verify(previous)  # Establish the actually working rollback baseline.
     swarm.pull(request['image-ref'])
@@ -230,10 +225,6 @@ def deploy_locked(state, request, swarm, authorize):
 
 def main():
     import pwd
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--request-stdin', action='store_true', required=True)
-    args = parser.parse_args()
-    del args
     # Ordinary SSH loss must not abort a submitted operation halfway through.
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     envelope = json.load(sys.stdin)
@@ -250,7 +241,6 @@ def main():
     logs = state / 'logs'
     logs.mkdir(mode=0o700, exist_ok=True)
     log_path = logs / f'{operation_id(request)}.log'
-    original_stdout = os.dup(1)
     log_fd = os.open(log_path, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600)
     if os.geteuid() == 0:
         os.chown(logs, owner.pw_uid, owner.pw_gid)
@@ -261,19 +251,13 @@ def main():
     with deployment_lock(state):
         try:
             receipt = deploy_locked(state, request, Swarm(request['environment']),
-                                    lambda value: require_authorized_head(api, value))
+                                    lambda value: require_authorized_head(api, value),
+                                    lambda value: require_verified_image(api, value))
         finally:
             if os.geteuid() == 0:
                 for path in (state, *state.rglob('*')):
                     os.chown(path, owner.pw_uid, owner.pw_gid)
-    # Receipt is also available on disk if SSH loses this final response.
-    os.dup2(original_stdout, 1)
-    os.close(original_stdout)
-    try:
-        print('SNI25_RECEIPT=' + json.dumps(receipt), flush=True)
-    except BrokenPipeError:
-        # The journal and release are already committed; scp/reconciliation reads them.
-        pass
+    # SSH transports only the exit status. The durable journal is the receipt source.
     return 0 if receipt['outcome'] == 'verified' else 1
 
 

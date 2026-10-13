@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from github_cd import GitHub, TASK, record_evidence, require_authorized_head, select_evidence, valid_evidence
+from github_cd import GitHub, TASK, record_evidence, require_authorized_head, require_verified_image, select_evidence, valid_evidence
 from test_deploy_service import CHECKS, request
 
 
@@ -86,6 +86,15 @@ class EvidenceTests(unittest.TestCase):
         self.api.records = []
         with self.assertRaises(ValueError):
             select_evidence(self.api, 'snippets-service', 'c' * 40)
+
+    def test_prod_proof_requires_exact_digest_but_dev_does_not_need_previous_proof(self):
+        promoted = {**request('prod'), 'target-sha': self.api.current_sha}
+        require_verified_image(self.api, promoted)
+        self.api.records = []
+        require_authorized_head(self.api, promoted)
+        with self.assertRaises(ValueError):
+            require_verified_image(self.api, promoted)
+        require_verified_image(self.api, request())
 
     def test_generic_or_untrusted_or_failed_receipt_is_not_evidence(self):
         cases = [

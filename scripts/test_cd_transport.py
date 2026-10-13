@@ -6,22 +6,107 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from cd_evidence import build_request, inspect_image
+from cd_evidence import build_request, inspect_image, main as evidence_main, publication_source, published_artifact, select_artifact, summary
+from github_cd import ARTIFACT_FIELDS
 from ssh_deploy import connection_options, main
 from test_deploy_service import request
 
 
 class RunnerContractTests(unittest.TestCase):
+    def environment(self, **changes):
+        value = request()
+        return {'GITHUB_REPOSITORY': value['repository'], 'GITHUB_SHA': value['target-sha'],
+                'GITHUB_REF': 'refs/heads/dev', 'GITHUB_EVENT_NAME': 'push',
+                'GITHUB_RUN_ID': '10', 'GITHUB_RUN_ATTEMPT': '1',
+                'IMAGE_NAME': 'ghcr.io/jjt-ingsis/snippets-service', 'PLATFORMS': 'linux/amd64',
+                'SOURCE_TREE': value['source-tree'], 'IMAGE_DIGEST': 'sha256:' + 'a' * 64, **changes}
+
+    def test_publication_descriptor_survives_job_output_and_preserves_build_on_retry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'output'
+            with patch.dict(os.environ, self.environment(GITHUB_OUTPUT=str(output)), clear=True), \
+                    patch('cd_evidence.sys.argv', ['cd_evidence.py', 'published']):
+                evidence_main()
+            exported = dict(line.split('=', 1) for line in output.read_text().splitlines())
+            self.assertEqual(set(exported), {'artifact'})
+            artifact = json.loads(exported['artifact'])
+            self.assertEqual(set(artifact), set(ARTIFACT_FIELDS))
+            with patch.dict(os.environ, self.environment(GITHUB_RUN_ATTEMPT='2'), clear=True):
+                retry = build_request(artifact)
+            self.assertEqual(retry['image-ref'], request()['image-ref'])
+            self.assertEqual(retry['source-tree'], request()['source-tree'])
+            self.assertEqual(retry['run-attempt'], 2)
+            self.assertEqual(retry['build-run-attempt'], 1)
+
+    def test_publication_rejects_foreign_image_bad_platform_or_unverified_checkout(self):
+        cases = [{'IMAGE_NAME': 'ghcr.io/another/service'}, {'PLATFORMS': 'linux/other'}, {}]
+        for changes in cases:
+            with self.subTest(changes=changes), patch.dict(os.environ, self.environment(**changes), clear=True), \
+                    patch('cd_evidence.subprocess.check_output', return_value='f' * 40), self.assertRaises(ValueError):
+                publication_source()
+
+    def test_metadata_keeps_tree_and_platform_specific_cache_scope(self):
+        with patch.dict(os.environ, self.environment(PLATFORMS='linux/amd64,linux/arm64'), clear=True), \
+                patch('cd_evidence.subprocess.check_output', side_effect=['b' * 40, 'c' * 40]):
+            source = publication_source()
+        self.assertEqual(source['tree'], 'c' * 40)
+        self.assertEqual(source['image'], 'ghcr.io/jjt-ingsis/snippets-service')
+        self.assertEqual(source['cache-scope'], 'snippets-service-linux-amd64-linux-arm64')
+
+    def test_select_uses_target_commit_tree_and_returns_exact_historical_artifact(self):
+        from test_github_cd import FakeGitHub
+        api = FakeGitHub()
+        with patch.dict(os.environ, self.environment(GITHUB_REF='refs/heads/main', GITHUB_SHA='d' * 40,
+                                                    PROD_DEPLOY_ENABLED='true'), clear=True):
+            artifact = select_artifact(api)
+            promoted = build_request(artifact)
+        self.assertEqual(artifact['source-sha'], 'b' * 40)
+        self.assertEqual(promoted['target-sha'], 'd' * 40)
+        self.assertEqual(promoted['image-ref'], request()['image-ref'])
+        self.assertIn(('/git/commits/' + 'd' * 40, None), api.calls)
+
+    def test_main_publication_disabled_prod_and_pr_are_rejected_before_selection(self):
+        from test_github_cd import FakeGitHub
+        for changes in ({'PUBLISH_REQUESTED': 'true', 'PROD_DEPLOY_ENABLED': 'true'},
+                        {'PROD_DEPLOY_ENABLED': 'false'},
+                        {'GITHUB_EVENT_NAME': 'pull_request', 'PROD_DEPLOY_ENABLED': 'true'}):
+            api = FakeGitHub()
+            with self.subTest(changes=changes), patch.dict(os.environ,
+                    self.environment(GITHUB_REF='refs/heads/main', **changes), clear=True), self.assertRaises(ValueError):
+                select_artifact(api)
+            self.assertEqual(api.calls, [])
+
+    def test_invalid_build_digest_cannot_be_exported(self):
+        with patch.dict(os.environ, self.environment(IMAGE_DIGEST='latest'), clear=True), self.assertRaises(ValueError):
+            published_artifact()
+
+    def test_prepare_checks_labels_once_and_writes_only_current_request(self):
+        artifact = {key: request()[key] for key in ARTIFACT_FIELDS}
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / 'request.json'
+            with patch.dict(os.environ, self.environment(ARTIFACT=json.dumps(artifact)), clear=True), \
+                    patch('cd_evidence.sys.argv', ['cd_evidence.py', 'prepare', str(target)]), \
+                    patch('cd_evidence.inspect_image') as inspect:
+                evidence_main()
+            self.assertEqual(json.loads(target.read_text()), request())
+            inspect.assert_called_once_with(request())
+
+    def test_summary_does_not_report_missing_receipt_as_success(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'summary.md'
+            with patch.dict(os.environ, {'GITHUB_STEP_SUMMARY': str(output)}):
+                summary(Path(temporary) / 'missing.json')
+            self.assertIn('Despliegue no confirmado', output.read_text())
+
     def test_rerun_uses_original_build_attempt_and_current_verification_attempt(self):
         value = request()
         environment = {
             'GITHUB_REPOSITORY': value['repository'], 'GITHUB_SHA': value['target-sha'],
-            'DEPLOY_ENV': 'dev', 'IMAGE_REF': value['image-ref'], 'SOURCE_SHA': value['source-sha'],
-            'SOURCE_TREE': value['source-tree'], 'GITHUB_RUN_ID': '10', 'GITHUB_RUN_ATTEMPT': '2',
-            'BUILD_RUN_ID': '10', 'BUILD_RUN_ATTEMPT': '1',
+            'GITHUB_REF': 'refs/heads/dev', 'GITHUB_EVENT_NAME': 'push',
+            'GITHUB_RUN_ID': '10', 'GITHUB_RUN_ATTEMPT': '2',
         }
         with patch.dict(os.environ, environment, clear=True):
-            result = build_request()
+            result = build_request({key: value[key] for key in ARTIFACT_FIELDS})
         self.assertEqual(result['run-attempt'], 2)
         self.assertEqual(result['build-run-attempt'], 1)
 
@@ -88,7 +173,7 @@ class RunnerContractTests(unittest.TestCase):
                 else:
                     with self.assertRaises(RuntimeError):
                         main()
-                    self.assertFalse(destination.exists())
+                    self.assertEqual(json.loads(destination.read_text())['outcome'], 'recovered')
             self.assertEqual(len(submitted), 2)
             self.assertEqual(submitted[0], submitted[1])
             self.assertEqual(json.loads(submitted[0])['token'], environment['GH_TOKEN'])
