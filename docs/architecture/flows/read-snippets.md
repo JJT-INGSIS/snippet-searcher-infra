@@ -55,4 +55,6 @@ sequenceDiagram
 - **Propuestas:** resolver autorización antes de filtros, orden y eventual paginación; no cargar todos los contenidos ni ejecutar lint en cada listado. Obtener IDs accesibles alcanza inicialmente, sujeto al volumen real.
 - **Errores y vigencia:** si permissions o storage fallan, informar indisponibilidad. No entregar un derivado viejo como actual; un fallo de formatting no elimina el original. Un resultado de lint pendiente o fallido técnicamente no equivale a incumplimiento.
 
+- **Contrato acordado (SNI-26):** rutas, filtros, orden, paginación y errores de listado y detalle en [reading.md de Snippets](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/reading.md); la consulta de IDs accesibles en [access.md de Permissions](https://github.com/JJT-INGSIS/permissions-service/blob/dev/docs/access.md). Propuesto, no implementado.
+
 [Volver a la referencia de arquitectura](../README.md)
