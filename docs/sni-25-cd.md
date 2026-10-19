@@ -132,6 +132,11 @@ el servicio se haya caído porque el cliente perdió la respuesta.
 - Candidata ejecutándose y verificada: confirmar el éxito.
 - Candidata fallida: restaurar el digest anterior verificado y comprobarlo.
 - Swarm ya hizo rollback: verificar la versión recuperada sin otra actualización.
+- Swarm está en `rollback_started` hacia el digest esperado: esperar la
+  convergencia y el período de estabilidad. Ese estado no confirma todavía la
+  recuperación. Si se esperaba la candidata y Swarm volvió a otra imagen, la
+  comprobación del digest rechaza la candidata; `rollback_paused` sigue siendo
+  un fallo.
 - Recuperación fallida: conservar el pendiente y marcar el registro como no saludable.
 - Imagen externa inesperada: detenerse y pedir intervención; no sobrescribirla.
 

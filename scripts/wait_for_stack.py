@@ -19,7 +19,9 @@ def converged(stack):
     for name in SERVICES:
         service = docker_json("service", "inspect", f"{stack}_{name}")[0]
         state = service.get("UpdateStatus", {}).get("State", "")
-        if state in {"paused", "rollback_started", "rollback_paused"}:
+        # A rollback toward the expected digest is still converging. The digest
+        # check below continues to reject a rollback while verifying a candidate.
+        if state in {"paused", "rollback_paused"}:
             raise RuntimeError(f"{name}: actualización fallida ({state})")
         desired = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Image"]
         if name in expected and desired != expected[name]:
