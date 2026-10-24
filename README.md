@@ -16,6 +16,24 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 ## Alcance actual
 
+### Asset Service — SNI-33
+
+[Runtime, pruebas, configuración y transición](docs/sni-33-asset.md). Compose incluye
+Asset Service oficial + Azurite persistente bajo el perfil opcional `assets`, sin
+puertos públicos. Snippets conserva `local` por defecto; levantar el runtime no
+migra datos ni activa el proveedor. `swarm/stack.asset.yaml` prepara la ampliación
+sin alterar el stack operativo de SNI-25: no desplegarlo hasta integrar SNI-43.
+
+Prueba aislada sin credenciales ni reconstruir aplicaciones:
+
+```bash
+python3 -B scripts/validate_asset_config.py
+python3 -B scripts/verify_asset_persistence.py
+```
+
+La prueba reemplaza sus contenedores para comprobar persistencia, retira sólo sus
+contenedores/red y conserva su volumen. No toca dev/prod ni los datos del entorno habitual.
+
 | Contenedor | Función | Acceso desde la computadora |
 | --- | --- | --- |
 | `snippets-service` | Aplicación de snippets | `http://localhost:8080` |
