@@ -14,6 +14,12 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 [Componentes y flujos en Mermaid](./docs/architecture/README.md): diagramas editables del diseño de servicios, permisos, tests, formatting, linting y revalidación. Las dependencias y capacidades futuras están marcadas; estos diagramas no describen únicamente lo que ya está configurado en Compose.
 
+[Contrato de tests y ejecución incremental — SNI-45](docs/architecture/execution-contract.md):
+API pública/interna, NDJSON con `fetch`, inputs, límites y recuperación. Incluye
+decisiones aprobadas por Thiago y fixtures verificables para revisión del equipo;
+no agrega endpoints ni despliega un ejecutor. Verificar los ejemplos con
+`python3 -B -m unittest discover -s scripts -p 'test_execution_contract.py' -v`.
+
 ## Alcance actual
 
 ### Asset Service — SNI-33

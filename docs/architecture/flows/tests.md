@@ -1,5 +1,10 @@
 # Tests: creación y ejecución
 
+US8–10 se precisan en el [contrato SNI-45](../execution-contract.md).
+Canal aprobado: NDJSON con `fetch`, inputs mediante POST; snapshot, comparación
+y recuperación están definidos para revisión del equipo. US16 permanece
+fuera de SNI-45. Este flujo no acredita persistencia de resultados implementada.
+
 `snippets-service` conserva las definiciones y compara salidas reales con esperadas. `Language`, módulo interno, delega la ejecución a PrintScript por HTTP; los tests automáticos se ejecutan después de confirmar una actualización.
 
 ```mermaid
@@ -46,7 +51,7 @@ sequenceDiagram
         end
         PS-->>L: Terminación o error
         L-->>S: Resultado de ejecución
-        S->>S: Comparar outputs y persistir resultado con revisión
+        S->>S: Comparar outputs y asociar resultado al snapshot
         S-->>UI: Aprobado, fallido o no completado
     else Tests automáticos - US16
         Note over S: La actualización autorizada ya fue confirmada
@@ -64,7 +69,7 @@ sequenceDiagram
 ```
 
 - **Requerimientos:** crear un test requiere ser owner y admite expectativas que no se cumplan; ejecutar manualmente requiere acceso y entrega output incremental en la futura US9. US16 ejecuta todos los tests tras actualizar, sin revertir el guardado.
-- **Propuestas:** fijar revisión de código y definición del test; comparar secuencias respetando orden y cantidad. La normalización de outputs y el alcance de “un test a la vez” deben acordarse con la UI.
-- **Errores y persistencia:** una diferencia de outputs es test fallido; una caída o timeout deja la ejecución no completada. Los resultados viven en BD snippets y nunca se muestran como actuales si corresponden a otra revisión. La ejecución postcommit puede ser síncrona si es acotada; pasarla a segundo plano exige registrar trabajo pendiente durable.
+- **Contrato US8–10 aprobado por Thiago:** snapshot coherente de código y definición; comparación exacta de secuencias, sin normalización. Una ejecución activa por actor y cuatro globales inicialmente, con un coordinador por servicio y sin cola. Ver detalles y trade-offs en SNI-45; no son capacidades runtime ya verificadas.
+- **Errores y persistencia:** una diferencia de outputs tras finalizar normalmente es test fallido; una caída o timeout es otro resultado. Las definiciones son durables en BD Snippets; SNI-45 conserva resultados transitorios durante 60 s y no exige histórico. Nunca mostrarlos como vigentes si el snapshot cambió. El diagrama de US16 sigue siendo diseño futuro fuera de esta tanda: hacerlo durable requiere definir y persistir su trabajo y resultados por separado.
 
 [Volver a la referencia de arquitectura](../README.md)
