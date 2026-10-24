@@ -1,0 +1,70 @@
+# SNI-33: additive candidate, NOT consumed by bootstrap/CD until SNI-43 integration.
+# Render together with stack.yaml. Rendering is safe; deployment requires the
+# environment inventory, data cutover approval and compatible release tooling.
+version: "3.8"
+
+services:
+  snippets-service:
+    environment:
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      STORAGE_ASSET_BASE_URL: ${STORAGE_ASSET_BASE_URL:-http://asset-service:8080}
+      STORAGE_ASSET_CONTAINER: ${STORAGE_ASSET_CONTAINER:-snippets}
+      STORAGE_ASSET_CONNECT_TIMEOUT: ${STORAGE_ASSET_CONNECT_TIMEOUT:-2s}
+      STORAGE_ASSET_READ_TIMEOUT: ${STORAGE_ASSET_READ_TIMEOUT:-5s}
+      STORAGE_ASSET_MAX_CONTENT_BYTES: ${STORAGE_ASSET_MAX_CONTENT_BYTES:-1048576}
+
+  asset-service:
+    image: ghcr.io/austral-ingsis/snippet-asset-service@sha256:eacad54bf95717c5483619ad1fe45a9b4a0012a37b451c37baf13e6f43200656
+    environment:
+      AZURE_HOST: http://azurite
+      NEW_RELIC_AGENT_ENABLED: "false"
+    healthcheck:
+      test: [CMD-SHELL, "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9090; printf \"GET /actuator/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3; read -t 5 -r line <&3; [[ \"$$line\" == *\" 200 \"* ]]'"]
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 90s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 256M
+      restart_policy:
+        condition: any
+        delay: 10s
+      update_config:
+        parallelism: 1
+        order: start-first
+        monitor: 60s
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
+    command: [azurite-blob, --blobHost, 0.0.0.0, --location, /data, --skipApiVersionCheck]
+    volumes:
+      - asset_blobs:/data
+    healthcheck:
+      test: [CMD, node, -e, "const r=require('http').get('http://127.0.0.1:10000/',s=>{s.resume();process.exit(s.statusCode===400||s.statusCode===403?0:1)});r.on('error',()=>process.exit(1));r.setTimeout(3000,()=>{r.destroy();process.exit(1)})"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256M
+      placement:
+        constraints: [node.labels.asset_storage == true]
+      restart_policy:
+        condition: any
+        delay: 10s
+      update_config:
+        order: stop-first
+
+volumes:
+  asset_blobs:
