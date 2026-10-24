@@ -16,6 +16,23 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 ## Alcance actual
 
+### Entrada HTTP NGINX — SNI-38
+
+[Contrato, decisiones, pruebas y coordinación](docs/sni-38-nginx.md).
+[Guía desde cero usando estos archivos](docs/nginx-desde-cero.md).
+Perfil local opcional `ingress`: `localhost:8088`, UI `/` → `ui:8080`, `/api/` →
+Snippets sin ese prefijo. No requiere certificados para probar transporte.
+El candidato `swarm/stack.ingress.yaml` retira puertos públicos de las aplicaciones;
+no está activado en VMs ni debe aplicarse antes de integrar SNI-43.
+
+```bash
+python3 -B scripts/validate_nginx_config.py
+python3 -B scripts/verify_nginx.py
+```
+
+La aceptación usa NGINX real con upstreams controlados, tarda más de un minuto por
+el timeout real de 60 s y no sustituye pruebas funcionales de UI/Snippets.
+
 ### Asset Service — SNI-33
 
 [Runtime, pruebas, configuración y transición](docs/sni-33-asset.md). Compose incluye
