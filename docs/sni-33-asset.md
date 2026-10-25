@@ -1,5 +1,9 @@
 # SNI-33 — Runtime persistente de Asset Service
 
+> Integración operativa posterior: [SNI-43](sni-43-cd.md). Instalar Asset/Azurite
+> no cambia el proveedor activo de Snippets ni migra contenido. La evidencia
+> local de este documento no acredita activación remota.
+
 ## Alcance y estado
 
 Asset Service oficial + Azurite, imágenes fijas, red interna y volumen persistente.

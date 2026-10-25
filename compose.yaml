@@ -5,6 +5,20 @@ x-http-destinations: &http-destinations
   PRINTSCRIPT_BASE_URL: ${PRINTSCRIPT_BASE_URL:-http://printscript-service:8080}
 
 services:
+  ui:
+    profiles: [ui]
+    build:
+      context: ../snippet-searcher-ui
+    image: snippet-searcher-ui:local
+    environment:
+      APP_ENV: dev
+      UI_DEV_ACTOR: ${UI_DEV_ACTOR:-}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+
   nginx:
     profiles: [ingress]
     image: nginx:1.30.6-alpine@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951

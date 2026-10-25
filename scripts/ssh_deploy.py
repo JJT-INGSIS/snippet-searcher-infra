@@ -12,7 +12,10 @@ import tempfile
 from github_cd import operation_id, validate_request
 
 BUNDLE_SCRIPTS = ('deploy_service.py', 'github_cd.py', 'stack_release.py', 'wait_for_stack.py',
-                  'verify_stack.py', 'internal_http.py', 'smoke_tests.py')
+                  'verify_stack.py', 'internal_http.py', 'smoke_tests.py', 'bootstrap_swarm.py',
+                  'stack_runtime.py', 'rollout_checks.py', 'validate_asset_config.py', 'asset_probe.py')
+BUNDLE_FILES = ('swarm/stack.yaml', 'swarm/stack.ingress.yaml', 'swarm/stack.asset.yaml',
+                'swarm/stack.ui.yaml', 'nginx/nginx.conf', 'nginx/templates/ingress.conf.template', 'nginx/validate-env.sh')
 
 
 def connection_options(host, user, port, directory):
@@ -58,6 +61,11 @@ def main():
                 if path.is_symlink():
                     raise ValueError('No se permiten enlaces en el bundle de scripts')
                 archive.add(path, arcname=f'scripts/{path.name}', recursive=False)
+            for relative in BUNDLE_FILES:
+                path = Path(__file__).resolve().parent.parent / relative
+                if path.is_symlink():
+                    raise ValueError('No se permiten enlaces en recursos del bundle')
+                archive.add(path, arcname=relative, recursive=False)
         # Serialize bundle installation too: another service can use this revision.
         identity = operation_id(request)
         uploaded = f'{remote}/{identity}.tar'

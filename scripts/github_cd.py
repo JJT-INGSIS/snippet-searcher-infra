@@ -4,7 +4,7 @@ import re
 import urllib.request
 from urllib.error import HTTPError
 
-from stack_release import SERVICES, DIGEST
+from stack_release import APPLICATIONS, DIGEST
 
 TASK = 'sni25:verified'
 SHA = r'[a-f0-9]{40}'
@@ -13,10 +13,14 @@ ARTIFACT_FIELDS = ('image-ref', 'source-sha', 'source-tree', 'build-run-id', 'bu
 
 
 def validate_repository(repository):
-    service = repository.split('/')[-1]
-    if service not in SERVICES or repository != f'JJT-INGSIS/{service}':
-        raise ValueError('Repositorio fuera del alcance de CD')
-    return service
+    for service, spec in APPLICATIONS.items():
+        if repository == spec['repository']:
+            return service
+    raise ValueError('Repositorio fuera del alcance de CD')
+
+
+def checks_for(service):
+    return {'convergence': 'passed', 'ui_http': 'passed'} if service == 'ui' else CHECKS
 
 
 def operation_id(request):
@@ -29,7 +33,7 @@ def validate_request(request):
         raise ValueError('Servicio y repositorio no coinciden')
     if request['environment'] not in ('dev', 'prod'):
         raise ValueError('Ambiente inválido')
-    if not re.fullmatch(rf'ghcr.io/jjt-ingsis/{service}@{DIGEST}', request['image-ref']):
+    if not re.fullmatch(re.escape(APPLICATIONS[service]['package']) + rf'@{DIGEST}', request['image-ref']):
         raise ValueError('Se requiere el paquete del servicio por digest')
     for field in ('source-sha', 'source-tree', 'target-sha'):
         if not re.fullmatch(SHA, request[field]):
@@ -59,11 +63,13 @@ class GitHub:
             # Do not expose the response or authorization headers in diagnostics.
             raise RuntimeError(f'GitHub {error.code} en {path.split("?")[0]}') from None
 
-    def pages(self, path):
+    def pages(self, path, key=None):
         page = 1
         separator = '&' if '?' in path else '?'
         while True:
             items = self.request(f'{path}{separator}per_page=100&page={page}')
+            if key is not None:
+                items = items[key]
             if not isinstance(items, list):
                 raise ValueError('Respuesta paginada de GitHub inválida')
             yield from items
@@ -110,7 +116,7 @@ def valid_evidence(api, deployment, service, tree):
         return None
     if payload.get('service') != service or payload.get('source-tree') != tree:
         return None
-    if payload.get('checks') != CHECKS:
+    if payload.get('checks') != checks_for(service):
         return None
     if payload.get('outcome') != 'verified' or payload.get('actual-image') != payload.get('image-ref'):
         return None
@@ -133,7 +139,8 @@ def valid_evidence(api, deployment, service, tree):
     # one immutable revision. A similarly named local workflow is not proof.
     workflows = run.get('referenced_workflows', [])
     revisions = {}
-    for name in ('kotlin-service-pipeline.yml', 'cd.yml'):
+    required_workflows = ('frontend-ci.yml', 'cd.yml') if service == 'ui' else ('kotlin-service-pipeline.yml', 'cd.yml')
+    for name in required_workflows:
         prefix = f'JJT-INGSIS/github-workflows/.github/workflows/{name}@'
         matches = [entry.get('sha') for entry in workflows
                    if entry.get('path', '').startswith(prefix)]
@@ -142,6 +149,13 @@ def valid_evidence(api, deployment, service, tree):
         revisions[name] = matches[0]
     if len(set(revisions.values())) != 1:
         return None
+    if service == 'ui':
+        if (payload['build-run-id'], payload['build-run-attempt']) != (payload['run-id'], payload['run-attempt']):
+            return None
+        jobs = [job for job in api.pages(f'/actions/runs/{payload["run-id"]}/attempts/{payload["run-attempt"]}/jobs', 'jobs')
+                if job.get('name', '').endswith('/ Frontend CI') or job.get('name') == 'Frontend CI']
+        if len(jobs) != 1 or jobs[0].get('status') != 'completed' or jobs[0].get('conclusion') != 'success':
+            return None
     commit = api.request(f'/git/commits/{payload["source-sha"]}')
     if commit['tree']['sha'] != tree:
         return None
@@ -162,7 +176,7 @@ def record_evidence(api, receipt):
     if receipt.get('outcome') != 'verified' or receipt.get('environment') != 'dev':
         raise ValueError('Sólo un despliegue dev verificado puede emitir evidencia')
     validate_request(receipt)
-    if receipt.get('checks') != CHECKS \
+    if receipt.get('checks') != checks_for(receipt['service']) \
             or receipt.get('actual-image') != receipt['image-ref']:
         raise ValueError('El recibo no confirma checks e imagen efectiva')
     payload = {**receipt, 'schema': 1}
@@ -180,6 +194,6 @@ def record_evidence(api, receipt):
     api.request(f'/deployments/{deployment["id"]}/statuses', {
         'state': 'success', 'auto_inactive': False,
         'log_url': f'https://github.com/{receipt["repository"]}/actions/runs/{receipt["run-id"]}',
-        'description': 'Convergencia, SQL y HTTP verificados',
+        'description': 'Convergencia y HTTP UI verificados' if receipt['service'] == 'ui' else 'Convergencia, SQL y HTTP verificados',
     })
     return deployment['id']

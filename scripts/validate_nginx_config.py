@@ -45,12 +45,16 @@ def main():
         record = json.loads((ROOT / f"swarm/{target}-release.json").read_text())
         selected = {**environment, **validate_manifest(record)}
         base = render(["swarm/stack.yaml"], selected)
-        candidate = render(["swarm/stack.ingress.yaml"], selected)
+        candidate = render(["swarm/stack.yaml", "swarm/stack.ingress.yaml"], selected)
+        for service in base['services']:
+            candidate['services'][service].pop('ports', None)
         validate_candidate(base, candidate)
         for assets in (False, True):
-            files = ["swarm/stack.ingress.yaml"] + (["swarm/stack.asset.yaml"] if assets else [])
+            files = ["swarm/stack.yaml", "swarm/stack.ingress.yaml"] + (["swarm/stack.asset.yaml"] if assets else [])
             if assets:
                 expanded = render(files, selected)
+                for service in base['services']:
+                    expanded['services'][service].pop('ports', None)
                 validate_asset_candidate(candidate, expanded, "local")
             command = ["docker", "stack", "config"]
             for file in files:

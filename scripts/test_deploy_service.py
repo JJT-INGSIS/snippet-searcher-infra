@@ -25,6 +25,7 @@ def request(environment='dev', run=10):
 
 class FakeSwarm:
     def __init__(self, previous):
+        self.environment = previous['environment']
         self.current = expected_images(previous)
         self.updates = []
         self.bad = set()
@@ -55,7 +56,7 @@ class FakeSwarm:
             self.interruption = None
             raise KeyboardInterrupt()
 
-    def verify(self, manifest):
+    def verify(self, manifest, application=None):
         if self.current != expected_images(manifest) or any(image in self.bad for image in self.current.values()):
             raise RuntimeError('Convergencia o salud fallida')
 
