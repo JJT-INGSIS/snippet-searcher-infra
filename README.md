@@ -10,6 +10,10 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 [Operación y verificación de los Swarms](./docs/sni-21-docker-swarm.md): inventario, acceso mediante sudo, prueba temporal de creación/actualización de servicios y secretos, limpieza y recuperación básica.
 
+## DNS y red por ambiente — SNI-39
+
+[Hostnames DuckDNS y reglas de NSG](./docs/sni-39-dns-red.md): `jjt-snippets-dev.duckdns.org` y `jjt-snippets-prod.duckdns.org`, IPs estáticas sin actualizador, 80/443 abiertos en prod y restringidos al equipo en dev, cómo agregar la IP de un integrante y la comprobación después de arrancar una VM. No declara HTTPS: eso se prueba en SNI-40/44.
+
 ## Documentación de arquitectura
 
 [Componentes y flujos en Mermaid](./docs/architecture/README.md): diagramas editables del diseño de servicios, permisos, tests, formatting, linting y revalidación. Las dependencias y capacidades futuras están marcadas; estos diagramas no describen únicamente lo que ya está configurado en Compose.
