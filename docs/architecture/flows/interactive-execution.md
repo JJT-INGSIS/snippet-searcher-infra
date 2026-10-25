@@ -1,5 +1,10 @@
 # Ejecución interactiva — US10 futura
 
+El [contrato SNI-45](../execution-contract.md) precisa API pública e
+interna, eventos y límites. NDJSON con `fetch` y POST separados para inputs están
+aprobados; los motivos y costos aceptados se registran al final del contrato.
+Cancelar HTTP no acredita que el intérprete se haya detenido.
+
 PrintScript conserva el estado transitorio del intérprete. `snippets-service` autoriza el inicio, asocia la ejecución al usuario y transmite outputs y solicitudes de input mediante `Language`, su módulo interno.
 
 ```mermaid

@@ -1,0 +1,199 @@
+{
+  "contractVersion": "v1",
+  "status": "approved-by-thiago-for-team-review",
+  "mediaType": "application/x-ndjson",
+  "approvedDefaults": {
+    "activePerActor": 1,
+    "activeGlobal": 4,
+    "totalSeconds": 120,
+    "inputWaitSeconds": 30,
+    "reconnectSeconds": 15,
+    "codeBytes": 1048576,
+    "inputBytes": 8192,
+    "outputBytes": 1048576,
+    "bufferEvents": 256,
+    "bufferBytes": 262144,
+    "terminalRetentionSeconds": 60
+  },
+  "protocolDefaults": {
+    "heartbeatSeconds": 10
+  },
+  "httpExamples": {
+    "createTest": {
+      "method": "POST",
+      "path": "/snippets/770e8400-e29b-41d4-a716-446655440000/tests",
+      "request": {"inputs": ["", "ñ", "ñ"], "expectedOutputs": ["", "ñ", "ñ"]},
+      "status": 201,
+      "response": {"id": "880e8400-e29b-41d4-a716-446655440000", "snippetId": "770e8400-e29b-41d4-a716-446655440000", "inputs": ["", "ñ", "ñ"], "expectedOutputs": ["", "ñ", "ñ"]}
+    },
+    "emptyList": {"method": "GET", "path": "/snippets/770e8400-e29b-41d4-a716-446655440000/tests", "status": 200, "response": {"items": []}},
+    "startInteractive": {
+      "method": "POST",
+      "path": "/snippets/770e8400-e29b-41d4-a716-446655440000/executions",
+      "request": {},
+      "status": 201,
+      "response": {
+        "executionId": "550e8400-e29b-41d4-a716-446655440011",
+        "snippetId": "770e8400-e29b-41d4-a716-446655440000",
+        "mode": "INTERACTIVE", "state": "RUNNING", "lastSeq": 1,
+        "snapshot": {"language": "printscript", "version": "1.1", "codeHash": "sha256-v1:d36f4e10154d0ba0e271496ff499add84339de6e586ad4b4088f343c1d796b58"},
+        "limits": {"activePerActor": 1, "activeGlobal": 4, "totalSeconds": 120, "inputWaitSeconds": 30, "reconnectSeconds": 15, "codeBytes": 1048576, "inputBytes": 8192, "outputBytes": 1048576, "bufferEvents": 256, "bufferBytes": 262144, "terminalRetentionSeconds": 60}
+      }
+    },
+    "internalStartTest": {
+      "method": "POST", "path": "/executions",
+      "request": {"code": "println(1);", "version": "1.0", "mode": "TEST", "inputs": []},
+      "status": 201
+    },
+    "inputAccepted": {
+      "method": "POST", "path": "/executions/550e8400-e29b-41d4-a716-446655440002/inputs",
+      "request": {"requestId": "660e8400-e29b-41d4-a716-446655440000", "value": "á\n"},
+      "status": 200, "response": {"requestId": "660e8400-e29b-41d4-a716-446655440000", "accepted": true}
+    },
+    "cancel": {
+      "method": "POST", "path": "/executions/550e8400-e29b-41d4-a716-446655440002/cancel",
+      "request": {}, "status": 202, "response": {"state": "CANCELLING"}
+    }
+  },
+  "examples": [
+    {
+      "name": "test-pass-duplicates-empty-unicode",
+      "mode": "TEST",
+      "definition": {"inputs": ["", "ñ", "ñ"], "expectedOutputs": ["", "ñ", "ñ"]},
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440000", "seq": 1, "type": "started", "data": {"mode": "TEST"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440000", "seq": 2, "type": "output", "data": {"text": ""}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440000", "seq": 3, "type": "output", "data": {"text": "ñ"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440000", "seq": 4, "type": "output", "data": {"text": "ñ"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440000", "seq": 5, "type": "terminal", "data": {"outcome": "COMPLETED", "reason": "program-completed", "comparison": "PASSED", "unusedInputs": 0}}
+      ],
+      "transportEnded": true,
+      "expectedState": "COMPLETED"
+    },
+    {
+      "name": "assertion-failure-keeps-spaces",
+      "mode": "TEST",
+      "definition": {"inputs": [], "expectedOutputs": ["hola"]},
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440001", "seq": 1, "type": "started", "data": {"mode": "TEST"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440001", "seq": 2, "type": "output", "data": {"text": "hola "}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440001", "seq": 3, "type": "terminal", "data": {"outcome": "COMPLETED", "reason": "program-completed", "comparison": "FAILED", "unusedInputs": 0}}
+      ],
+      "transportEnded": true,
+      "expectedState": "COMPLETED"
+    },
+    {
+      "name": "output-before-interactive-input",
+      "mode": "INTERACTIVE",
+      "inputPosts": [{"requestId": "660e8400-e29b-41d4-a716-446655440000", "value": "á\n"}],
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440002", "seq": 1, "type": "started", "data": {"mode": "INTERACTIVE"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440002", "seq": 2, "type": "output", "data": {"text": "antes"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440002", "seq": 3, "type": "input-required", "data": {"requestId": "660e8400-e29b-41d4-a716-446655440000", "prompt": "Nombre?"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440002", "seq": 4, "type": "input-accepted", "data": {"requestId": "660e8400-e29b-41d4-a716-446655440000"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440002", "seq": 5, "type": "output", "data": {"text": "á\n"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440002", "seq": 6, "type": "terminal", "data": {"outcome": "COMPLETED", "reason": "program-completed"}}
+      ],
+      "transportEnded": true,
+      "expectedState": "COMPLETED"
+    },
+    {
+      "name": "input-wait-timeout",
+      "mode": "INTERACTIVE",
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440003", "seq": 1, "type": "started", "data": {"mode": "INTERACTIVE"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440003", "seq": 2, "type": "input-required", "data": {"requestId": "660e8400-e29b-41d4-a716-446655440001", "prompt": "Valor?"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440003", "seq": 3, "type": "terminal", "data": {"outcome": "LIMIT_EXCEEDED", "reason": "input-wait-timeout"}}
+      ],
+      "transportEnded": true,
+      "expectedState": "LIMIT_EXCEEDED"
+    },
+    {
+      "name": "test-input-exhausted",
+      "mode": "TEST",
+      "definition": {"inputs": [], "expectedOutputs": []},
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440004", "seq": 1, "type": "started", "data": {"mode": "TEST"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440004", "seq": 2, "type": "terminal", "data": {"outcome": "INPUT_EXHAUSTED", "reason": "test-input-exhausted"}}
+      ],
+      "transportEnded": true,
+      "expectedState": "INPUT_EXHAUSTED"
+    },
+    {
+      "name": "disconnect-is-not-success",
+      "mode": "INTERACTIVE",
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440005", "seq": 1, "type": "started", "data": {"mode": "INTERACTIVE"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440005", "seq": 2, "type": "output", "data": {"text": "parcial"}}
+      ],
+      "transportEnded": true,
+      "expectedState": "UNKNOWN"
+    },
+    {
+      "name": "technical-failure-is-not-assertion-failure",
+      "mode": "TEST",
+      "definition": {"inputs": [], "expectedOutputs": []},
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440006", "seq": 1, "type": "started", "data": {"mode": "TEST"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440006", "seq": 2, "type": "terminal", "data": {"outcome": "TECHNICAL_FAILURE", "reason": "interpreter-unavailable"}}
+      ],
+      "transportEnded": true,
+      "expectedState": "TECHNICAL_FAILURE"
+    },
+    {
+      "name": "program-error-preserves-diagnostic",
+      "mode": "INTERACTIVE",
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440007", "seq": 1, "type": "started", "data": {"mode": "INTERACTIVE"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440007", "seq": 2, "type": "terminal", "data": {"outcome": "PROGRAM_ERROR", "reason": "program-error", "diagnostics": [{"rule": "EXAMPLE_RUNTIME_ERROR", "message": "Diagnóstico ilustrativo, no ID de la biblioteca", "line": 1, "column": 1}]}}
+      ],
+      "transportEnded": true,
+      "expectedState": "PROGRAM_ERROR"
+    },
+    {
+      "name": "cancelled-after-worker-stops",
+      "mode": "INTERACTIVE",
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440008", "seq": 1, "type": "started", "data": {"mode": "INTERACTIVE"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440008", "seq": 2, "type": "terminal", "data": {"outcome": "CANCELLED", "reason": "actor-cancelled"}}
+      ],
+      "transportEnded": true,
+      "expectedState": "CANCELLED"
+    },
+    {
+      "name": "restart-interrupts-session",
+      "mode": "INTERACTIVE",
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440009", "seq": 1, "type": "started", "data": {"mode": "INTERACTIVE"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440009", "seq": 2, "type": "terminal", "data": {"outcome": "INTERRUPTED", "reason": "interpreter-restarted"}}
+      ],
+      "transportEnded": true,
+      "expectedState": "INTERRUPTED"
+    },
+    {
+      "name": "unused-inputs-do-not-fail-expectations",
+      "mode": "TEST",
+      "definition": {"inputs": ["unused"], "expectedOutputs": []},
+      "events": [
+        {"executionId": "550e8400-e29b-41d4-a716-446655440010", "seq": 1, "type": "started", "data": {"mode": "TEST"}},
+        {"executionId": "550e8400-e29b-41d4-a716-446655440010", "seq": 2, "type": "terminal", "data": {"outcome": "COMPLETED", "reason": "program-completed", "comparison": "PASSED", "unusedInputs": 1}}
+      ],
+      "transportEnded": true,
+      "expectedState": "COMPLETED"
+    }
+  ],
+  "problemExamples": [
+    {"type": "urn:snippets:problem:execution-actor-mismatch", "title": "Forbidden", "status": 403, "detail": "Actor distinto al de la sesión", "instance": "/executions/550e8400-e29b-41d4-a716-446655440002/inputs"},
+    {"type": "urn:snippets:problem:event-history-unavailable", "title": "Conflict", "status": 409, "detail": "El cursor precede al historial disponible", "instance": "/executions/550e8400-e29b-41d4-a716-446655440002/events"}
+  ],
+  "hashVectors": [
+    {"value": ["printscript", "1.1", "println(1);"], "hash": "sha256-v1:d36f4e10154d0ba0e271496ff499add84339de6e586ad4b4088f343c1d796b58"},
+    {"value": ["printscript", "1.1", "println(\"ñ\");"], "hash": "sha256-v1:db1223024faaec1cede79e159fd1ef5f563a490507fad288c7ec0eadb71865d4"},
+    {"value": [[], ["", "ñ", "ñ"]], "hash": "sha256-v1:5a06757185434df7e1a5598d9b782415c93cafe132900d299edc2c0d14779bd6"}
+  ],
+  "snapshotExamples": [
+    {"executed": ["printscript", "1.1", "println(1);"], "current": ["printscript", "1.1", "println(2);"], "expectedCurrent": false},
+    {"executed": ["printscript", "1.0", "println(1);"], "current": ["printscript", "1.1", "println(1);"], "expectedCurrent": false},
+    {"executed": ["printscript", "1.1", "println(1);"], "current": ["printscript", "1.1", "println(1);"], "expectedCurrent": true}
+  ]
+}

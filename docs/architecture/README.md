@@ -49,6 +49,11 @@ PrintScript recibe código y parámetros; no posee snippets ni necesita una BD d
 
 ## Flujos principales
 
+Para US8–10, consultar el [contrato de ejecución incremental
+(SNI-45)](./execution-contract.md) y sus [fixtures](../contracts/execution-v1.json).
+Documenta las decisiones aprobadas por Thiago y sus trade-offs; no afirma
+que existan los endpoints ni que la ejecución integrada esté implementada.
+
 | Flujo | Fuente | Diagrama |
 | --- | --- | --- |
 | Crear y actualizar, por archivo o editor | US1–4 | [Creación y actualización](./flows/create-update-snippet.md) |
