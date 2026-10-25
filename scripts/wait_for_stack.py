@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 
-from stack_release import STACK_SERVICES as SERVICES, DATABASE_SERVICES, VARIABLES
+from stack_release import SERVICES, DATABASE_SERVICES, VARIABLES, permanent_services
 
 
 
@@ -14,9 +14,13 @@ def docker_json(*arguments):
 
 
 def converged(stack):
-    expected = dict(zip(SERVICES[:3], (os.environ[name] for name in VARIABLES)))
-    expected.update({name: os.environ['POSTGRES_IMAGE'] for name in DATABASE_SERVICES})
-    for name in SERVICES:
+    if os.environ.get('SNIPPET_RELEASE'):
+        release = json.loads(os.environ['SNIPPET_RELEASE'])
+        expected = permanent_services(release, os.environ.get('VERIFY_APPLICATION') or None)
+    else:
+        expected = dict(zip(SERVICES, (os.environ[name] for name in VARIABLES)))
+        expected.update({name: os.environ['POSTGRES_IMAGE'] for name in DATABASE_SERVICES})
+    for name in expected:
         service = docker_json("service", "inspect", f"{stack}_{name}")[0]
         state = service.get("UpdateStatus", {}).get("State", "")
         # A rollback toward the expected digest is still converging. The digest
@@ -51,7 +55,7 @@ def main():
             if stable_since is None:
                 stable_since = time.monotonic()
             if time.monotonic() - stable_since >= 60:
-                print("Las cinco instancias ejecutan las imágenes esperadas y permanecieron estables 60s.")
+                print("Los componentes seleccionados ejecutan sus digests y permanecieron estables 60s.")
                 return
         else:
             stable_since = None

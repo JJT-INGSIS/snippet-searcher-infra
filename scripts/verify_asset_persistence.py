@@ -25,8 +25,13 @@ def local_engine():
     else:
         endpoint = subprocess.check_output(
             ["docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"], text=True, timeout=15).strip()
-    if not endpoint.startswith("unix://"):
-        raise RuntimeError("This acceptance runner requires a local Unix Docker engine, never a remote VM")
+    if endpoint.startswith('unix://'):
+        return
+    if os.name == 'nt' and endpoint == 'npipe:////./pipe/dockerDesktopLinuxEngine':
+        engine = subprocess.check_output(['docker', 'info', '--format', '{{.OSType}}'], text=True, timeout=15).strip()
+        if engine == 'linux':
+            return
+    raise RuntimeError("This acceptance runner requires local Linux Docker (Unix socket or Desktop Linux pipe), never a remote VM")
 
 
 def verify():

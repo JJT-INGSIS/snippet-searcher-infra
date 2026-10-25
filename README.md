@@ -22,14 +22,30 @@ no agrega endpoints ni despliega un ejecutor. Verificar los ejemplos con
 
 ## Alcance actual
 
+### Inventario y CD ampliado — SNI-43
+
+[Guía de integración, recuperación y rollout](docs/sni-43-cd.md). Los scripts
+admiten inventario explícito de NGINX, Asset/Azurite y una UI futura, manteniendo
+el despliegue independiente y las evidencias por digest. La ampliación requiere
+primero herramientas/callers v0.6.0 y después una operación explícita bajo lock;
+no se activó en Azure. El registro v2 bloquea herramientas antiguas antes de mutar.
+Reaplicar conserva imágenes vigentes y el proveedor de storage seleccionado.
+La UI real, TLS y aceptación remota corresponden a SNI-42/40/44.
+
+SNI-42 incorpora el perfil local `ui`: con el repo hermano de UI preparado,
+`docker compose --profile ui --profile ingress up --build -d` sirve la aplicación
+en http://localhost:8088/. UI_DEV_ACTOR es opcional y público; vacío deja identidad
+deshabilitada. [Empaquetado y pruebas de UI](https://github.com/JJT-INGSIS/snippet-searcher-ui/blob/dev/docs/sni-42-deployment.md).
+
 ### Entrada HTTP NGINX — SNI-38
 
 [Contrato, decisiones, pruebas y coordinación](docs/sni-38-nginx.md).
 [Guía desde cero usando estos archivos](docs/nginx-desde-cero.md).
 Perfil local opcional `ingress`: `localhost:8088`, UI `/` → `ui:8080`, `/api/` →
 Snippets sin ese prefijo. No requiere certificados para probar transporte.
-El candidato `swarm/stack.ingress.yaml` retira puertos públicos de las aplicaciones;
-no está activado en VMs ni debe aplicarse antes de integrar SNI-43.
+`swarm/stack.ingress.yaml` es un overlay; el render de SNI-43 retira explícitamente
+los puertos de las aplicaciones. No está activado en VMs: seguir el rollout de
+la guía antes de aplicarlo.
 
 ```bash
 python3 -B scripts/validate_nginx_config.py

@@ -1,5 +1,10 @@
 # SNI-25 — Despliegue independiente por digest
 
+> La [extensión SNI-43](sni-43-cd.md) conserva este protocolo de aplicaciones y
+> amplía inventario/recuperación de infraestructura. Las notas de habilitación
+> v0.4/v0.5 de abajo son históricas; el rollout nuevo requiere v0.6.0 y su SHA
+> de infra revisado. No reutilizar herramientas v0.5.1 tras migrar a registro v2.
+
 Los pipelines de cada servicio hacen CI y llaman al CD central. Dev construye una
 imagen, la despliega y verifica; main selecciona ese mismo digest por igualdad
 exacta del Git tree y lo despliega en prod. El merge de una PR dev → main autoriza

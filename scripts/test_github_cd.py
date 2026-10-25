@@ -18,7 +18,8 @@ def deployment():
 
 
 class FakeGitHub:
-    def __init__(self):
+    def __init__(self, repository=None):
+        self.repository = repository or request()['repository']
         self.records = [deployment()]
         self.current_sha = 'd' * 40
         self.tree = 'c' * 40
@@ -34,7 +35,7 @@ class FakeGitHub:
     def pages(self, path):
         if path.startswith('/commits/'):
             return iter([{'merged_at': '2026-10-13', 'merge_commit_sha': self.current_sha,
-                          'base': {'ref': 'main'}, 'head': {'ref': 'dev', 'repo': {'full_name': request()['repository']}}}]
+                          'base': {'ref': 'main'}, 'head': {'ref': 'dev', 'repo': {'full_name': self.repository}}}]
                         if self.merged_pr else [])
         return iter(self.records)
 
@@ -50,7 +51,7 @@ class FakeGitHub:
             return {'conclusion': self.conclusion, 'status': 'completed', 'event': self.event,
                     'head_branch': 'dev', 'head_sha': 'b' * 40,
                     'referenced_workflows': self.workflows,
-                    'path': '.github/workflows/pipeline.yml', 'repository': {'full_name': request()['repository']}}
+                    'path': '.github/workflows/pipeline.yml', 'repository': {'full_name': self.repository}}
         raise AssertionError('Unexpected API call: ' + path)
 
 

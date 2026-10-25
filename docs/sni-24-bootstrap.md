@@ -1,5 +1,9 @@
 # SNI-24 — Stack y bootstrap manual dev/prod
 
+> Antecedente del bootstrap base de cinco servicios. Para operar el inventario
+> ampliado usar la [guía SNI-43](sni-43-cd.md), scripts nuevos y el registro real
+> de la VM. Los JSON de este documento no reemplazan las referencias vigentes.
+
 ## Alcance y referencias
 
 Cambios locales preparados en `feat/sni-24-swarm-bootstrap`, sin commit, push ni merge. Se conserva `compose.yaml` para desarrollo local. El despliegue usa [`swarm/stack.yaml`](../swarm/stack.yaml), cinco servicios y referencias exactas; no construye imágenes en las VMs ni activa CD. El usuario confirmó usar los paquetes públicos actuales de GHCR. No se requieren tokens de build ni login al registro público.

@@ -5,7 +5,7 @@
 Una entrada por ambiente: UI en `/`, API pública de Snippets en `/api/`.
 La implementación local y el candidato Swarm **no activan NGINX en Azure**.
 No se abren puertos, no se emiten certificados ni se modifica identidad/autenticación.
-El CD ampliado sigue en SNI-43; evidencia remota final en SNI-44.
+El CD ampliado se prepara en [SNI-43](sni-43-cd.md); evidencia remota final en SNI-44.
 
 Base: infra/dev `1ef642081876601f6dc7238a022abe0aa3963280`, con SNI-33 integrado.
 Rama: `feat/sni-38-nginx-ingress`. No hay cambios Kotlin ni en los controllers.
@@ -52,12 +52,12 @@ de SNI-19/33 se mantienen; esta aprobación no autoriza despliegues o migracione
 | Salud propia del proxy | Una UI caída no hace reiniciar NGINX ni corta una API sana | Salud 200 no acredita disponibilidad de aplicaciones; se necesitan probes por destino. |
 | Headers canónicos, no cadena confiada del navegador | Evita confiar en protocolo, host o IP afirmados por el cliente | Se pierde una cadena previa de proxies; añadir un balanceador externo exige revisar explícitamente la frontera de confianza. |
 | Log estructurado mínimo; errores sólo fatales | Evita que URLs, querystrings, Authorization, bodies o claves aparezcan en errores de request de NGINX | Menos detalle diagnóstico. Se correlaciona por request ID, estado y tiempos; habilitar debug requiere una decisión de seguridad. |
-| Candidato Swarm completo, base operativa intacta | Elimina de verdad los puertos viejos sin romper CD/verificadores de cinco servicios | Duplicación temporal del YAML base. CI compara ambos y sólo permite quitar puertos y agregar NGINX; SNI-43 debe integrar y resolver esta duplicación. |
+| Overlay Swarm integrado mediante render SNI-43 | Comparte la base y elimina explícitamente los puertos de aplicaciones en el resultado | Requiere herramientas nuevas; no aplicar el overlay directamente con herramientas antiguas. |
 
-El candidato completo es deliberado: una lista `ports: []` en un overlay no se
-debe asumir como eliminación de puertos en el merge de Swarm. No usamos `!reset`
-de Compose como si fuera compatible con `docker stack`. La comparación estructural
-rechaza diferencias en imágenes, perfiles, secretos, montajes y otros servicios.
+SNI-38 entregó inicialmente un candidato completo. SNI-43 elimina esa duplicación:
+el renderer combina base y overlay y quita explícitamente los puertos de aplicación.
+Una lista `ports: []` no garantiza eliminarlos en el merge de Swarm. No usamos
+`!reset` como si fuera compatible con `docker stack`; CI verifica el resultado.
 
 ## Configuración de archivos
 
@@ -69,8 +69,8 @@ rechaza diferencias en imágenes, perfiles, secretos, montajes y otros servicios
 * `nginx/validate-env.sh`: verifica hostname y puerto antes de ejecutar el entrypoint
   oficial. No admite inyección de directivas ni imprime el valor inválido.
 * `compose.yaml`: perfil `ingress` opt-in, binds de sólo lectura y puerto localhost.
-* `swarm/stack.ingress.yaml`: candidato HTTP que reemplazaría la base al integrar
-  SNI-43; no se aplica junto a `stack.yaml`. Puede combinarse con `stack.asset.yaml`.
+* `swarm/stack.ingress.yaml`: overlay HTTP de NGINX/configs/ACME, combinado con
+  `stack.yaml` y opcionalmente Asset/UI por el renderer SNI-43.
 * `scripts/validate_nginx_config.py`: renderiza dev/prod, con y sin Asset, y rechaza drift.
 * `scripts/verify_nginx.py`: aceptación real local; no despliega en Swarm ni Azure.
 * `tests/nginx/`: upstreams HTTP y desafío ACME exclusivamente para transporte de prueba.
@@ -138,9 +138,9 @@ DNS y recuperación están acotados, pero no son instantáneos ni una garantía 
 
 ## Swarm, configs y recuperación de configuración
 
-**No ejecutar este candidato con los scripts operativos actuales ni aplicar un
-`docker stack deploy` manual como atajo.** SNI-43 debe integrar inventario/lock,
-registro vigente y herramientas centrales antes del rollout coordinado.
+**No aplicar el overlay con herramientas antiguas ni un `docker stack deploy`
+manual como atajo.** Seguir [el rollout SNI-43](sni-43-cd.md): herramientas,
+callers, drenaje, registro vigente y operación de infraestructura bajo lock.
 
 El candidato publica sólo HTTP 80 → NGINX 8080 y deja las aplicaciones sin puertos
 publicados. TLS futuro agregará 443 y su configuración; hoy no se publica un 443

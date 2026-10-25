@@ -1,0 +1,30 @@
+# Runtime contract only. SNI-42 supplies the real UI image and runtime configuration.
+# No default/dummy digest; not selected until UI is explicitly installed in the release.
+version: "3.8"
+services:
+  ui:
+    image: ${UI_IMAGE:?Definir UI_IMAGE por digest revisado}
+    environment:
+      APP_ENV: ${DEPLOY_ENV:?Definir DEPLOY_ENV}
+      UI_DEV_ACTOR: ${UI_DEV_ACTOR:-}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 128M
+      restart_policy:
+        condition: any
+        delay: 10s
+      update_config:
+        parallelism: 1
+        order: start-first
+        monitor: 60s
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
