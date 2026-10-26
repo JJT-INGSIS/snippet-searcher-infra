@@ -67,7 +67,8 @@ red de dev muestra sólo `vm-snippet-dev-nsg` aplicado a `vm-snippet-dev628`.
 | Prioridad | Regla | Puertos | dev | prod |
 | --- | --- | --- | --- | --- |
 | 300 | `SSH` | TCP 22 | Cualquier origen, sin cambios | Cualquier origen, sin cambios |
-| 310 | `AllowTeamWeb` (dev) / `AllowPublicWeb` (prod) | TCP 80, 443 | **Sólo IPs del equipo** | Cualquier origen |
+| 305 | `AllowPublicHttp` (sólo dev, desde SNI-40) | TCP 80 | Cualquier origen: sólo ACME y redirect 308 | — |
+| 310 | `AllowTeamWeb` (dev) / `AllowPublicWeb` (prod) | dev: TCP 443; prod: TCP 80, 443 | **Sólo IPs del equipo** | Cualquier origen |
 | 65000 | `AllowVnetInBound` | todos | Predeterminada | Predeterminada |
 | 65001 | `AllowAzureLoadBalancerInBound` | todos | Predeterminada | Predeterminada |
 | 65500 | `DenyAllInBound` | todos | Denegar | Denegar |
@@ -159,6 +160,7 @@ equipo; la prueba reproducible es la tabla de comandos.
   el origen de 80 a cualquier origen **sólo** cuando el server del puerto 80 responda
   únicamente el desafío ACME y la redirección a HTTPS; el template de SNI-38 todavía
   sirve UI y `/api` por 80. 443 de dev sigue restringido al equipo.
+  Hecho el 26/10/2026: el 80 de dev se abrió con `AllowPublicHttp`.
 * **SNI-43:** usar los hostnames de la tabla como `--nginx-host` de cada ambiente.
 * **SNI-44:** repetir la comprobación externa con NGINX y TLS activos.
 * **SNI-20/25:** sin cambios de destino SSH ni de `known_hosts`.
