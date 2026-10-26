@@ -14,6 +14,13 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 [Hostnames DuckDNS y reglas de NSG](./docs/sni-39-dns-red.md): `jjt-snippets-dev.duckdns.org` y `jjt-snippets-prod.duckdns.org`, IPs estáticas sin actualizador, 80/443 abiertos en prod y restringidos al equipo en dev, cómo agregar la IP de un integrante y la comprobación después de arrancar una VM. No declara HTTPS: eso se prueba en SNI-40/44.
 
+## Canal incremental y CORS — SNI-52
+
+[Configuración, pruebas y diagnóstico](docs/sni-52-streaming.md): eventos NDJSON sin
+buffering/compresión en la familia `/api/executions/`, conservando caché/reintentos
+deshabilitados y el timeout de inactividad de 60s. Pruebas con NGINX real por HTTP,
+HTTPS local y navegador; el intérprete y la integración funcional se verifican después.
+
 ## HTTPS y certificados — SNI-40
 
 [TLS con Let's Encrypt y renovación](./docs/sni-40-tls.md): NGINX en dos estados (HTTP con sólo ACME y redirect 308; HTTPS con 443), `scripts/certificates.py` para emitir, renovar, recargar y consultar el vencimiento real con Certbot fijado por digest, y el timer de systemd de cada VM. La emisión real en dev y prod está pendiente y se registra en la tabla de evidencia del documento.

@@ -31,6 +31,17 @@ location /api/ {
     proxy_pass http://snippets_backend/;
 }
 
+# SNI-45: event streams and their small input/cancel requests share this prefix.
+# Keep the URI replacement identical to /api/, without regex rewrites or a second
+# forwarding policy. Other API responses retain normal buffering.
+location /api/executions/ {
+    proxy_buffering off;
+    gzip off;
+    proxy_hide_header Cache-Control;
+    add_header Cache-Control "no-store" always;
+    proxy_pass http://snippets_backend/executions/;
+}
+
 location / {
     # SPA fallback belongs to the UI server, never to the API proxy.
     proxy_pass http://ui_backend;
