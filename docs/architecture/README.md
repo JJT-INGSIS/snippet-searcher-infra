@@ -49,6 +49,11 @@ PrintScript recibe código y parámetros; no posee snippets ni necesita una BD d
 
 ## Flujos principales
 
+Para US8–10, consultar el [contrato de ejecución incremental
+(SNI-45)](./execution-contract.md) y sus [fixtures](../contracts/execution-v1.json).
+Documenta las decisiones aprobadas por Thiago y sus trade-offs; no afirma
+que existan los endpoints ni que la ejecución integrada esté implementada.
+
 | Flujo | Fuente | Diagrama |
 | --- | --- | --- |
 | Crear y actualizar, por archivo o editor | US1–4 | [Creación y actualización](./flows/create-update-snippet.md) |
@@ -66,6 +71,7 @@ PrintScript recibe código y parámetros; no posee snippets ni necesita una BD d
 - HTTP alcanza para operaciones puntuales. Los lotes de US12/15 necesitan progreso durable, reanudación y manejo de fallos por snippet; no se elige todavía un broker.
 - US9/10 necesitan salida incremental; la sesión interactiva además recibe inputs durante la ejecución.
 - Conservar original y formateado. Asociar resultados a revisión de código, reglas y procesador; no publicar resultados obsoletos como actuales.
+- El contrato con la UI para US1–7 está en [ui-integration.md de Snippets](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/ui-integration.md) (SNI-26).
 - Antes de implementar, confirmar el contrato de la UI, alcance de reglas, semántica de original/formateado, límite de una ejecución y contrato futuro de storage.
 
 Para actualizar un diagrama, editar su bloque `mermaid`. Los enlaces entre archivos son relativos; desde Google Docs se utilizan enlaces absolutos de GitHub a estos mismos archivos.

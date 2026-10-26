@@ -1,0 +1,17 @@
+server {
+    listen 8080 default_server;
+    server_name _;
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "nginx-up\n";
+    }
+    location / { return 404; }
+}
+
+server {
+    listen 8080;
+    server_name ${PROXY_HOSTNAME};
+    absolute_redirect off;
+    include /etc/nginx/conf.d/routes/app.conf;
+}

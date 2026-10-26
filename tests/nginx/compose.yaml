@@ -1,0 +1,31 @@
+# Test-only upstreams. Never deploy this file to dev/prod.
+services:
+  nginx:
+    extends:
+      file: ../../compose.yaml
+      service: nginx
+    environment:
+      PROXY_HOSTNAME: ${FIXTURE_PROXY_HOSTNAME:-snippet.test}
+      PROXY_PUBLIC_PORT: "8088"
+
+  snippets-service:
+    image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+    command: [python, -B, /test/upstream.py, api]
+    volumes:
+      - ./upstream.py:/test/upstream.py:ro
+    read_only: true
+    user: "10001:10001"
+
+  ui:
+    image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+    command: [python, -B, /test/upstream.py, ui]
+    volumes:
+      - ./upstream.py:/test/upstream.py:ro
+    read_only: true
+    user: "10001:10001"
+
+  address-holder:
+    image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+    command: [python, -c, "import time; time.sleep(300)"]
+    read_only: true
+    user: "10001:10001"

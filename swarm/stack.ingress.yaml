@@ -1,0 +1,61 @@
+# SNI-43: rendered by stack_runtime; application ports are removed explicitly in JSON.
+version: "3.8"
+services:
+  nginx:
+    image: nginx:1.30.6-alpine@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951
+    entrypoint: [sh, /etc/nginx/validate-env.sh]
+    command: [nginx, -g, "daemon off;"]
+    environment:
+      PROXY_HOSTNAME: ${PROXY_HOSTNAME:?Definir PROXY_HOSTNAME del ambiente}
+      PROXY_PUBLIC_PORT: "443"
+      NGINX_ENVSUBST_FILTER: ^(PROXY_HOSTNAME|PROXY_PUBLIC_PORT)$$
+    ports:
+      - target: 8080
+        published: 80
+        protocol: tcp
+        mode: ingress
+    configs:
+      - source: nginx_main
+        target: /etc/nginx/nginx.conf
+      - source: nginx_redirect
+        target: /etc/nginx/templates/default.conf.template
+      - source: nginx_env_check
+        target: /etc/nginx/validate-env.sh
+    volumes:
+      - ingress_acme:/var/www/acme:ro
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 128M
+      restart_policy:
+        condition: any
+        delay: 10s
+      update_config:
+        parallelism: 1
+        order: start-first
+        monitor: 30s
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+
+
+volumes:
+  ingress_acme:
+
+configs:
+  nginx_main:
+    name: snippet-searcher-${DEPLOY_ENV}_nginx_main_v1
+    file: ../nginx/nginx.conf
+  nginx_redirect:
+    name: snippet-searcher-${DEPLOY_ENV}_nginx_redirect_v1
+    file: ../nginx/templates/redirect.conf.template
+  nginx_env_check:
+    name: snippet-searcher-${DEPLOY_ENV}_nginx_env_check_v1
+    file: ../nginx/validate-env.sh

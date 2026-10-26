@@ -2,3 +2,6 @@
 *.py text eol=lf
 *.sh text eol=lf
 *.yaml text eol=lf
+
+# Byte-for-byte historical validator fixture, including on Windows checkouts.
+tests/legacy/v0.5.1-stack_release.txt -text

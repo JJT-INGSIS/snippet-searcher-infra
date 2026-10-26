@@ -1,0 +1,58 @@
+name: Infrastructure CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate infrastructure
+    runs-on: ubuntu-24.04
+    env:
+      SNIPPETS_DB_PASSWORD: unused-compose-validation
+      PERMISSIONS_DB_PASSWORD: unused-compose-validation
+      GITHUB_ACTOR: compose-validation
+      GITHUB_TOKEN: unused-compose-validation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v2
+        with:
+          version: v5.1.1
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Validate Swarm configuration for both environments
+        run: |
+          bash -n scripts/prepare_swarm_vm.sh
+          bash -n scripts/install_certificates.sh
+          python3 scripts/validate_stack.py
+          python3 -B scripts/validate_asset_config.py
+          sh -n nginx/validate-env.sh
+          python3 -B scripts/validate_nginx_config.py
+          python3 -B scripts/validate_expanded_stack.py
+
+      - name: Test HTTP verification, evidence and deployment recovery
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
+
+      - name: Verify real Asset and Azurite persistence in an isolated project
+        run: python3 -B scripts/verify_asset_persistence.py
+
+      - name: Verify real NGINX transport, upstream recovery and bounded timeout
+        run: python3 -B scripts/verify_nginx.py
+
+      - name: Verify real NGINX HTTPS, HTTP redirect, ACME webroot and certificate reload
+        run: python3 -B scripts/verify_https.py

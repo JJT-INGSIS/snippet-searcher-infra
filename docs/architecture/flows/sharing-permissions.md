@@ -43,4 +43,6 @@ sequenceDiagram
 - **Requerimiento / propuesta:** compartir permite leer snippet y tests; US9 permite ejecutar tests con acceso. No concede edición ni volver a compartir. Se propone que repetir el mismo share sea idempotente.
 - **Errores:** verificar existencia en snippets no reemplaza la comprobación de ownership en permissions. Ante un timeout no se confirma éxito; un reintento idempotente permite resolver el resultado sin duplicar accesos.
 
+- **Contrato acordado (SNI-26):** búsqueda de destinatarios y share en [sharing.md de Snippets](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/sharing.md); registro del share en [access.md de Permissions](https://github.com/JJT-INGSIS/permissions-service/blob/dev/docs/access.md). Propuesto, no implementado.
+
 [Volver a la referencia de arquitectura](../README.md)

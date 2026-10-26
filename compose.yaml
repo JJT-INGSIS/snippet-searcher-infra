@@ -5,6 +5,43 @@ x-http-destinations: &http-destinations
   PRINTSCRIPT_BASE_URL: ${PRINTSCRIPT_BASE_URL:-http://printscript-service:8080}
 
 services:
+  ui:
+    profiles: [ui]
+    build:
+      context: ../snippet-searcher-ui
+    image: snippet-searcher-ui:local
+    environment:
+      APP_ENV: dev
+      UI_DEV_ACTOR: ${UI_DEV_ACTOR:-}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+
+  nginx:
+    profiles: [ingress]
+    image: nginx:1.30.6-alpine@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951
+    entrypoint: [sh, /etc/nginx/validate-env.sh]
+    command: [nginx, -g, "daemon off;"]
+    environment:
+      PROXY_HOSTNAME: ${PROXY_HOSTNAME:-localhost}
+      PROXY_PUBLIC_PORT: ${PROXY_PUBLIC_PORT:-8088}
+      NGINX_ENVSUBST_FILTER: ^(PROXY_HOSTNAME|PROXY_PUBLIC_PORT)$$
+    ports:
+      - "127.0.0.1:${PROXY_HTTP_PORT:-8088}:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates/ingress.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx/templates/routes.conf.template:/etc/nginx/templates/routes/app.conf.template:ro
+      - ./nginx/validate-env.sh:/etc/nginx/validate-env.sh:ro
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
   snippets-service:
     build:
       context: ../snippets-service
@@ -13,11 +50,20 @@ services:
         - github_token
     environment:
       <<: *http-destinations
+      SPRING_PROFILES_ACTIVE: dev
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      STORAGE_ASSET_BASE_URL: ${STORAGE_ASSET_BASE_URL:-http://asset-service:8080}
+      STORAGE_ASSET_CONTAINER: ${STORAGE_ASSET_CONTAINER:-snippets}
+      STORAGE_ASSET_CONNECT_TIMEOUT: ${STORAGE_ASSET_CONNECT_TIMEOUT:-2s}
+      STORAGE_ASSET_READ_TIMEOUT: ${STORAGE_ASSET_READ_TIMEOUT:-5s}
+      STORAGE_ASSET_MAX_CONTENT_BYTES: ${STORAGE_ASSET_MAX_CONTENT_BYTES:-1048576}
       SPRING_DATASOURCE_URL: jdbc:postgresql://snippets-db:5432/snippets
       SPRING_DATASOURCE_USERNAME: snippets
       SPRING_DATASOURCE_PASSWORD: ${SNIPPETS_DB_PASSWORD:?Definir SNIPPETS_DB_PASSWORD en .env}
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      - snippets_content:/var/lib/snippets/content
     depends_on:
       snippets-db:
         condition: service_healthy
@@ -96,6 +142,45 @@ services:
       printscript-service:
         condition: service_started
 
+  # Opt-in runtime. Merely starting these services does not switch existing data.
+  asset-service:
+    profiles: [assets]
+    image: ghcr.io/austral-ingsis/snippet-asset-service@sha256:eacad54bf95717c5483619ad1fe45a9b4a0012a37b451c37baf13e6f43200656
+    environment:
+      AZURE_HOST: http://azurite
+      NEW_RELIC_AGENT_ENABLED: "false"
+    healthcheck:
+      test: [CMD-SHELL, "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9090; printf \"GET /actuator/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3; read -t 5 -r line <&3; [[ \"$$line\" == *\" 200 \"* ]]'"]
+      interval: 5s
+      timeout: 8s
+      retries: 12
+      start_period: 60s
+
+  azurite:
+    profiles: [assets]
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
+    command: [azurite-blob, --blobHost, 0.0.0.0, --location, /data, --skipApiVersionCheck]
+    volumes:
+      - asset_blobs:/data
+    healthcheck:
+      test: [CMD, node, -e, "const r=require('http').get('http://127.0.0.1:10000/',s=>{s.resume();process.exit(s.statusCode===400||s.statusCode===403?0:1)});r.on('error',()=>process.exit(1));r.setTimeout(3000,()=>{r.destroy();process.exit(1)})"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  asset-tests:
+    profiles: [verification]
+    image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+    environment:
+      STORAGE_ASSET_BASE_URL: http://asset-service:8080
+      ASSET_MANAGEMENT_BASE_URL: http://asset-service:9090
+    volumes:
+      - ./scripts:/verification:ro
+    read_only: true
+    user: "10001:10001"
+    command: [python, -B, /verification/asset_probe.py, prepare]
+
 secrets:
   github_actor:
     environment: GITHUB_ACTOR
@@ -104,4 +189,6 @@ secrets:
 
 volumes:
   snippets_data:
+  snippets_content:
   permissions_data:
+  asset_blobs:
