@@ -1,0 +1,27 @@
+server {
+    listen 8080 default_server;
+    server_name _;
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "nginx-up\n";
+    }
+    location / { return 404; }
+}
+
+server {
+    listen 8080;
+    server_name ${PROXY_HOSTNAME};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/acme;
+        default_type text/plain;
+        autoindex off;
+        limit_except GET { deny all; }
+        try_files $uri =404;
+    }
+
+    location / {
+        return 308 https://${PROXY_HOSTNAME}$request_uri;
+    }
+}

@@ -52,3 +52,6 @@ jobs:
 
       - name: Verify real NGINX transport, upstream recovery and bounded timeout
         run: python3 -B scripts/verify_nginx.py
+
+      - name: Verify real NGINX HTTPS, HTTP redirect, ACME webroot and certificate reload
+        run: python3 -B scripts/verify_https.py

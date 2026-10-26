@@ -102,5 +102,33 @@ class NginxEnvironmentTests(unittest.TestCase):
         self.assertNotIn("$http_authorization", config)
 
 
+class NginxTemplateTests(unittest.TestCase):
+    def template(self, name):
+        return (ROOT / "nginx/templates" / name).read_text()
+
+    def test_plain_http_only_serves_acme_and_redirects_to_the_fixed_https_host(self):
+        redirect = self.template("redirect.conf.template")
+        self.assertNotIn("proxy_pass", redirect)
+        self.assertNotIn("routes/app.conf", redirect)
+        self.assertIn("return 308 https://${PROXY_HOSTNAME}$request_uri;", redirect)
+        self.assertIn("limit_except GET { deny all; }", redirect)
+        self.assertNotIn("$host", redirect)
+
+    def test_tls_uses_letsencrypt_paths_modern_protocols_and_rejects_unknown_names(self):
+        tls = self.template("tls.conf.template")
+        self.assertIn("ssl_certificate /etc/letsencrypt/live/${PROXY_HOSTNAME}/fullchain.pem;", tls)
+        self.assertIn("ssl_certificate_key /etc/letsencrypt/live/${PROXY_HOSTNAME}/privkey.pem;", tls)
+        self.assertIn("ssl_protocols TLSv1.2 TLSv1.3;", tls)
+        self.assertIn("ssl_reject_handshake on;", tls)
+        self.assertNotIn("add_header Strict-Transport-Security", tls)
+
+    def test_routes_have_a_single_source_shared_by_local_http_and_tls(self):
+        for name in ("ingress.conf.template", "tls.conf.template"):
+            server = self.template(name)
+            self.assertIn("include /etc/nginx/conf.d/routes/app.conf;", server)
+            self.assertNotIn("proxy_pass", server)
+        self.assertNotIn("server {", self.template("routes.conf.template"))
+
+
 if __name__ == "__main__":
     unittest.main()

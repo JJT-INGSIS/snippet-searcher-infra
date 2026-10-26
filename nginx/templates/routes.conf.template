@@ -1,0 +1,37 @@
+# Only PROXY_HOSTNAME and PROXY_PUBLIC_PORT are expanded, never NGINX variables.
+# Drop untrusted standardized Forwarded; overwrite the headers we support.
+proxy_set_header Connection "";
+proxy_set_header Forwarded "";
+proxy_set_header Host "${PROXY_HOSTNAME}:${PROXY_PUBLIC_PORT}";
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Host "${PROXY_HOSTNAME}:${PROXY_PUBLIC_PORT}";
+proxy_set_header X-Forwarded-Port "${PROXY_PUBLIC_PORT}";
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Server "${PROXY_HOSTNAME}";
+proxy_set_header X-Forwarded-Ssl "";
+proxy_set_header X-Forwarded-Prefix $external_prefix;
+proxy_set_header X-Request-ID $request_id;
+
+location = /healthz {
+    access_log off;
+    default_type text/plain;
+    return 200 "nginx-up\n";
+}
+
+# A relative 308 preserves method/body and avoids using a supplied Host to
+# construct an external redirect. The querystring is preserved explicitly.
+location = /api {
+    return 308 /api/$is_args$args;
+}
+
+location /api/ {
+    # The final slash replaces /api/ with /, exactly once. Request method,
+    # query, body and ordinary headers (Authorization/Idempotency-Key) pass on.
+    proxy_pass http://snippets_backend/;
+}
+
+location / {
+    # SPA fallback belongs to the UI server, never to the API proxy.
+    proxy_pass http://ui_backend;
+}
