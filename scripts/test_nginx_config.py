@@ -15,11 +15,11 @@ def configs():
     del candidate["services"]["snippets-service"]["ports"]
     candidate["services"]["nginx"] = {
         "image": NGINX_IMAGE, "ports": [{"published": "80", "target": 8080}],
-        "configs": [{"source": name} for name in ("nginx_main", "nginx_routes", "nginx_env_check")],
+        "configs": [{"source": name} for name in ("nginx_main", "nginx_redirect", "nginx_env_check")],
         "volumes": [{"source": "ingress_acme", "target": "/var/www/acme", "read_only": True}],
     }
     candidate["configs"] = {name: {"name": "snippet-searcher-dev_" + name + "_v1", "file": "config"}
-                            for name in ("nginx_main", "nginx_routes", "nginx_env_check")}
+                            for name in ("nginx_main", "nginx_redirect", "nginx_env_check")}
     return base, candidate
 
 
@@ -65,9 +65,9 @@ class NginxCandidateTests(unittest.TestCase):
 
     def test_configs_require_version_but_allow_a_future_reviewed_revision(self):
         base, candidate = configs()
-        candidate["configs"]["nginx_routes"]["name"] = "snippet-searcher-dev_nginx_routes_v2"
+        candidate["configs"]["nginx_redirect"]["name"] = "snippet-searcher-dev_nginx_redirect_v2"
         validate_candidate(base, candidate)
-        candidate["configs"]["nginx_routes"]["name"] = "mutable-config"
+        candidate["configs"]["nginx_redirect"]["name"] = "mutable-config"
         with self.assertRaises(ValueError):
             validate_candidate(base, candidate)
 
@@ -100,6 +100,34 @@ class NginxEnvironmentTests(unittest.TestCase):
         self.assertNotIn("proxy_buffering off;", config)
         self.assertNotIn("$request_uri", config)
         self.assertNotIn("$http_authorization", config)
+
+
+class NginxTemplateTests(unittest.TestCase):
+    def template(self, name):
+        return (ROOT / "nginx/templates" / name).read_text()
+
+    def test_plain_http_only_serves_acme_and_redirects_to_the_fixed_https_host(self):
+        redirect = self.template("redirect.conf.template")
+        self.assertNotIn("proxy_pass", redirect)
+        self.assertNotIn("routes/app.conf", redirect)
+        self.assertIn("return 308 https://${PROXY_HOSTNAME}$request_uri;", redirect)
+        self.assertIn("limit_except GET { deny all; }", redirect)
+        self.assertNotIn("$host", redirect)
+
+    def test_tls_uses_letsencrypt_paths_modern_protocols_and_rejects_unknown_names(self):
+        tls = self.template("tls.conf.template")
+        self.assertIn("ssl_certificate /etc/letsencrypt/live/${PROXY_HOSTNAME}/fullchain.pem;", tls)
+        self.assertIn("ssl_certificate_key /etc/letsencrypt/live/${PROXY_HOSTNAME}/privkey.pem;", tls)
+        self.assertIn("ssl_protocols TLSv1.2 TLSv1.3;", tls)
+        self.assertIn("ssl_reject_handshake on;", tls)
+        self.assertNotIn("add_header Strict-Transport-Security", tls)
+
+    def test_routes_have_a_single_source_shared_by_local_http_and_tls(self):
+        for name in ("ingress.conf.template", "tls.conf.template"):
+            server = self.template(name)
+            self.assertIn("include /etc/nginx/conf.d/routes/app.conf;", server)
+            self.assertNotIn("proxy_pass", server)
+        self.assertNotIn("server {", self.template("routes.conf.template"))
 
 
 if __name__ == "__main__":

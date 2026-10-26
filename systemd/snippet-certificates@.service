@@ -1,0 +1,9 @@
+[Unit]
+Description=Renovación del certificado HTTPS de Snippet Searcher (%i)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -B /usr/local/lib/snippet-searcher/certificates.py renew %i

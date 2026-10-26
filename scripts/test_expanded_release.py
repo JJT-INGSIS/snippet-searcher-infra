@@ -13,7 +13,7 @@ from bootstrap_swarm import deploy_infrastructure, plan_release
 from deploy_service import deploy_locked, reconcile
 from github_cd import checks_for, validate_repository, validate_request
 from rollout_checks import require_updated_callers
-from stack_release import (NGINX_FILES, database_image, expected_images, permanent_services, select_release,
+from stack_release import (database_image, expected_images, nginx_files, permanent_services, select_release,
                            ui_configuration, update_service, upgrade_release, validate_manifest, write_record)
 from stack_runtime import ROOT, apply_release, render_release, stack_document, require_configs
 from test_deploy_service import CHECKS, FakeSwarm, release, request
@@ -22,10 +22,10 @@ from test_deploy_service import CHECKS, FakeSwarm, release, request
 def expanded(environment='dev', assets=True, ui=False):
     result = upgrade_release(release(environment))
     from validate_nginx_config import NGINX_IMAGE
-    result['infrastructure']['nginx'] = {'image': NGINX_IMAGE, 'hostname': f'snippet-{environment}.test', 'port': 80,
+    result['infrastructure']['nginx'] = {'image': NGINX_IMAGE, 'hostname': f'snippet-{environment}.test', 'tls': False,
         'configs': {key: {'name': f'snippet-searcher-{environment}_{key}_v1',
                          'sha256': hashlib.sha256((ROOT / file).read_bytes()).hexdigest()}
-                    for key, file in NGINX_FILES.items()}}
+                    for key, file in nginx_files(False).items()}}
     if assets:
         result['infrastructure'].update({
             'asset-service': {'image': 'ghcr.io/austral-ingsis/snippet-asset-service@sha256:' + 'a' * 64},
@@ -138,7 +138,7 @@ class ExpandedReleaseTests(unittest.TestCase):
         before = copy.deepcopy(current)
         self.assertEqual(select_release(release(), current), before)
         candidate = expanded(ui=True)
-        candidate['infrastructure']['nginx']['configs']['nginx_routes']['name'] = 'snippet-searcher-dev_nginx_routes_v2'
+        candidate['infrastructure']['nginx']['configs']['nginx_redirect']['name'] = 'snippet-searcher-dev_nginx_redirect_v2'
         selected = select_release(candidate, current, change_infrastructure=True)
         self.assertEqual(selected['images'], current['images'])
         self.assertEqual(selected['deployments'], current['deployments'])
@@ -254,7 +254,7 @@ class InfrastructureRecoveryTests(unittest.TestCase):
         self.swarm = InfrastructureSwarm(old)
         write_record(self.state / 'release.json', old)
         candidate = copy.deepcopy(old)
-        candidate['infrastructure']['nginx']['configs']['nginx_routes']['name'] = 'snippet-searcher-dev_nginx_routes_v2'
+        candidate['infrastructure']['nginx']['configs']['nginx_redirect']['name'] = 'snippet-searcher-dev_nginx_redirect_v2'
         verify = self.swarm.verify
         def only_old(manifest, application=None):
             verify(manifest, application)

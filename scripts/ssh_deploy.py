@@ -14,8 +14,9 @@ from github_cd import operation_id, validate_request
 BUNDLE_SCRIPTS = ('deploy_service.py', 'github_cd.py', 'stack_release.py', 'wait_for_stack.py',
                   'verify_stack.py', 'internal_http.py', 'smoke_tests.py', 'bootstrap_swarm.py',
                   'stack_runtime.py', 'rollout_checks.py', 'validate_asset_config.py', 'asset_probe.py')
-BUNDLE_FILES = ('swarm/stack.yaml', 'swarm/stack.ingress.yaml', 'swarm/stack.asset.yaml',
-                'swarm/stack.ui.yaml', 'nginx/nginx.conf', 'nginx/templates/ingress.conf.template', 'nginx/validate-env.sh')
+BUNDLE_FILES = ('swarm/stack.yaml', 'swarm/stack.ingress.yaml', 'swarm/stack.tls.yaml', 'swarm/stack.asset.yaml',
+                'swarm/stack.ui.yaml', 'nginx/nginx.conf', 'nginx/templates/redirect.conf.template',
+                'nginx/templates/tls.conf.template', 'nginx/templates/routes.conf.template', 'nginx/validate-env.sh')
 
 
 def connection_options(host, user, port, directory):

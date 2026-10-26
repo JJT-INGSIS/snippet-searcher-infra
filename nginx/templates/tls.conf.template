@@ -1,0 +1,21 @@
+server {
+    listen 8443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+    return 404;
+}
+
+server {
+    listen 8443 ssl;
+    server_name ${PROXY_HOSTNAME};
+    absolute_redirect off;
+
+    ssl_certificate /etc/letsencrypt/live/${PROXY_HOSTNAME}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${PROXY_HOSTNAME}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:TLS:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    include /etc/nginx/conf.d/routes/app.conf;
+}

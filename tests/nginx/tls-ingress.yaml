@@ -1,0 +1,31 @@
+services:
+  nginx:
+    image: nginx:1.30.6-alpine@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951
+    entrypoint: [sh, /etc/nginx/validate-env.sh]
+    command: [nginx, -g, "daemon off;"]
+    environment:
+      PROXY_HOSTNAME: snippet.test
+      PROXY_PUBLIC_PORT: "443"
+      NGINX_ENVSUBST_FILTER: ^(PROXY_HOSTNAME|PROXY_PUBLIC_PORT)$$
+    ports:
+      - "127.0.0.1:0:8080"
+      - "127.0.0.1:0:8443"
+    volumes:
+      - ../../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../nginx/templates/redirect.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ../../nginx/templates/tls.conf.template:/etc/nginx/templates/tls.conf.template:ro
+      - ../../nginx/templates/routes.conf.template:/etc/nginx/templates/routes/app.conf.template:ro
+      - ../../nginx/validate-env.sh:/etc/nginx/validate-env.sh:ro
+      - ./acme:/var/www/acme:ro
+      - ${TLS_FIXTURE_DIR:?}/live:/etc/letsencrypt/live:ro
+      - ${TLS_FIXTURE_DIR:?}/archive:/etc/letsencrypt/archive:ro
+
+  snippets-service:
+    extends:
+      file: compose.yaml
+      service: snippets-service
+
+  ui:
+    extends:
+      file: compose.yaml
+      service: ui

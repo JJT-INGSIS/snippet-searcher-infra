@@ -7,6 +7,11 @@ La implementación local y el candidato Swarm **no activan NGINX en Azure**.
 No se abren puertos, no se emiten certificados ni se modifica identidad/autenticación.
 El CD ampliado se prepara en [SNI-43](sni-43-cd.md); evidencia remota final en SNI-44.
 
+**Actualización SNI-40:** las rutas de este documento se movieron a
+`nginx/templates/routes.conf.template`, sin cambios. En las VMs el puerto 80 sólo
+sirve `/healthz`, el desafío ACME y un 308 a HTTPS; las rutas se sirven por 443. El
+ingreso local en `localhost:8088` sigue en HTTP. Ver [SNI-40](sni-40-tls.md).
+
 Base: infra/dev `1ef642081876601f6dc7238a022abe0aa3963280`, con SNI-33 integrado.
 Rama: `feat/sni-38-nginx-ingress`. No hay cambios Kotlin ni en los controllers.
 

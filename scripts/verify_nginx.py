@@ -105,9 +105,6 @@ def check_routes_and_failures(port):
         require(result.status == expected and result.headers.get("Content-Type") == "application/problem+json", "API error became SPA HTML")
         require(json.loads(result.body)["status"] == expected, "Problem Details changed")
     require(request(port, "/api/snippets", headers={"Host": "attacker.test"}).status == 404, "Unknown Host reached a backend")
-    require(request(port, "/.well-known/acme-challenge/probe-token").body.strip() == b"test-challenge-not-a-certificate", "ACME webroot incorrect")
-    require(request(port, "/.well-known/acme-challenge/missing").status == 404, "Missing challenge fell through to UI")
-    require(request(port, "/.well-known/acme-challenge/probe-token", "POST", b"x").status == 403, "ACME webroot accepts writes")
     # Send only an oversized Content-Length: reject before sending/storing 8 MiB.
     require(request(port, "/api/snippets", "POST", headers={"Content-Length": str(8 * 1024 * 1024 + 1)}).status == 413,
             "Oversized body was not rejected")
@@ -117,7 +114,7 @@ def check_routes_and_failures(port):
     require(request(port, "/api/disconnect-write", "POST", b"x").status == 502, "Disconnected write not reported as gateway failure")
     stats = json.loads(request(port, "/api/__test/stats").body)
     require(stats.get("/fail-write") == 1 and stats.get("/disconnect-write") == 1, "Proxy replayed a write")
-    print("PASS 308, UI/API separation, Problem Details, ACME, 8 MiB limit and no write replay", flush=True)
+    print("PASS 308, UI/API separation, Problem Details, 8 MiB limit and no write replay", flush=True)
 
 
 def verify():

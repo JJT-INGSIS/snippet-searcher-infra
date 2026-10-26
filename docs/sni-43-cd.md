@@ -59,7 +59,8 @@ y agrega referencias mínimas de los componentes efectivos. Ejemplo conceptual:
 ```
 
 Los ejemplos abreviados no son manifiestos desplegables. NGINX registra imagen,
-hostname, puerto y nombre/SHA-256 de sus tres configs inmutables. Asset/Azurite
+hostname, estado `tls` y nombre/SHA-256 de sus configs inmutables: tres en HTTP y
+cinco con TLS, según [SNI-40](sni-40-tls.md), que reemplazó el antiguo `port`. Asset/Azurite
 registran imágenes. La configuración del proveedor, si existe, vive en `asset`:
 container, timeouts, límite y probe controlado. No se guardan secretos ni código
 de snippets. No se convierte el archivo en una definición completa del sistema.
@@ -125,6 +126,8 @@ python3 -B scripts/bootstrap_swarm.py check candidate-dev.json
 ```
 
 HOSTNAME_DEV_ACORDADO debe reemplazarse por el hostname real validado de SNI-39.
+Ese plan instala el estado HTTP; `--tls` agrega el 443 una vez emitido el
+certificado, siguiendo el procedimiento de [SNI-40](sni-40-tls.md).
 El modo plan no modifica recursos ni exige permisos Docker de escritura. Calcula
 hashes sobre los archivos exactos del checkout; generar en Linux desde la revisión
 que se ejecutará, evitando hashes de otros finales de línea de Windows.
