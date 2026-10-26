@@ -9,12 +9,11 @@ infraestructura nueva.
 
 | Parte | Estado al 26/10/2026 |
 | --- | --- |
-| Código, tests y CI | Implementado en `feat/sni-40-https-certbot` y verificado localmente |
-| Primera instalación de NGINX en Azure | **Pendiente:** la hace SNI-40, sin UI (ver Coordinación) |
-| Certificados reales de dev y prod | **Pendiente:** se registran en [Evidencia](#evidencia) al emitirlos |
+| Código, tests y CI | Integrado en `dev` (PRs #21, #23 y #24) |
+| dev | **HTTPS confiable en servicio**, con renovación automática. Ver [Evidencia](#evidencia) |
+| prod | **Pendiente:** requiere infra y callers `@v0.6.1` en `main` |
 
-Hasta completar la tabla de evidencia, este documento no declara HTTPS funcionando
-en ningún ambiente.
+Este documento declara HTTPS funcionando sólo en dev.
 
 ## Dos estados de NGINX
 
@@ -123,33 +122,54 @@ en Azure la hace SNI-40, sin UI, y después SNI-42 incorpora la UI. Juan respond
 
 ## Procedimiento por ambiente
 
-Una VM encendida a la vez, como indica SNI-20. Dev primero; prod sólo después de
-pasar infra y los callers a `main` por PR. Los comandos se ejecutan por SSH con la
-clave propia, dentro del checkout fijo y revisado de infra en la VM, igual que
+Una VM encendida a la vez, como indica SNI-20. Dev se hizo el 26/10/2026; prod sólo
+después de pasar infra y los callers a `main` por PR. Los comandos van por SSH con la
+clave propia, dentro de un checkout de infra en la revisión revisada, igual que
 [SNI-43](sni-43-cd.md). `<host>` es `jjt-snippets-dev.duckdns.org` o
-`jjt-snippets-prod.duckdns.org`.
+`jjt-snippets-prod.duckdns.org`; `<registro>` es
+`/home/azureuser/.local/state/snippet-searcher/<env>/release.json`.
 
-**Requisito previo:** el CD central v0.6.0 fija infra `27e060d`, anterior a SNI-40, y
-rechaza un registro con `tls`. Antes del primer corte, github-workflows v0.6.1 fija
-el infra con SNI-40 y los callers de snippets, permissions, printscript y ui usan
-`@v0.6.1` en `dev` (y en `main` antes de prod). El control de corte lo exige.
+**Requisitos previos:**
+
+* El CD central v0.6.0 fija infra `27e060d`, anterior a SNI-40, y rechaza un registro
+  con `tls`. github-workflows v0.6.1 fija infra `9f7eee8`, y los callers de
+  snippets, permissions y printscript (y ui, si está instalada) usan `@v0.6.1` en la
+  rama del ambiente. El control de corte lo exige.
+* Los últimos deploys del CD de esos repos terminaron en verde **con la VM encendida**.
+  Con la VM apagada fallan con `Connection timed out` por SSH, sin tocar nada.
+* El checkout de la VM incluye el fix #24 (revisa la configuración también después de
+  la convergencia).
+
+Pasos:
 
 1. **Preparar:** `sudo -n bash scripts/install_certificates.sh <env>`.
-2. **Ingreso HTTP:** `python3 -B scripts/bootstrap_swarm.py plan <registro> --nginx-host <host> > candidate-http.json`,
-   revisar el JSON y aplicar con `deploy candidate-http.json --infrastructure` bajo `sudo`.
-3. **Red de dev:** en `vm-snippet-dev-nsg`, abrir TCP 80 a cualquier origen y dejar
-   443 sólo para el equipo. Prod ya tiene los dos abiertos desde SNI-39.
-4. **Comprobar desde afuera:** `curl -i http://<host>/` responde 308 hacia `https://<host>/`.
-5. **Staging:** `sudo -n python3 -B scripts/certificates.py issue <env> --staging`.
-6. **Ingreso HTTPS:** el mismo `plan` con `--tls`, revisar y `deploy --infrastructure`.
-   El navegador todavía desconfía, porque es staging.
-7. **Producción:** `sudo -n python3 -B scripts/certificates.py issue <env>`. El
-   script recarga NGINX y comprueba que sirve el certificado nuevo.
-8. **Desde afuera, sin `-k`:** `curl -sS -o /dev/null -w '%{http_code}\n' https://<host>/healthz` da 200.
-9. **Timer:** `sudo -n systemctl enable --now snippet-certificates@<env>.timer`.
-10. **Renovación y recarga, por separado:** `renew <env> --dry-run`, `reload <env>` y `status <env>`.
-11. **Reinicio del proxy:** reemplazar sólo la tarea NGINX y confirmar con `status`
-    que sigue sirviendo el mismo certificado; los digests de las aplicaciones no cambian.
+2. **Sacar los puertos de las apps, de a una.** Si el corte se los saca a las tres a la
+   vez, Swarm levanta seis Spring Boot juntos (`start-first`), no llegan sanos al
+   healthcheck y hace rollback. Por cada app, bajo el lock:
+   `sudo -n flock -w 60 <estado>/deploy.lock docker service update --detach=false --publish-rm 8080 snippet-searcher-<env>_<app>`,
+   y comprobar `"State":"completed"` y puertos `null` con `docker service inspect`.
+3. **Ingreso HTTP:** `plan <registro> --nginx-host <host> > candidate-http.json`,
+   `check`, respaldar el registro y `sudo -n python3 -B scripts/bootstrap_swarm.py deploy candidate-http.json --infrastructure`.
+   La salida va a `logs/infrastructure.log`: confirmar con `echo $?` y el `PASS proxy HTTP` del log.
+4. **Puertos publicados desde la propia VM:** `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/healthz`
+   da 200. Si da `000`, Swarm no reprogramó el ingress (cadena `DOCKER-INGRESS` vacía):
+   `docker service update --detach=false --force snippet-searcher-<env>_nginx` bajo el lock.
+5. **Red:** en dev, `AllowPublicHttp` (305) abre TCP 80 a cualquier origen y
+   `AllowTeamWeb` (310) queda sólo en 443. Prod tiene 80 y 443 abiertos desde SNI-39.
+6. **Desde afuera:** `curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://<host>/api/snippets` da `308 https://<host>/api/snippets`.
+7. **Staging:** `sudo -n python3 -B scripts/certificates.py issue <env> --staging`.
+8. **Ingreso HTTPS:** el mismo `plan` con `--tls`, `check`, respaldo y `deploy --infrastructure`.
+   Repetir el paso 4 también para 443 (`curl -sk --resolve <host>:443:127.0.0.1 https://<host>/healthz`).
+9. **Producción:** `sudo -n python3 -B scripts/certificates.py issue <env>`. Recarga NGINX
+   y comprueba que sirve el certificado nuevo.
+10. **Desde afuera, sin `-k`:** `curl -sv https://<host>/healthz` con `SSL certificate verify ok` y 200.
+11. **Timer:** `sudo -n systemctl enable --now snippet-certificates@<env>.timer` y una
+    corrida real con `sudo -n systemctl start snippet-certificates@<env>.service`;
+    `sudo -n journalctl -u snippet-certificates@<env>.service` muestra el resultado.
+12. **Renovación y recarga, por separado:** `renew <env> --dry-run`, `reload <env>` y `status <env>`.
+13. **Reinicio del proxy:** guardar `docker service ls` (nombre e imagen), forzar sólo la
+    tarea NGINX, confirmar con `status` que sirve el mismo certificado y que la lista
+    de imágenes no cambió.
 
 ## Recuperación y diagnóstico
 
@@ -161,6 +181,8 @@ el infra con SNI-40 y los callers de snippets, permissions, printscript y ui usa
 | VM desasignada | Ningún scheduler corre; no hay encendido automático | Al encender, `OnBootSec`/`Persistent` renuevan; revisar con `status` |
 | Certificado vencido tras mucho tiempo apagada | Los navegadores muestran error hasta renovar | `renew <env>`: Certbot renueva certificados vencidos |
 | Se perdió la carpeta de certificados | El estado HTTPS no arranca: falta el archivo | Volver al estado HTTP (`plan` sin `--tls`), emitir y volver a HTTPS. Cuidar los límites de Let's Encrypt |
+| Swarm hace rollback al sacar puertos de las apps | Las apps vuelven a publicar 8080–8082; desde el fix #24 la operación falla en vez de confirmarse | Sacar los puertos de a una app (paso 2) y repetir el corte |
+| Los puertos publicados no responden ni desde la VM | NGINX sano por la red interna, pero `DOCKER-INGRESS` sin reglas `DNAT` | Forzar la tarea NGINX (paso 4); no hace falta reiniciar Docker |
 
 Para diagnosticar: `systemctl list-timers 'snippet-certificates@*'`,
 `systemctl status snippet-certificates@<env>.service` y
@@ -193,24 +215,43 @@ todos los validadores y las dos aceptaciones con NGINX real. Las pruebas mutadas
 
 ## Evidencia
 
+dev, 26/10/2026, por Juan Rudolph, con infra `0481274`. Horas en UTC (Argentina = UTC−3).
+
 | Comprobación | dev | prod |
 | --- | --- | --- |
-| Ingreso HTTP desplegado y 308 desde afuera | Pendiente | Pendiente |
-| Certificado staging emitido | Pendiente | Pendiente |
-| Certificado de producción: emisor y vencimiento real | Pendiente | Pendiente |
-| HTTPS sin `-k` con el hostname correcto | Pendiente | Pendiente |
-| `renew --dry-run` correcto | Pendiente | Pendiente |
-| Recarga real sirviendo el certificado nuevo | Pendiente | Pendiente |
-| Reinicio del proxy conserva el certificado | Pendiente | Pendiente |
-| Timer habilitado y próxima ejecución | Pendiente | Pendiente |
-| Digests de aplicaciones sin cambios | Pendiente | Pendiente |
+| Puertos de apps retirados de a uno | `completed`, puertos `null` en las tres; ver Incidentes | Pendiente |
+| Ingreso HTTP y 308 desde afuera | Desplegado 14:08; `308 https://<host>/api/snippets?q=a` desde la IP del equipo y desde Cloud Shell; 443 con timeout para la IP ajena | Pendiente |
+| Certificado staging | `(STAGING) Baloney Bulgur YE2`, vencía el 29/12/2026 (64 días) | Pendiente |
+| Certificado de producción | Let's Encrypt `YE1`, vence el 24/01/2027 13:55:41 GMT; reemplazó a staging una sola vez | Pendiente |
+| HTTPS sin `-k` | 200, `SSL certificate verify ok`, `CN=jjt-snippets-dev.duckdns.org` | Pendiente |
+| `renew --dry-run` | `all simulated renewals succeeded` | Pendiente |
+| Recarga real | `nginx -t` correcto, reload y certificado servido igual al del disco, sin reiniciar tareas (en `issue` y en `reload`) | Pendiente |
+| Reinicio del proxy | Tarea forzada; `status` confirma el mismo certificado | Pendiente |
+| Timer | Habilitado; corrida real por systemd a las 15:00:14, `status=0/SUCCESS`, `not yet due for renewal` | Pendiente |
+| Digests de aplicaciones | Sin cambios antes y después del reinicio del proxy | Pendiente |
+| Verificación completa del registro | `Swarm.verify` con el fix #24: configuración, 60 s estable, SQL, HTTP y redirect correctos | Pendiente |
+
+### Incidentes de dev
+
+1. **Rollback de las apps al sacarles los puertos (14:08–14:10).** El primer corte
+   actualizó las tres apps a la vez. Las tareas nuevas quedaron `unhealthy` y Swarm
+   hizo rollback, devolviendo 8080–8082. La operación se confirmó igual, porque la
+   configuración se revisaba antes de la convergencia. Se corrigió con el PR #24 y se
+   retiraron los puertos de a una app (14:31–14:40). No hubo exposición: el NSG
+   bloquea esos puertos.
+2. **Ingress sin reprogramar tras publicar 443.** NGINX respondía por la red interna,
+   pero 80 y 443 daban `Connection refused` desde afuera y desde la VM. La cadena
+   `DOCKER-INGRESS` estaba vacía. Se resolvió forzando la tarea NGINX, sin tocar las
+   apps.
 
 ## Coordinación
 
-* **SNI-39:** abrir el 80 de dev a Internet en el paso 3, porque el 80 ya no sirve la API.
+* **SNI-39:** dev quedó con `AllowPublicHttp` (80 a cualquier origen) y `AllowTeamWeb` (sólo 443).
 * **SNI-42:** la UI entra al ingreso HTTPS ya preparado; el probe interno exige `/` por 443 cuando hay UI.
+  Su caller tiene que pasar a `@v0.6.1` antes de instalarla.
 * **SNI-41:** CORS con el origen `https://<host>`.
-* **SNI-43:** el registro cambia `port` por `tls`; `plan` acepta `--tls`.
+* **SNI-43:** el registro cambia `port` por `tls`; `plan` acepta `--tls`. El CD v0.6.1 fija
+  infra `9f7eee8`, sin el fix #24: conviene publicar v0.6.2 antes del corte de prod.
 * **SNI-44:** verifica el ingreso completo desde afuera, incluida la cadena pública.
 
 El probe interno de despliegue no valida la cadena pública: usa TLS sin verificar
