@@ -107,6 +107,7 @@ class Swarm:
         environment['VERIFY_APPLICATION'] = application or ''
         subprocess.run([sys.executable, str(ROOT / 'scripts/wait_for_stack.py'), self.stack],
                        check=True, env=environment, timeout=700)
+        verify_service_configuration(release, docker_json, application)
         subprocess.run([sys.executable, str(ROOT / 'scripts/verify_stack.py'), self.stack],
                        check=True, env=environment, timeout=300)
 
