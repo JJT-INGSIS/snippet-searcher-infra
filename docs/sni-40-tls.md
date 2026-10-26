@@ -11,9 +11,9 @@ infraestructura nueva.
 | --- | --- |
 | Código, tests y CI | Integrado en `dev` (PRs #21, #23 y #24) |
 | dev | **HTTPS confiable en servicio**, con renovación automática. Ver [Evidencia](#evidencia) |
-| prod | **Pendiente:** requiere infra y callers `@v0.6.1` en `main` |
+| prod | **HTTPS confiable en servicio**, con renovación automática. Ver [Evidencia](#evidencia) |
 
-Este documento declara HTTPS funcionando sólo en dev.
+Este documento declara HTTPS funcionando en dev y en prod.
 
 ## Dos estados de NGINX
 
@@ -139,6 +139,13 @@ clave propia, dentro de un checkout de infra en la revisión revisada, igual que
   Con la VM apagada fallan con `Connection timed out` por SSH, sin tocar nada.
 * El checkout de la VM incluye el fix #24 (revisa la configuración también después de
   la convergencia).
+* Para prod, los callers llegan a `main` por una release. **El CD de prod sólo despliega
+  si `main` recibió un PR cuya rama de origen es `dev`**; un PR desde otra rama llega a
+  `main` pero la VM rechaza el deploy sin tocar nada. Como las releases anteriores
+  fueron squash, `main` y `dev` chocan: se crea `release/sni-40-main` desde `dev` con
+  `git merge -s ours origin/main` (`git diff origin/dev` vacío), se mergea a `dev`, y
+  recién después se abre el PR `dev` → `main`. Si GitHub pide actualizar la rama, usar
+  **Update branch** con merge, nunca con rebase.
 
 Pasos:
 
@@ -215,21 +222,22 @@ todos los validadores y las dos aceptaciones con NGINX real. Las pruebas mutadas
 
 ## Evidencia
 
-dev, 26/10/2026, por Juan Rudolph, con infra `0481274`. Horas en UTC (Argentina = UTC−3).
+26/10/2026, por Juan Rudolph. dev con infra `0481274`; prod con infra `45aa45c` (`main`,
+mismo contenido). Horas en UTC (Argentina = UTC−3).
 
 | Comprobación | dev | prod |
 | --- | --- | --- |
-| Puertos de apps retirados de a uno | `completed`, puertos `null` en las tres; ver Incidentes | Pendiente |
-| Ingreso HTTP y 308 desde afuera | Desplegado 14:08; `308 https://<host>/api/snippets?q=a` desde la IP del equipo y desde Cloud Shell; 443 con timeout para la IP ajena | Pendiente |
-| Certificado staging | `(STAGING) Baloney Bulgur YE2`, vencía el 29/12/2026 (64 días) | Pendiente |
-| Certificado de producción | Let's Encrypt `YE1`, vence el 24/01/2027 13:55:41 GMT; reemplazó a staging una sola vez | Pendiente |
-| HTTPS sin `-k` | 200, `SSL certificate verify ok`, `CN=jjt-snippets-dev.duckdns.org` | Pendiente |
-| `renew --dry-run` | `all simulated renewals succeeded` | Pendiente |
-| Recarga real | `nginx -t` correcto, reload y certificado servido igual al del disco, sin reiniciar tareas (en `issue` y en `reload`) | Pendiente |
-| Reinicio del proxy | Tarea forzada; `status` confirma el mismo certificado | Pendiente |
-| Timer | Habilitado; corrida real por systemd a las 15:00:14, `status=0/SUCCESS`, `not yet due for renewal` | Pendiente |
-| Digests de aplicaciones | Sin cambios antes y después del reinicio del proxy | Pendiente |
-| Verificación completa del registro | `Swarm.verify` con el fix #24: configuración, 60 s estable, SQL, HTTP y redirect correctos | Pendiente |
+| Puertos de apps retirados de a uno | `completed`, puertos `null` en las tres; ver Incidentes | `converged` en las tres, sin rollback, antes del corte |
+| Ingreso HTTP y 308 desde afuera | Desplegado 14:08; `308 https://<host>/api/snippets?q=a` desde la IP del equipo y desde Cloud Shell; 443 con timeout para la IP ajena | `salida=0` y `PASS proxy HTTP`; `local80 200` desde la VM; `308 https://<host>/api/snippets?q=a` desde afuera |
+| Certificado staging | `(STAGING) Baloney Bulgur YE2`, vencía el 29/12/2026 (64 días) | `(STAGING) Baloney Bulgur YE2`, vencía el 29/12/2026 15:57:31 GMT |
+| Certificado de producción | Let's Encrypt `YE1`, vence el 24/01/2027 13:55:41 GMT; reemplazó a staging una sola vez | Let's Encrypt `YE2`, vence el 24/01/2027 16:07:19 GMT; emitido 17:05, reemplazó a staging una sola vez |
+| HTTPS sin `-k` | 200, `SSL certificate verify ok`, `CN=jjt-snippets-dev.duckdns.org` | 200, `SSL certificate verify ok`, `CN=jjt-snippets-prod.duckdns.org` |
+| `renew --dry-run` | `all simulated renewals succeeded` | `all simulated renewals succeeded` |
+| Recarga real | `nginx -t` correcto, reload y certificado servido igual al del disco, sin reiniciar tareas (en `issue` y en `reload`) | Igual que dev, en `issue` (17:05) y en `reload` (17:13) |
+| Reinicio del proxy | Tarea forzada; `status` confirma el mismo certificado | Tarea forzada; `local443 200` y `status` confirma el mismo certificado |
+| Timer | Habilitado; corrida real por systemd a las 15:00:14, `status=0/SUCCESS`, `not yet due for renewal` | Habilitado; corrida real por systemd a las 17:07:35, `status=0/SUCCESS` |
+| Digests de aplicaciones | Sin cambios antes y después del reinicio del proxy | `IMAGENES-IGUALES` antes y después del reinicio del proxy |
+| Verificación completa del registro | `Swarm.verify` con el fix #24: configuración, 60 s estable, SQL, HTTP y redirect correctos | Hecha por los dos `deploy --infrastructure` (fix #24 incluido): `PASS proxy HTTP` y `PASS proxy y rutas internas por TLS` |
 
 ### Incidentes de dev
 
@@ -244,6 +252,16 @@ dev, 26/10/2026, por Juan Rudolph, con infra `0481274`. Horas en UTC (Argentina 
    `DOCKER-INGRESS` estaba vacía. Se resolvió forzando la tarea NGINX, sin tocar las
    apps.
 
+### Incidentes de prod
+
+1. **Deploy de prod rechazado en la primera release.** El primer PR a `main` salía de
+   `release/sni-40-main`. La VM respondió `Prod exige el merge de una PR de dev a main
+   del mismo repositorio` y no tocó nada. Se repitió por el camino `release` → `dev` →
+   `main` descrito en los requisitos previos.
+2. **Ingress sin reprogramar tras publicar 443**, igual que en dev. El paso 8 lo detectó
+   (`local80 000`, `local443 000`) y se resolvió forzando la tarea NGINX, antes de
+   emitir el certificado de producción. El retiro previo de puertos evitó el rollback de dev.
+
 ## Coordinación
 
 * **SNI-39:** dev quedó con `AllowPublicHttp` (80 a cualquier origen) y `AllowTeamWeb` (sólo 443).
@@ -251,11 +269,13 @@ dev, 26/10/2026, por Juan Rudolph, con infra `0481274`. Horas en UTC (Argentina 
   Su caller tiene que pasar a `@v0.6.1` antes de instalarla.
 * **SNI-41:** CORS con el origen `https://<host>`.
 * **SNI-43:** el registro cambia `port` por `tls`; `plan` acepta `--tls`. El CD v0.6.1 fija
-  infra `9f7eee8`, sin el fix #24: conviene publicar v0.6.2 antes del corte de prod.
+  infra `9f7eee8`, sin el fix #24. Los cortes de infraestructura se hacen con un checkout
+  que sí lo incluye, y en los deploys de apps un rollback ya se detecta por el digest, así
+  que publicar v0.6.2 es una mejora opcional.
 * **SNI-44:** verifica el ingreso completo desde afuera, incluida la cadena pública.
 
 El probe interno de despliegue no valida la cadena pública: usa TLS sin verificar
-para comprobar ruteo, porque en el paso 6 el certificado todavía es de staging. La
+para comprobar ruteo, porque en el paso 8 el certificado todavía es de staging. La
 cadena se verifica desde afuera, sin `-k`.
 
 Fuentes: material de clase «07-reverse-proxy» (págs. 4–7) y «06-https» (págs. 19–40),
