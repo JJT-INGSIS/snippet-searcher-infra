@@ -14,26 +14,29 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from stack_release import (APPLICATIONS, DATABASE_SERVICES, database_image, expected_images, infrastructure,
-                           NGINX_FILES, upgrade_release, write_record, validate_manifest, select_release, update_service, validate_promotion)
+from stack_release import (APPLICATIONS, CERTIFICATES, DATABASE_SERVICES, database_image, expected_images, infrastructure,
+                           nginx_files, upgrade_release, write_record, validate_manifest, select_release, update_service,
+                           validate_promotion)
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def plan_release(previous, hostname=None, install_assets=False, config_version=1, ui_image=None, ui_actor=None):
+def plan_release(previous, hostname=None, install_assets=False, config_version=1, ui_image=None, ui_actor=None, tls=False):
     """Read-only candidate, from actual references rather than historical YAML digests."""
     from validate_asset_config import render
     from validate_nginx_config import NGINX_IMAGE
+    if tls and not hostname:
+        raise ValueError('TLS requiere --nginx-host explícito')
     planned = upgrade_release(previous)
     planned.pop('checks', None)
     if hostname:
         configs = {}
         old = infrastructure(previous).get('nginx', {}).get('configs', {})
-        for key, file in NGINX_FILES.items():
+        for key, file in nginx_files(tls).items():
             digest = hashlib.sha256((ROOT / file).read_bytes()).hexdigest()
             configs[key] = dict(old[key]) if key in old and old[key]['sha256'] == digest else {
                 'name': f'snippet-searcher-{previous["environment"]}_{key}_v{config_version}', 'sha256': digest}
-        planned['infrastructure']['nginx'] = {'image': NGINX_IMAGE, 'hostname': hostname, 'port': 80, 'configs': configs}
+        planned['infrastructure']['nginx'] = {'image': NGINX_IMAGE, 'hostname': hostname, 'tls': tls, 'configs': configs}
     if install_assets:
         data = render(['swarm/stack.yaml', 'swarm/stack.asset.yaml'], {**os.environ, **validate_manifest(previous)})
         for name in ('asset-service', 'azurite'):
@@ -46,6 +49,15 @@ def plan_release(previous, hostname=None, install_assets=False, config_version=1
         planned['ui'] = {'dev_actor': ui_actor}
     validate_manifest(planned)
     return planned
+
+def require_certificate(manifest):
+    proxy = infrastructure(manifest).get('nginx')
+    if not proxy or not proxy['tls']:
+        return
+    live = Path(CERTIFICATES.format(environment=manifest['environment'])) / 'live' / proxy['hostname']
+    if not all((live / name).is_file() for name in ('fullchain.pem', 'privkey.pem')):
+        raise ValueError('TLS requiere el certificado emitido para el hostname; emitirlo antes de publicar 443')
+
 
 def docker_json(*arguments):
     return json.loads(subprocess.check_output(["docker", *arguments], text=True, timeout=30))
@@ -65,6 +77,7 @@ def preflight(manifest, environment):
         raise ValueError('Azurite requiere el nodo con volumen original y asset_storage=true; no etiquetar automáticamente')
     for secret in ("snippets_db_password", "permissions_db_password"):
         docker_json("secret", "inspect", secret)
+    require_certificate(manifest)
     if manifest.get('schema_version') == 2:
         from stack_runtime import render_release, require_configs, validate_rendered
         validate_rendered(render_release(manifest))
@@ -237,7 +250,8 @@ def main():
     parser.add_argument("manifest", type=Path)
     parser.add_argument('--service', choices=APPLICATIONS, help='Prueba manual de actualización dev; producción usa CD')
     parser.add_argument('--infrastructure', action='store_true', help='Cambio explícito de infraestructura, con recuperación')
-    parser.add_argument('--nginx-host', help='Sólo plan: hostname explícito del proxy HTTP')
+    parser.add_argument('--nginx-host', help='Sólo plan: hostname explícito del proxy')
+    parser.add_argument('--tls', action='store_true', help='Sólo plan: publicar 443 con el certificado ya emitido')
     parser.add_argument('--install-assets', action='store_true', help='Sólo plan: instalar runtime sin activar proveedor')
     parser.add_argument('--config-version', type=int, default=1, help='Sólo plan: revisión para configs cuyo contenido cambió')
     parser.add_argument('--ui-image', help='Sólo plan: incorporar UI por su digest real; no actualiza una UI instalada')
@@ -250,7 +264,7 @@ def main():
         if args.config_version < 1:
             raise ValueError('La revisión de config debe ser positiva')
         print(json.dumps(plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
-                                      args.ui_image, args.ui_dev_actor), indent=2))
+                                      args.ui_image, args.ui_dev_actor, args.tls), indent=2))
         return
     if args.mode == "check":
         print(json.dumps(selected, indent=2))

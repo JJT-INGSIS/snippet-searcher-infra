@@ -15,11 +15,11 @@ def configs():
     del candidate["services"]["snippets-service"]["ports"]
     candidate["services"]["nginx"] = {
         "image": NGINX_IMAGE, "ports": [{"published": "80", "target": 8080}],
-        "configs": [{"source": name} for name in ("nginx_main", "nginx_routes", "nginx_env_check")],
+        "configs": [{"source": name} for name in ("nginx_main", "nginx_redirect", "nginx_env_check")],
         "volumes": [{"source": "ingress_acme", "target": "/var/www/acme", "read_only": True}],
     }
     candidate["configs"] = {name: {"name": "snippet-searcher-dev_" + name + "_v1", "file": "config"}
-                            for name in ("nginx_main", "nginx_routes", "nginx_env_check")}
+                            for name in ("nginx_main", "nginx_redirect", "nginx_env_check")}
     return base, candidate
 
 
@@ -65,9 +65,9 @@ class NginxCandidateTests(unittest.TestCase):
 
     def test_configs_require_version_but_allow_a_future_reviewed_revision(self):
         base, candidate = configs()
-        candidate["configs"]["nginx_routes"]["name"] = "snippet-searcher-dev_nginx_routes_v2"
+        candidate["configs"]["nginx_redirect"]["name"] = "snippet-searcher-dev_nginx_redirect_v2"
         validate_candidate(base, candidate)
-        candidate["configs"]["nginx_routes"]["name"] = "mutable-config"
+        candidate["configs"]["nginx_redirect"]["name"] = "mutable-config"
         with self.assertRaises(ValueError):
             validate_candidate(base, candidate)
 

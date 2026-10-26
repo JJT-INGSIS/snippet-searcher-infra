@@ -17,13 +17,20 @@ APPLICATIONS['ui'] = {'repository': 'JJT-INGSIS/snippet-searcher-ui',
 INFRA_PACKAGES = {'nginx': 'nginx:1.30.6-alpine',
                   'asset-service': 'ghcr.io/austral-ingsis/snippet-asset-service',
                   'azurite': 'mcr.microsoft.com/azure-storage/azurite:3.35.0'}
-NGINX_FILES = {'nginx_main': 'nginx/nginx.conf', 'nginx_routes': 'nginx/templates/ingress.conf.template',
-               'nginx_env_check': 'nginx/validate-env.sh'}
+NGINX_FILES = {'nginx_main': 'nginx/nginx.conf', 'nginx_redirect': 'nginx/templates/redirect.conf.template',
+               'nginx_env_check': 'nginx/validate-env.sh', 'nginx_tls': 'nginx/templates/tls.conf.template',
+               'nginx_routes': 'nginx/templates/routes.conf.template'}
+TLS_CONFIGS = ('nginx_tls', 'nginx_routes')
+CERTIFICATES = '/var/lib/snippet-searcher/{environment}/letsencrypt'
 ONE_SHOT_SERVICES = ('certbot',)
 
 
 def database_image(manifest):
     return manifest['database']['image'] if manifest.get('schema_version') == 2 else manifest['database_image']
+
+
+def nginx_files(tls):
+    return {key: file for key, file in NGINX_FILES.items() if tls or key not in TLS_CONFIGS}
 
 
 def infrastructure(manifest):
@@ -117,7 +124,7 @@ def validate_components(manifest):
         if not isinstance(spec, dict) or not isinstance(spec.get('image'), str) or not re.fullmatch(
                 re.escape(INFRA_PACKAGES[name]) + rf'@{DIGEST}', spec['image']):
             raise ValueError(f'{name}: paquete exacto por digest requerido')
-        fields = {'image', 'hostname', 'port', 'configs'} if name == 'nginx' else {'image'}
+        fields = {'image', 'hostname', 'tls', 'configs'} if name == 'nginx' else {'image'}
         if set(spec) != fields:
             raise ValueError(f'{name}: campos de configuración desconocidos o incompletos')
     if ('asset-service' in components) != ('azurite' in components):
@@ -141,10 +148,10 @@ def validate_components(manifest):
         if not isinstance(host, str) or len(host) > 253 or not re.fullmatch(
                 r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*', host):
             raise ValueError('Hostname de NGINX inválido')
-        if type(proxy.get('port')) is not int or proxy['port'] != 80:
-            raise ValueError('Ingreso HTTP usa puerto 80; TLS se incorpora en SNI-40')
-        if not isinstance(proxy.get('configs'), dict) or set(proxy['configs']) != set(NGINX_FILES):
-            raise ValueError('NGINX requiere las tres configs versionadas')
+        if type(proxy.get('tls')) is not bool:
+            raise ValueError('NGINX requiere tls true o false')
+        if not isinstance(proxy.get('configs'), dict) or set(proxy['configs']) != set(nginx_files(proxy['tls'])):
+            raise ValueError('NGINX requiere exactamente las configs versionadas de su estado TLS')
         for key, spec in proxy['configs'].items():
             if not isinstance(spec, dict) or set(spec) != {'name', 'sha256'} or not isinstance(spec.get('name'), str) \
                     or not isinstance(spec.get('sha256'), str) or not re.fullmatch(

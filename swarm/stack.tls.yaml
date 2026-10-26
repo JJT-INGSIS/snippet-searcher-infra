@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  nginx:
+    ports:
+      - target: 8443
+        published: 443
+        protocol: tcp
+        mode: ingress
+    configs:
+      - source: nginx_tls
+        target: /etc/nginx/templates/tls.conf.template
+      - source: nginx_routes
+        target: /etc/nginx/templates/routes/app.conf.template
+    volumes:
+      - type: bind
+        source: /var/lib/snippet-searcher/${DEPLOY_ENV}/letsencrypt/live
+        target: /etc/letsencrypt/live
+        read_only: true
+      - type: bind
+        source: /var/lib/snippet-searcher/${DEPLOY_ENV}/letsencrypt/archive
+        target: /etc/letsencrypt/archive
+        read_only: true
+
+configs:
+  nginx_tls:
+    name: snippet-searcher-${DEPLOY_ENV}_nginx_tls_v1
+    file: ../nginx/templates/tls.conf.template
+  nginx_routes:
+    name: snippet-searcher-${DEPLOY_ENV}_nginx_routes_v1
+    file: ../nginx/templates/routes.conf.template

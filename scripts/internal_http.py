@@ -1,6 +1,9 @@
 """HTTP from the stack network; no privileged credentials or public ports."""
+import http.client
 import json
 import os
+import socket
+import ssl
 import sys
 import urllib.request
 from urllib.error import HTTPError
@@ -80,19 +83,49 @@ def verify_ui(release):
     print('PASS UI HTTP y configuración runtime del ambiente', flush=True)
 
 
+class ProxyHTTPS(http.client.HTTPSConnection):
+    def connect(self):
+        self.sock = self._context.wrap_socket(socket.create_connection(('nginx', 8443), self.timeout),
+                                              server_hostname=self.host)
+
+
+def through_tls(host, path):
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    connection = ProxyHTTPS(host, 8443, context=context, timeout=10)
+    try:
+        connection.request('GET', path)
+        answer = connection.getresponse()
+        return answer.status, answer.getheader('Content-Type', ''), answer.read(1048576)
+    finally:
+        connection.close()
+
+
 def verify_ingress(release):
     proxy = release['infrastructure']['nginx']
-    headers = {'Host': f'{proxy["hostname"]}:{proxy["port"]}'}
-    with urllib.request.urlopen(urllib.request.Request('http://nginx:8080/healthz', headers=headers), timeout=10) as answer:
+    host = proxy['hostname']
+    with urllib.request.urlopen('http://nginx:8080/healthz', timeout=10) as answer:
         assert answer.status == 200 and answer.read(1024) == b'nginx-up\n'
-    direct_status, direct = request('http://snippets-service:8080/languages')
-    routed_status, routed = request('http://nginx:8080/api/languages', headers=headers)
-    assert direct_status == routed_status == 200 and direct and routed == direct
+    plain = http.client.HTTPConnection('nginx', 8080, timeout=10)
+    try:
+        plain.request('GET', '/api/languages', headers={'Host': host})
+        answer = plain.getresponse()
+        assert answer.status == 308 and answer.getheader('Location') == f'https://{host}/api/languages'
+    finally:
+        plain.close()
     if 'ui' in release['images']:
         verify_ui(release)
-        with urllib.request.urlopen(urllib.request.Request('http://nginx:8080/', headers=headers), timeout=10) as answer:
-            assert answer.status == 200 and 'text/html' in answer.headers.get('Content-Type', '')
-    print('PASS proxy y rutas internas; DNS/TLS externos NO verificados (SNI-44)', flush=True)
+    if not proxy['tls']:
+        print('PASS proxy HTTP: salud y redirect a HTTPS; 443 todavía sin publicar', flush=True)
+        return
+    direct_status, direct = request('http://snippets-service:8080/languages')
+    routed_status, _, routed = through_tls(host, '/api/languages')
+    assert direct_status == routed_status == 200 and direct and json.loads(routed) == direct
+    if 'ui' in release['images']:
+        status, media, _ = through_tls(host, '/')
+        assert status == 200 and 'text/html' in media
+    print('PASS proxy y rutas internas por TLS; cadena pública y DNS externos NO verificados (SNI-44)', flush=True)
 
 
 if __name__ == '__main__':

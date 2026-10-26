@@ -19,7 +19,9 @@ def render_release(release):
     files = ['swarm/stack.yaml']
     if 'nginx' in components:
         files.append('swarm/stack.ingress.yaml')
-        settings.update(PROXY_HOSTNAME=components['nginx']['hostname'], PROXY_PUBLIC_PORT='80')
+        if components['nginx']['tls']:
+            files.append('swarm/stack.tls.yaml')
+        settings.update(PROXY_HOSTNAME=components['nginx']['hostname'], PROXY_PUBLIC_PORT='443')
     if 'asset-service' in components:
         files.append('swarm/stack.asset.yaml')
     if 'ui' in release['images']:
@@ -132,11 +134,12 @@ def verify_service_configuration(release, docker_json, application=None):
         if names != {entry['name'] for entry in proxy['configs'].values()}:
             raise ValueError('NGINX no usa las configs registradas')
         values = dict(entry.split('=', 1) for entry in spec.get('Env', []))
-        if values.get('PROXY_HOSTNAME') != proxy['hostname'] or values.get('PROXY_PUBLIC_PORT') != str(proxy['port']):
+        if values.get('PROXY_HOSTNAME') != proxy['hostname'] or values.get('PROXY_PUBLIC_PORT') != '443':
             raise ValueError('NGINX no usa el origen registrado')
         ports = actual['Spec'].get('EndpointSpec', {}).get('Ports', [])
-        if len(ports) != 1 or ports[0].get('TargetPort') != 8080 or ports[0].get('PublishedPort') != proxy['port']:
-            raise ValueError('NGINX no publica el puerto registrado')
+        expected = {(8080, 80), (8443, 443)} if proxy['tls'] else {(8080, 80)}
+        if len(ports) != len(expected) or {(port.get('TargetPort'), port.get('PublishedPort')) for port in ports} != expected:
+            raise ValueError('NGINX no publica los puertos de su estado TLS')
         require_configs(release, docker_json)
         for name in (*SERVICES, *DATABASE_SERVICES, 'ui', 'asset-service', 'azurite'):
             if name in expected_images(release):
