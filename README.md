@@ -14,6 +14,14 @@ Configuración del entorno local de Snippet Searcher. Este repositorio contiene 
 
 [Hostnames DuckDNS y reglas de NSG](./docs/sni-39-dns-red.md): `jjt-snippets-dev.duckdns.org` y `jjt-snippets-prod.duckdns.org`, IPs estáticas sin actualizador, 80/443 abiertos en prod y restringidos al equipo en dev, cómo agregar la IP de un integrante y la comprobación después de arrancar una VM. No declara HTTPS: eso se prueba en SNI-40/44.
 
+## HTTPS y certificados — SNI-40
+
+[TLS con Let's Encrypt y renovación](./docs/sni-40-tls.md): NGINX en dos estados (HTTP con sólo ACME y redirect 308; HTTPS con 443), `scripts/certificates.py` para emitir, renovar, recargar y consultar el vencimiento real con Certbot fijado por digest, y el timer de systemd de cada VM. La emisión real en dev y prod está pendiente y se registra en la tabla de evidencia del documento.
+
+```bash
+python3 -B scripts/verify_https.py
+```
+
 ## Documentación de arquitectura
 
 [Componentes y flujos en Mermaid](./docs/architecture/README.md): diagramas editables del diseño de servicios, permisos, tests, formatting, linting y revalidación. Las dependencias y capacidades futuras están marcadas; estos diagramas no describen únicamente lo que ya está configurado en Compose.
@@ -49,7 +57,8 @@ Perfil local opcional `ingress`: `localhost:8088`, UI `/` → `ui:8080`, `/api/`
 Snippets sin ese prefijo. No requiere certificados para probar transporte.
 `swarm/stack.ingress.yaml` es un overlay; el render de SNI-43 retira explícitamente
 los puertos de las aplicaciones. No está activado en VMs: seguir el rollout de
-la guía antes de aplicarlo.
+la guía antes de aplicarlo. En las VMs el 80 sólo sirve ACME y redirect a HTTPS;
+las rutas se sirven por 443 desde SNI-40.
 
 ```bash
 python3 -B scripts/validate_nginx_config.py

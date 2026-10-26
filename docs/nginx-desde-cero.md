@@ -96,7 +96,10 @@ publicar un puerto Docker no modifica automáticamente las reglas de Azure.
 ## 5. Qué archivos leer y en qué orden
 
 1. [`nginx/nginx.conf`](../nginx/nginx.conf): reglas generales del proceso y proxy.
-2. [`ingress.conf.template`](../nginx/templates/ingress.conf.template): hostname y rutas.
+2. [`ingress.conf.template`](../nginx/templates/ingress.conf.template): hostname del ingreso local, que incluye
+   [`routes.conf.template`](../nginx/templates/routes.conf.template) con las rutas. En las VMs, el 80 usa
+   [`redirect.conf.template`](../nginx/templates/redirect.conf.template) y el 443
+   [`tls.conf.template`](../nginx/templates/tls.conf.template) ([SNI-40](sni-40-tls.md)).
 3. [`validate-env.sh`](../nginx/validate-env.sh): validación previa de configuración.
 4. [`compose.yaml`](../compose.yaml): cómo se levanta localmente.
 5. [`stack.ingress.yaml`](../swarm/stack.ingress.yaml): candidato para Swarm, no activado.

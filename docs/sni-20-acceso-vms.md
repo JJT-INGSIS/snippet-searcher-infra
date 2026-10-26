@@ -4,7 +4,7 @@
 
 Preparación de las VMs existentes, revisada el **11 de octubre de 2026**. No recrear recursos ni modificar Docker, Swarm, stack o workflows para completar este ticket. Azure IAM/PIM autoriza operaciones del plano de control; el acceso Linux requiere una clave pública en `azureuser` y una prueba SSH independiente.
 
-**SNI-20 sigue pendiente:** Juan Francisco y Juan Rudolph deben entregar sus claves públicas y ejecutar las pruebas en ambos ambientes. La documentación y la prueba de Thiago no sustituyen esas comprobaciones. El pull autenticado de las imágenes privadas de GHCR pertenece a SNI-24; Juan Francisco carga la configuración de Actions en SNI-25.
+**SNI-20 sigue pendiente:** Juan Francisco debe entregar su clave pública y ejecutar las pruebas en ambos ambientes. Juan Rudolph completó las suyas el 25/10/2026. La documentación y la prueba de Thiago no sustituyen esas comprobaciones. El pull autenticado de las imágenes privadas de GHCR pertenece a SNI-24; Juan Francisco carga la configuración de Actions en SNI-25.
 
 ## Inventario verificado
 
@@ -117,7 +117,7 @@ La ruta `-i` pertenece a cada persona; Thiago usó su clave existente sin distri
 | --- | --- | --- | --- |
 | Thiago | Clave existente conservada | `vm-snippet-dev` / `x86_64`, SSH estricto, 2026-10-11 16:25:18 UTC | `vm-snippet-prod` / `x86_64`, SSH estricto, 2026-10-11 16:31:29 UTC |
 | Juan Francisco | Pendiente de entrega de `.pub` y alta | Pendiente | Pendiente |
-| Juan Rudolph | Pendiente de entrega de `.pub` y alta | Pendiente | Pendiente |
+| Juan Rudolph | ED25519 `SHA256:oaUNKepRwnyNaqRMTqOFbM4qeJncdshJE6dsgLmPYks`, agregada por Azure Run Command conservando las existentes, 2026-10-25 | `vm-snippet-dev` / `x86_64`, SSH estricto, 2026-10-25 | `vm-snippet-prod` / `x86_64`, SSH estricto, 2026-10-25 |
 
 Para revocar: identificar la huella con `ssh-keygen -lf ~/.ssh/authorized_keys -E sha256`, respaldar el archivo y quitar **sólo la línea correspondiente a esa clave** en ambas VMs. Mantener una sesión administrativa abierta y probar que otro acceso autorizado sigue funcionando. Probar una conexión nueva con la clave revocada: debe fallar. Quitar también las copias autorizadas de la misma clave en `authorized_keys2`, si existiesen; no restaurar después un respaldo que la vuelva a habilitar. La revocación no cierra sesiones activas ni elimina permisos Azure/PIM: coordinar esos controles aparte.
 
