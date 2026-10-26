@@ -129,6 +129,11 @@ clave propia, dentro del checkout fijo y revisado de infra en la VM, igual que
 [SNI-43](sni-43-cd.md). `<host>` es `jjt-snippets-dev.duckdns.org` o
 `jjt-snippets-prod.duckdns.org`.
 
+**Requisito previo:** el CD central v0.6.0 fija infra `27e060d`, anterior a SNI-40, y
+rechaza un registro con `tls`. Antes del primer corte, github-workflows v0.6.1 fija
+el infra con SNI-40 y los callers de snippets, permissions, printscript y ui usan
+`@v0.6.1` en `dev` (y en `main` antes de prod). El control de corte lo exige.
+
 1. **Preparar:** `sudo -n bash scripts/install_certificates.sh <env>`.
 2. **Ingreso HTTP:** `python3 -B scripts/bootstrap_swarm.py plan <registro> --nginx-host <host> > candidate-http.json`,
    revisar el JSON y aplicar con `deploy candidate-http.json --infrastructure` bajo `sudo`.
