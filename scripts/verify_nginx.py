@@ -117,11 +117,12 @@ def check_routes_and_failures(port):
     print("PASS 308, UI/API separation, Problem Details, 8 MiB limit and no write replay", flush=True)
 
 
-def verify():
+def verify(browser=False):
     local_engine()
     project = "sni38-check-" + uuid4().hex[:12]
     environment = {**os.environ, "SNIPPETS_DB_PASSWORD": "unused-validation", "PERMISSIONS_DB_PASSWORD": "unused-validation",
                    "GITHUB_ACTOR": "unused-validation", "GITHUB_TOKEN": "unused-validation", "PROXY_HTTP_PORT": "0"}
+    environment["FIXTURE_PROXY_HOSTNAME"] = "localhost" if browser else "snippet.test"
     command = ["docker", "compose", "--env-file", os.devnull, "--profile", "ingress", "-p", project,
                "-f", str(ROOT / "tests/nginx/compose.yaml")]
 
@@ -138,6 +139,12 @@ def verify():
 
     print(f"SNI-38 isolated project: {project}", flush=True)
     try:
+        if browser:
+            compose("up", "-d", "--wait", "nginx", "snippets-service", "ui")
+            port = int(capture("port", "nginx", "8080").rsplit(":", 1)[1])
+            print(f"SNI-52 browser fixture: http://localhost:{port} (transport only)", flush=True)
+            input("Press Enter or Ctrl+C to clean up the isolated project: ")
+            return
         # Start with NO upstreams: runtime DNS must not prevent proxy startup.
         compose("up", "-d", "--wait", "--wait-timeout", "30", "nginx")
         compose("exec", "-T", "nginx", "nginx", "-t")
@@ -152,6 +159,11 @@ def verify():
         eventually(port, "/api/snippets", 200)
         check_transport(port)
         check_routes_and_failures(port)
+        from verify_execution_stream import check_execution_stream, check_heartbeat_stream
+        check_execution_stream(lambda: http.client.HTTPConnection("127.0.0.1", port, timeout=6),
+                               lambda path, method="GET", body=None, headers=None: request(port, path, method, body, headers))
+        print("CHECK real 10s heartbeats over a stream longer than the 60s inactivity timeout", flush=True)
+        check_heartbeat_stream(lambda: http.client.HTTPConnection("127.0.0.1", port, timeout=6))
         print("CHECK bounded read timeout: waiting for the configured 60 seconds", flush=True)
         started = time.monotonic()
         require(request(port, "/api/slow", timeout=70).status == 504, "Slow API did not time out")
@@ -189,7 +201,11 @@ def verify():
 
 if __name__ == "__main__":
     try:
-        verify()
+        if sys.argv[1:] not in ([], ["--browser"]):
+            raise ValueError("Usage: verify_nginx.py [--browser]")
+        verify(browser=bool(sys.argv[1:]))
+    except (KeyboardInterrupt, EOFError):
+        pass
     except (RuntimeError, OSError, ValueError, http.client.HTTPException, subprocess.SubprocessError) as error:
         print(f"FAIL NGINX transport acceptance: {error}", file=sys.stderr)
         sys.exit(1)

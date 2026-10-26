@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from verify_asset_persistence import local_engine
 from verify_nginx import ROOT, Response, require
+from verify_execution_stream import check_execution_stream
 
 HOST = "snippet.test"
 
@@ -74,10 +75,10 @@ def context(ca, version=None):
     return created
 
 
-def secure(port, ca, path, method="GET", body=None, version=None):
+def secure(port, ca, path, method="GET", body=None, version=None, headers=None):
     connection = PinnedHTTPS(HOST, port, context=context(ca, version), timeout=8)
     try:
-        connection.request(method, path, body=body)
+        connection.request(method, path, body=body, headers=headers or {})
         incoming = connection.getresponse()
         served = connection.sock.getpeercert()
         return Response(incoming.status, dict(incoming.getheaders()), incoming.read()), int(served["serialNumber"], 16)
@@ -171,6 +172,9 @@ def verify():
             compose("up", "-d", "snippets-service", "ui")
             eventually(lambda: secure(https_port, ca, "/api/snippets")[0].status == 200, "HTTPS API did not recover")
             check_https(https_port, ca, first)
+            check_execution_stream(lambda: PinnedHTTPS(HOST, https_port, context=context(ca), timeout=6),
+                                   lambda path, method="GET", body=None, headers=None:
+                                   secure(https_port, ca, path, method, body, headers=headers)[0])
             before = proxy_id()
             second = issue(directory, 2)
             compose("exec", "-T", "nginx", "nginx", "-t")
