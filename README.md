@@ -23,7 +23,7 @@ HTTPS local y navegador; el intérprete y la integración funcional se verifican
 
 ## HTTPS y certificados — SNI-40
 
-[TLS con Let's Encrypt y renovación](./docs/sni-40-tls.md): NGINX en dos estados (HTTP con sólo ACME y redirect 308; HTTPS con 443), `scripts/certificates.py` para emitir, renovar, recargar y consultar el vencimiento real con Certbot fijado por digest, y el timer de systemd de cada VM. La emisión real en dev y prod está pendiente y se registra en la tabla de evidencia del documento.
+[TLS con Let's Encrypt y renovación](./docs/sni-40-tls.md): NGINX en dos estados (HTTP con sólo ACME y redirect 308; HTTPS con 443), `scripts/certificates.py` para emitir, renovar, recargar y consultar el vencimiento real con Certbot fijado por digest, y el timer de systemd de cada VM. Desde el 26/10/2026, https://jjt-snippets-dev.duckdns.org y https://jjt-snippets-prod.duckdns.org sirven certificados confiables de Let's Encrypt con renovación automática; la evidencia está en el documento.
 
 ```bash
 python3 -B scripts/verify_https.py
