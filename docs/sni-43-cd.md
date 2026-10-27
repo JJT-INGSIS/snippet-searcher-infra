@@ -184,9 +184,12 @@ cambios de proveedor/configuración en este procedimiento. SNI-19/36 define copi
 verificación y aprobación de la transición; SNI-43 sólo opera sobre el proveedor
 ya seleccionado. No elimina contenidos, volúmenes ni backups.
 
-Validación y aplicación comparten la preparación del manifiesto, enviado por stdin
-al Docker CLI; no crean archivos temporales. Se despliega exactamente el documento
-validado, conservando el escape de variables shell.
+Validación y aplicación comparten el manifiesto enviado por stdin al Docker CLI,
+sin archivos temporales. El JSON de `docker compose config` ya conserva `$$` para
+la interpolación de Swarm: se envía sin volver a escapar esos dólares. Escaparlos
+dos veces deja `$$line` en el contenedor, que el shell interpreta como su PID y no
+como la variable leída por el healthcheck. La regresión de SNI-42 comprobó el valor
+almacenado en servicios Swarm aislados con cero réplicas y retirados al finalizar.
 
 ## Verificación y evidencia
 
