@@ -353,7 +353,8 @@ class RuntimeBoundaryTests(unittest.TestCase):
             Swarm('dev').require_recoverable_infrastructure(value, value)
 
     def test_deployment_submits_exactly_the_validated_document_without_temporary_files(self):
-        data = {'services': {'database': {'healthcheck': {'test': ['CMD-SHELL', 'echo "$POSTGRES_USER"']}}}}
+        # docker compose config --format json retains the Compose $$ escape.
+        data = {'services': {'database': {'healthcheck': {'test': ['CMD-SHELL', 'echo "$$POSTGRES_USER"']}}}}
         with patch('stack_runtime.render_release', return_value=data), \
                 patch('stack_runtime.require_configs'), patch('stack_runtime.subprocess.run') as docker:
             apply_release(expanded(), lambda *args: None)
@@ -362,6 +363,7 @@ class RuntimeBoundaryTests(unittest.TestCase):
         self.assertEqual(deployment.args[0][-3:], ['-c', '-', 'snippet-searcher-dev'])
         self.assertEqual(validation.kwargs['input'], deployment.kwargs['input'])
         self.assertIn('$$POSTGRES_USER', deployment.kwargs['input'])
+        self.assertNotIn('$$$$POSTGRES_USER', deployment.kwargs['input'])
 
     def test_invalid_manifest_cannot_create_configs_or_submit_deployment(self):
         with patch('stack_runtime.render_release', return_value={}), \
@@ -389,11 +391,11 @@ class RuntimeBoundaryTests(unittest.TestCase):
         self.assertTrue(all(spec['external'] for spec in data['configs'].values()))
         self.assertNotIn('command', data['services']['snippets-db'])
 
-    def test_render_protects_shell_variables_from_a_second_interpolation(self):
-        original = {'healthcheck': {'test': ['CMD-SHELL', 'pg_isready -U "$POSTGRES_USER"']}}
+    def test_render_preserves_compose_escaping_for_swarm_interpolation(self):
+        original = {'healthcheck': {'test': ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER"']}}
         document = json.loads(stack_document(original))
         self.assertEqual(document['healthcheck']['test'][1], 'pg_isready -U "$$POSTGRES_USER"')
-        self.assertIn('$POSTGRES_USER', original['healthcheck']['test'][1])
+        self.assertEqual(original, document)
 
     def test_config_hash_mismatch_is_rejected_without_overwriting_immutable_resource(self):
         value = expanded(assets=False)

@@ -65,17 +65,9 @@ def render_release(release):
 
 
 def stack_document(data):
-    # Compose config has already consumed $$ escaping. stack deploy interpolates
-    # once more; protect literal shell variables in healthchecks and entrypoints.
-    def escaped(value):
-        if isinstance(value, str):
-            return value.replace('$', '$$')
-        if isinstance(value, list):
-            return [escaped(entry) for entry in value]
-        if isinstance(value, dict):
-            return {key: escaped(entry) for key, entry in value.items()}
-        return value
-    return json.dumps(escaped(data))
+    # Compose JSON already retains $$ for the next interpolation by stack deploy.
+    # Escaping it again leaves $$ in the container shell (PID rather than a variable).
+    return json.dumps(data)
 
 
 def validate_rendered(data):
