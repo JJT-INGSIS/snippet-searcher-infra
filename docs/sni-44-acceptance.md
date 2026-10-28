@@ -30,7 +30,7 @@ en las VMs y evita recuperar con herramientas incompatibles.
 | Área | Procedimiento | Límite |
 | --- | --- | --- |
 | DNS/TLS/rutas/UI | `python -B scripts/verify_public_ingress.py dev` y `prod` | Estación externa autorizada; TLS con CA/hostname verificados, nunca `-k` |
-| Navegador HTTPS | `tests/nginx/public-ingress.cy.js` contra cada dominio | UI real, sin respuestas interceptadas; POST inválido sólo en dev |
+| Navegador HTTPS | `tests/nginx/public-ingress.cy.js` contra cada dominio | UI real, sin respuestas interceptadas; crear/actualizar/detalle de un snippet SNI-44 sólo en dev; prod sin escrituras |
 | CORS permitido/rechazado | `snippets-service/src/test/ui/cors.cy.ts` con Spring real local y allowlist explícita | No equivale a autorizar localhost en prod |
 | Proxy mismo origen | Spec HTTPS anterior y `cors-proxy.cy.ts` | Verificar errores y escritura inválida, no sólo GET |
 | Renovación/recarga | `certificates.py renew dev --dry-run`, `reload dev`, `status dev` | Dry-run usa staging sin reemplazar certificado público; registrar huella antes/después |
@@ -48,9 +48,14 @@ por asumir que la VM estaba apagada. No demuestra por sí solo CORS de navegador
 Para el spec HTTPS, desde UI copiar temporalmente el archivo al directorio
 Cypress de backend y ejecutar (reemplazar dev por prod cuando corresponda):
 
+En otra terminal de infra, servir el origen de prueba sin ninguna API simulada:
+`python -m http.server 5184 --bind 127.0.0.1 --directory tests/browser-origin`.
+El spec comprueba primero acceso HTTP real al catálogo y después que el navegador
+no exponga esa respuesta al origen local no autorizado. Detener el servidor al terminar.
+
 ```powershell
 Copy-Item ../snippet-searcher-infra/tests/nginx/public-ingress.cy.js cypress/e2e/backend/sni44-public.cy.js
-npx cypress run --config 'specPattern=cypress/e2e/backend/sni44-public.cy.js,chromeWebSecurity=true' --env environment=dev
+npx cypress run --config 'baseUrl=https://jjt-snippets-dev.duckdns.org,specPattern=cypress/e2e/backend/sni44-public.cy.js,chromeWebSecurity=true' --env environment=dev
 # Al terminar, retirar sólo la copia temporal; conservar este spec en infra.
 ```
 
