@@ -6,7 +6,7 @@ import re
 from github_cd import GitHub
 from stack_release import SERVICES
 
-CENTRAL_VERSION = 'v0.6.1'
+CENTRAL_VERSION = 'v0.6.2'
 
 
 def require_updated_callers(environment, api_factory=GitHub, include_ui=False):

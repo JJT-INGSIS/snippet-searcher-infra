@@ -44,10 +44,11 @@ no agrega endpoints ni despliega un ejecutor. Verificar los ejemplos con
 ### Inventario y CD ampliado — SNI-43
 
 [Guía de integración, recuperación y rollout](docs/sni-43-cd.md). Los scripts
-admiten inventario explícito de NGINX, Asset/Azurite y una UI futura, manteniendo
+admiten inventario explícito de NGINX, Asset/Azurite y UI, manteniendo
 el despliegue independiente y las evidencias por digest. La ampliación requiere
-primero herramientas/callers v0.6.0 y después una operación explícita bajo lock;
-no se activó en Azure. El registro v2 bloquea herramientas antiguas antes de mutar.
+primero herramientas/callers compatibles y después una operación explícita bajo lock.
+NGINX/TLS y UI están instalados en dev/prod; Asset sigue siendo opcional y su
+instalación no activa el proveedor. El registro v2 bloquea herramientas antiguas antes de mutar.
 Reaplicar conserva imágenes vigentes y el proveedor de storage seleccionado.
 La UI real, TLS y aceptación remota corresponden a SNI-42/40/44.
 
@@ -55,6 +56,7 @@ SNI-42 incorpora el perfil local `ui`: con el repo hermano de UI preparado,
 `docker compose --profile ui --profile ingress up --build -d` sirve la aplicación
 en http://localhost:8088/. UI_DEV_ACTOR es opcional y público; vacío deja identidad
 deshabilitada. [Empaquetado y pruebas de UI](https://github.com/JJT-INGSIS/snippet-searcher-ui/blob/dev/docs/sni-42-deployment.md).
+[Evidencia real, restauración e incidencias de SNI-42](docs/sni-42-evidencia.md).
 
 ### Entrada HTTP NGINX — SNI-38
 
