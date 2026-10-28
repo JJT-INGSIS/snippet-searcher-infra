@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 HOSTS = {'dev': 'jjt-snippets-dev.duckdns.org', 'prod': 'jjt-snippets-prod.duckdns.org'}
 # Explicit project ports, not a general-purpose scanner. SSH is intentionally excluded.
-PRIVATE_PORTS = (3000, 5432, 5434, 6379, 8080, 8081, 8082, 8083, 9000, 10000)
+PRIVATE_PORTS = (2375, 2376, 2377, 3000, 5432, 5434, 6379, 7946, 8080, 8081, 8082, 8083, 9000, 10000, 10001, 10002)
 
 
 def require(condition, message):
@@ -52,6 +52,7 @@ def check_runtime(environment, response):
     require(config.get('environment') == environment, 'UI de otro ambiente')
     if environment == 'prod':
         require(config.get('identity') == {'mode': 'disabled'}, 'Prod no debe usar identidad dev')
+    return config
 
 
 def check_api(response, expected):
@@ -90,13 +91,14 @@ def verify(environment):
         require(status == 200 and 'text/html' in (header(headers, 'Content-Type') or ''), f'SPA inválida: {path}')
         require(b'<div id="root"' in body, 'No se recibió la aplicación UI')
         require(not re.search(rb'(?:src|href)=["\']http://', body), 'HTML carga recursos por HTTP')
-    check_runtime(environment, request(host, '/app-config.json'))
+    runtime = check_runtime(environment, request(host, '/app-config.json'))
     check_api(request(host, '/api/languages'), 200)
     if environment == 'prod':
         for headers in ({}, {'X-Dev-Actor-Id': 'dev-juanfran'}):
             check_api(request(host, '/api/snippets?page=0&page_size=10', headers=headers), 401)
     for path in ('/api/actuator', '/api/actuator/health', '/api/permissions', '/api/assets'):
-        require(request(host, path)[0] in (401, 403, 404), f'Ruta interna expuesta: {path}')
+        headers = {'X-Dev-Actor-Id': runtime['identity']['actorId']} if environment == 'dev' else {}
+        require(request(host, path, headers=headers)[0] in (401, 403, 404), f'Ruta interna expuesta: {path}')
     blocked = request(host, '/api/languages', headers={'Origin': 'https://untrusted.invalid'})
     # Empty policy leaves public responses readable only same-origin; an explicit
     # allowlist may reject the request outright. Neither grants the hostile origin.

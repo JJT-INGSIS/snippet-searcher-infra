@@ -1,5 +1,10 @@
 # Snippet Searcher Infra
 
+[Aceptación integral SNI-44](docs/sni-44-acceptance.md) y
+[evidencia/estado de las comprobaciones](docs/sni-44-evidencia.md): ingreso público,
+CORS en navegador y recuperación del stack con UI/NGINX. Esta evidencia distingue
+verificaciones remotas, pruebas locales y funcionalidades pendientes.
+
 Configuración del entorno local de Snippet Searcher. Este repositorio contiene el único Compose del proyecto y permite levantar todo el entorno o seleccionar un servicio con sus dependencias. Cada servicio conserva su código y Dockerfile en su propio repositorio.
 
 ## Acceso a las VMs — SNI-20
