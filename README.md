@@ -36,6 +36,12 @@ python3 -B scripts/verify_https.py
 
 ## Documentación de arquitectura
 
+[Decisión de comunicación y procesamiento asíncrono — SNI-27](docs/architecture/adr-001-async-processing.md):
+HTTP síncrono por defecto; eventos de dominio, Redis Streams y outbox para cambios
+masivos de reglas, activación de parser y tests automáticos tras editar. Incluye
+[diseño mínimo y recuperación](docs/architecture/async-processing-design.md).
+Decisión aprobada el 29/10/2026; implementación y despliegue pendientes.
+
 [Componentes y flujos en Mermaid](./docs/architecture/README.md): diagramas editables del diseño de servicios, permisos, tests, formatting, linting y revalidación. Las dependencias y capacidades futuras están marcadas; estos diagramas no describen únicamente lo que ya está configurado en Compose.
 
 [Contrato de tests y ejecución incremental — SNI-45](docs/architecture/execution-contract.md):
