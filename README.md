@@ -26,6 +26,12 @@ buffering/compresión en la familia `/api/executions/`, conservando caché/reint
 deshabilitados y el timeout de inactividad de 60s. Pruebas con NGINX real por HTTP,
 HTTPS local y navegador; el intérprete y la integración funcional se verifican después.
 
+## Aceptación de US8–10 — SNI-53
+
+[Matriz, comandos, resultados y bugs encontrados](docs/sni-53-aceptacion.md):
+`scripts/verify_us8_10.py` prueba tests, ejecución e interacción con los servicios
+reales por NGINX local y provoca fallas con Compose, más un checklist de navegador.
+
 ## HTTPS y certificados — SNI-40
 
 [TLS con Let's Encrypt y renovación](./docs/sni-40-tls.md): NGINX en dos estados (HTTP con sólo ACME y redirect 308; HTTPS con 443), `scripts/certificates.py` para emitir, renovar, recargar y consultar el vencimiento real con Certbot fijado por digest, y el timer de systemd de cada VM. Desde el 26/10/2026, https://jjt-snippets-dev.duckdns.org y https://jjt-snippets-prod.duckdns.org sirven certificados confiables de Let's Encrypt con renovación automática; la evidencia está en el documento.
