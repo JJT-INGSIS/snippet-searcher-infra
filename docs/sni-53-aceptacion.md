@@ -4,8 +4,10 @@ Verifica crear tests (US8), ejecutarlos (US9) y ejecutar código de forma
 interactiva (US10) con Snippets, Permissions, PostgreSQL, storage `local`,
 PrintScript, NGINX y la UI reales, sin proveedores falsos.
 
-**Estado: abierto.** La corrida del 30/10/2026 encontró dos bugs (A y B). Se
-cierra cuando estén arreglados y una nueva corrida dé 15/15.
+**Estado: aceptación funcional local cumplida.** La primera corrida del 30/10/2026
+dio 13/15 y encontró dos bugs (A y B). Se arreglaron el mismo día y la corrida
+final dio **15/15** (ver [Corrida final](#corrida-final--1515)). Quedan
+pendientes HTTPS remoto y prod, fuera de esta aceptación local.
 
 ## Alcance
 
@@ -105,6 +107,9 @@ PrintScript rechaza la 5.ª ejecución con `429` y el tipo
 `503 dependency-unavailable`, así que el usuario ve "servicio no disponible"
 cuando el sistema está lleno. No deja reservas tomadas.
 
+**Arreglado** en printscript-service PR #26 (`fix/capacity-exhausted-name`): usa
+el nombre del contrato, y el test de capacidad verifica el rechazo exacto.
+
 ### B — Un inicio fallido bloquea al actor (snippets-service)
 
 Si alguien ejecuta mientras PrintScript está caído o arrancando, el cliente de
@@ -114,8 +119,36 @@ reserva sin asociación y la recuperación no la libera. Ese actor recibe
 libere a mano en la base.
 
 Una conexión rechazada prueba que el pedido no llegó, así que no hay
-incertidumbre. El arreglo requiere una decisión de diseño con el dueño de
-SNI-47/48.
+incertidumbre.
+
+**Arreglado** en snippets-service PR #50 (`fix/start-connect-failure`) con la
+opción B1, aprobada por Juan el 30/10/2026. Alternativas descartadas: liberar
+reservas viejas sin asociación, que podía liberar un programa que sí corría, e
+inicio idempotente, que cambia el contrato y dos servicios. Ahora una conexión
+rechazada o un timeout de conexión son fallas seguras y la reserva se libera. Un
+timeout **después** de enviar sigue siendo incierto, como define SNI-48.
+
+## Corrida final — 15/15
+
+30/10/2026 22:46 UTC, mismo script y mismos comandos, después de mergear los dos
+arreglos.
+
+| Repo | Commit |
+| --- | --- |
+| snippets-service | `7092414` |
+| permissions-service | `46e7af3` |
+| printscript-service | `ed6a686` |
+| snippet-searcher-ui | `3ce356d` |
+| snippet-searcher-infra | `c3398b0` |
+
+Los 15 casos pasaron. Los dos que antes fallaban:
+
+| Caso | Antes | Ahora |
+| --- | --- | --- |
+| 5 límite global | 5.ª ejecución `503` | `429 execution-capacity-exhausted`; las 4 activas se cancelan y la 5.ª ejecuta después |
+| 3 PrintScript caído | El actor del inicio fallido quedaba bloqueado | Recibe `503`, un actor nuevo ejecuta al volver PrintScript y el actor del inicio fallido queda liberado |
+
+Los demás casos repitieron los resultados de la primera corrida.
 
 ## Observaciones
 
@@ -138,9 +171,9 @@ SNI-47/48.
 6. **Datos de prueba:** cada corrida deja snippets y tests de actores `sni53-…`
    en la base local. No se usan en dev ni en prod.
 
-## Pendiente para cerrar
+## Pendiente
 
-- [ ] Arreglar el bug A y el bug B, en tickets aparte.
-- [ ] Repetir el script hasta 15/15 y agregar esa corrida acá.
+- [x] Arreglar el bug A (printscript-service #26) y el bug B (snippets-service #50).
+- [x] Repetir el script hasta 15/15 y agregar esa corrida acá.
 - [ ] HTTPS remoto y prod: anotarlo en SNI-52 cuando se enciendan las VMs.
 - [ ] SNI-37: marcar cumplida la parte de tests; lint sigue pendiente.
