@@ -72,9 +72,10 @@ exacto y prueba la incompatibilidad. Un tag nuevo con el mismo pin tampoco sirve
    health, volumen y conservación de servicios. Mantener workers deshabilitados
    hasta tener handlers funcionales.
 
-No se cambiaron tags, callers ni VMs durante la implementación local. El pin
-definitivo depende del commit integrado; no hay placeholders ejecutables en el
-workflow central. No aplicar el overlay a mano en la VM: omitiría el protocolo
+Durante la implementación local no se cambiaron tags, callers ni VMs. La transición
+y el despliegue autorizado de dev se completaron después del merge: ver
+[evidencia SNI-56 en dev](sni-56-dev-verification.md). No hay placeholders
+ejecutables en el workflow central. No aplicar el overlay a mano en la VM: omitiría el protocolo
 de registro, verificación y recuperación. Se acepta una breve interrupción de
 Snippets/PrintScript durante sus reemplazos, preservando Permissions y los demás.
 
@@ -151,9 +152,9 @@ Verificación local del 02/11: 204 unit tests de infra aprobados; renders Compos
 Swarm dev/prod y validadores anteriores aprobados; aceptación Redis real aprobada.
 Build completo de Snippets aprobado: 545 casos, 529 ejecutados sin fallos y 16
 omitidos por integraciones opcionales; el nuevo caso de disco lleno sí se ejecutó.
-No se probó un corte real de Swarm en dev ni se desplegó remotamente: quedan para
-aprobación posterior, junto con publicación del pin/tag/callers y comprobación de
-que ninguna tarea ajena se reinició en la VM.
+Tras la aprobación explícita se completó el corte real de Swarm en dev y se
+verificaron autenticación, AOF/PEL y preservación de servicios y datos. La
+[evidencia remota](sni-56-dev-verification.md) registra el alcance y sus límites.
 
 Alternativas descartadas: anchor global por impacto en Permissions; start-first
 en coordinadores por solapamiento; contraseña en environment/puerto público por
