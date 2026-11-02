@@ -44,12 +44,19 @@ jobs:
           sh -n nginx/validate-env.sh
           python3 -B scripts/validate_nginx_config.py
           python3 -B scripts/validate_expanded_stack.py
+          sh -n redis/entrypoint.sh
+          sh -n redis/healthcheck.sh
+          sh -n redis/cli.sh
+          python3 -B scripts/validate_redis.py
 
       - name: Test HTTP verification, evidence and deployment recovery
         run: python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
 
       - name: Verify real Asset and Azurite persistence in an isolated project
         run: python3 -B scripts/verify_asset_persistence.py
+
+      - name: Verify Redis authentication, persistence, restore, OOM and full AOF filesystem
+        run: python3 -B scripts/verify_redis_persistence.py
 
       - name: Verify real NGINX transport, upstream recovery and bounded timeout
         run: python3 -B scripts/verify_nginx.py

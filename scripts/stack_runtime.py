@@ -24,6 +24,8 @@ def render_release(release):
         settings.update(PROXY_HOSTNAME=components['nginx']['hostname'], PROXY_PUBLIC_PORT='443')
     if 'asset-service' in components:
         files.append('swarm/stack.asset.yaml')
+    if 'redis' in components:
+        files.append('swarm/stack.redis.yaml')
     if 'ui' in release['images']:
         files.append('swarm/stack.ui.yaml')
         settings.update(ui_environment(release))
@@ -45,12 +47,18 @@ def render_release(release):
     if 'nginx' in components:
         for name in SERVICES:
             data['services'][name].pop('ports', None)
+    from redis_runtime import config_files
+    registered_configs = config_files(release)
+    if registered_configs:
         data['configs'] = {key: {'external': True, 'name': spec['name']}
-                           for key, spec in components['nginx']['configs'].items()}
+                           for key, (spec, _) in registered_configs.items()}
     if set(data['services']) != set(expected_images(release)):
         raise ValueError('El render no coincide con el inventario autorizado')
     # Avoid Compose-only healthcheck/default fields unsupported by stack deploy.
     for service in data['services'].values():
+        for resources in service.get('deploy', {}).get('resources', {}).values():
+            if 'cpus' in resources:
+                resources['cpus'] = str(resources['cpus'])
         service.pop('profiles', None)
         for key in ('command', 'entrypoint'):
             if service.get(key) is None:
@@ -78,27 +86,31 @@ def validate_rendered(data):
 
 
 def require_configs(release, docker_json, create=False):
-    proxy = infrastructure(release).get('nginx')
-    if not proxy:
+    from redis_runtime import config_files
+    registered = config_files(release)
+    if not registered:
         return
     # Read the index once: an inspect/list failure is not proof of absence.
     found = subprocess.check_output(['docker', 'config', 'ls', '--format', '{{.Name}}'],
                                     text=True, timeout=30).splitlines()
-    for key, spec in proxy['configs'].items():
+    for key, (spec, file) in registered.items():
         if spec['name'] in found:
             actual = docker_json('config', 'inspect', spec['name'])[0]
             content = base64.b64decode(actual['Spec']['Data'], validate=True)
         else:
-            content = (ROOT / NGINX_FILES[key]).read_bytes()
+            content = (ROOT / file).read_bytes()
         if hashlib.sha256(content).hexdigest() != spec['sha256']:
             raise ValueError('La config tiene otro contenido que el registrado')
         if create and spec['name'] not in found:
-            subprocess.run(['docker', 'config', 'create', spec['name'], str(ROOT / NGINX_FILES[key])],
+            subprocess.run(['docker', 'config', 'create', spec['name'], str(ROOT / file)],
                            check=True, timeout=30)
 
 
 def verify_service_configuration(release, docker_json, application=None):
     stack = f'snippet-searcher-{release["environment"]}'
+    if 'redis' in infrastructure(release):
+        from redis_runtime import verify_effective
+        verify_effective(release, docker_json, application)
     if 'ui' in release['images'] and application in (None, 'ui'):
         actual = docker_json('service', 'inspect', f'{stack}_ui')[0]['Spec']['TaskTemplate']['ContainerSpec']
         values = dict(entry.split('=', 1) for entry in actual.get('Env', []))
@@ -140,8 +152,13 @@ def verify_service_configuration(release, docker_json, application=None):
                     raise ValueError('Sólo NGINX puede publicar puertos web en el stack ampliado')
 
 
-def apply_release(release, docker_json):
-    document = validate_rendered(render_release(release))
+def apply_release(release, docker_json, redis_transition=False):
+    rendered = render_release(release)
+    if redis_transition:
+        # Never --prune: leave every unrelated service untouched, including its task template.
+        allowed = {'redis', 'snippets-service', 'printscript-service'}
+        rendered['services'] = {name: spec for name, spec in rendered['services'].items() if name in allowed}
+    document = validate_rendered(rendered)
     require_configs(release, docker_json, create=True)
     subprocess.run(['docker', 'stack', 'deploy', '--resolve-image', 'always', '-c', '-',
                     f'snippet-searcher-{release["environment"]}'], input=document, text=True, check=True, timeout=180)

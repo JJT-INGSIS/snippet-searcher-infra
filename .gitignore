@@ -9,6 +9,8 @@
 .vscode/
 .DS_Store
 *.log
+secrets/
+.sni56/
 
 __pycache__/
 *.pyc
