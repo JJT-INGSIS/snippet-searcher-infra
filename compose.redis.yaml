@@ -1,0 +1,40 @@
+# Opt-in: docker compose -f compose.yaml -f compose.redis.yaml up -d
+services:
+  redis:
+    image: redis:7.4.7-alpine@sha256:02f2cc4882f8bf87c79a220ac958f58c700bdec0dfb9b9ea61b62fb0e8f1bfcf
+    entrypoint: [sh, /etc/redis/entrypoint.sh]
+    volumes:
+      - redis_data:/data
+      - ./redis:/etc/redis:ro
+    tmpfs: [/run/redis:rw,noexec,nosuid,size=1m]
+    secrets: [redis_password]
+    networks: [redis_internal]
+    mem_limit: 384m
+    cpus: 0.50
+    healthcheck:
+      test: [CMD, sh, /etc/redis/healthcheck.sh]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+  snippets-service:
+    environment:
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SNIPPETS_OUTBOX_STREAM: snippet-searcher:local:events
+    secrets:
+      - source: redis_password
+        target: spring.data.redis.password
+    networks: [default, redis_internal]
+    depends_on:
+      redis:
+        condition: service_healthy
+secrets:
+  redis_password:
+    file: ./secrets/redis_password
+networks:
+  redis_internal:
+    internal: true
+volumes:
+  redis_data:

@@ -113,7 +113,15 @@ class Swarm:
 
     def apply_infrastructure(self, release):
         from stack_runtime import apply_release
-        apply_release(release, docker_json)
+        actual = self.images()
+        redis_transition = ('redis' in actual) != ('redis' in expected_images(release))
+        if redis_transition:
+            if (set(actual) ^ set(expected_images(release))) - {'redis'}:
+                raise ValueError('El corte Redis no instala ni retira otros servicios')
+            for name, image in actual.items():
+                if name != 'redis' and expected_images(release).get(name) != image:
+                    raise ValueError('El corte Redis no combina cambios a otras imágenes')
+        apply_release(release, docker_json, redis_transition=redis_transition)
 
     def remove_components(self, names):
         if not set(names) <= set(INFRA_PACKAGES) | {'ui'}:

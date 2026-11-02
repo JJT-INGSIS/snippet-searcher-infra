@@ -21,13 +21,17 @@ from stack_release import (APPLICATIONS, CERTIFICATES, DATABASE_SERVICES, databa
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def plan_release(previous, hostname=None, install_assets=False, config_version=1, ui_image=None, ui_actor=None, tls=False):
+def plan_release(previous, hostname=None, install_assets=False, config_version=1, ui_image=None, ui_actor=None, tls=False,
+                 install_redis=False):
     """Read-only candidate, from actual references rather than historical YAML digests."""
     from validate_asset_config import render
     from validate_nginx_config import NGINX_IMAGE
     if tls and not hostname:
         raise ValueError('TLS requiere --nginx-host explícito')
     planned = upgrade_release(previous)
+    if install_redis:
+        from redis_runtime import specification
+        planned['infrastructure'].setdefault('redis', specification(previous['environment'], config_version))
     planned.pop('checks', None)
     if hostname:
         configs = {}
@@ -77,6 +81,10 @@ def preflight(manifest, environment):
         raise ValueError('Azurite requiere el nodo con volumen original y asset_storage=true; no etiquetar automáticamente')
     for secret in ("snippets_db_password", "permissions_db_password"):
         docker_json("secret", "inspect", secret)
+    if 'redis' in infrastructure(manifest):
+        from redis_preflight import require_capacity
+        docker_json('secret', 'inspect', 'redis_password')
+        require_capacity(info['DockerRootDir'])
     require_certificate(manifest)
     if manifest.get('schema_version') == 2:
         from stack_runtime import render_release, require_configs, validate_rendered
@@ -253,6 +261,7 @@ def main():
     parser.add_argument('--nginx-host', help='Sólo plan: hostname explícito del proxy')
     parser.add_argument('--tls', action='store_true', help='Sólo plan: publicar 443 con el certificado ya emitido')
     parser.add_argument('--install-assets', action='store_true', help='Sólo plan: instalar runtime sin activar proveedor')
+    parser.add_argument('--install-redis', action='store_true', help='Sólo plan: incorporar Redis sin activar workers')
     parser.add_argument('--config-version', type=int, default=1, help='Sólo plan: revisión para configs cuyo contenido cambió')
     parser.add_argument('--ui-image', help='Sólo plan: incorporar UI por su digest real; no actualiza una UI instalada')
     parser.add_argument('--ui-dev-actor', help='Sólo plan: actor público explícito de dev; vacío deshabilita identidad')
@@ -264,7 +273,7 @@ def main():
         if args.config_version < 1:
             raise ValueError('La revisión de config debe ser positiva')
         print(json.dumps(plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
-                                      args.ui_image, args.ui_dev_actor, args.tls), indent=2))
+                                      args.ui_image, args.ui_dev_actor, args.tls, args.install_redis), indent=2))
         return
     if args.mode == "check":
         print(json.dumps(selected, indent=2))
@@ -314,7 +323,8 @@ def main():
                 if previous is None or args.service:
                     raise ValueError('Infra requiere bootstrap confirmado y no combina --service')
                 deploy_infrastructure(state, manifest, swarm,
-                    lambda target: require_updated_callers(target, include_ui='ui' in manifest['images']))
+                    lambda target: require_updated_callers(target, include_ui='ui' in manifest['images'],
+                                                          redis='redis' in infrastructure(manifest)))
                 return
             selected_manifest = select_release(manifest, previous)
             if args.service:

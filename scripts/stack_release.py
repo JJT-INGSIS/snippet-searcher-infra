@@ -15,6 +15,7 @@ APPLICATIONS = {name: {'repository': f'JJT-INGSIS/{name}', 'package': f'ghcr.io/
 APPLICATIONS['ui'] = {'repository': 'JJT-INGSIS/snippet-searcher-ui',
                       'package': 'ghcr.io/jjt-ingsis/snippet-searcher-ui', 'variable': 'UI_IMAGE'}
 INFRA_PACKAGES = {'nginx': 'nginx:1.30.6-alpine',
+                  'redis': 'redis:7.4.7-alpine',
                   'asset-service': 'ghcr.io/austral-ingsis/snippet-asset-service',
                   'azurite': 'mcr.microsoft.com/azure-storage/azurite:3.35.0'}
 NGINX_FILES = {'nginx_main': 'nginx/nginx.conf', 'nginx_redirect': 'nginx/templates/redirect.conf.template',
@@ -63,6 +64,8 @@ def permanent_services(manifest, application=None):
     if application == 'ui':
         return {'ui': names['ui']}
     selected = set(STACK_SERVICES)
+    if 'redis' in infrastructure(manifest):
+        selected.add('redis')
     if storage_provider(manifest) == 'asset':
         selected.update(('asset-service', 'azurite'))
     return {name: image for name, image in names.items() if name in selected}
@@ -121,6 +124,12 @@ def validate_components(manifest):
     if not isinstance(components, dict) or not set(components) <= set(INFRA_PACKAGES):
         raise ValueError('Componente de infraestructura desconocido')
     for name, spec in components.items():
+        if name == 'redis':
+            from redis_runtime import validate
+            if not isinstance(spec, dict):
+                raise ValueError('Configuración Redis inválida')
+            validate(spec, manifest['environment'])
+            continue
         if not isinstance(spec, dict) or not isinstance(spec.get('image'), str) or not re.fullmatch(
                 re.escape(INFRA_PACKAGES[name]) + rf'@{DIGEST}', spec['image']):
             raise ValueError(f'{name}: paquete exacto por digest requerido')
@@ -189,6 +198,11 @@ def select_release(requested, previous, change_infrastructure=False):
     if not change_infrastructure:
         return deepcopy(previous)
     selected = upgrade_release(previous)
+    if 'redis' in infrastructure(requested) and 'redis' not in infrastructure(previous):
+        unrelated = {name: spec for name, spec in infrastructure(requested).items() if name != 'redis'}
+        if unrelated != infrastructure(previous) or set(requested['images']) != set(previous['images']) \
+                or requested.get('ui', {}) != previous.get('ui', {}):
+            raise ValueError('La incorporación de Redis no combina otros cambios de infraestructura/UI')
     if not set(infrastructure(previous)) <= set(infrastructure(requested)):
         raise ValueError('Retirar infraestructura persistente requiere un procedimiento específico')
     # Configuration changes preserve app/database versions, receipts and unknown metadata.

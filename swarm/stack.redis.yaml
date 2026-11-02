@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7.4.7-alpine@sha256:02f2cc4882f8bf87c79a220ac958f58c700bdec0dfb9b9ea61b62fb0e8f1bfcf
+    entrypoint: [sh, /etc/redis/entrypoint.sh]
+    configs:
+      - source: redis_configuration
+        target: /etc/redis/redis.conf
+      - source: redis_entrypoint
+        target: /etc/redis/entrypoint.sh
+      - source: redis_healthcheck
+        target: /etc/redis/healthcheck.sh
+    secrets:
+      - source: redis_password
+        target: redis_password
+    networks: [redis_internal]
+    volumes:
+      - redis_data:/data
+    tmpfs:
+      - /run/redis:rw,noexec,nosuid,size=1m
+    healthcheck:
+      test: [CMD, sh, /etc/redis/healthcheck.sh]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.50"
+        reservations:
+          memory: 64M
+      placement:
+        constraints: [node.labels.database == true]
+      restart_policy:
+        condition: any
+        delay: 10s
+      update_config:
+        parallelism: 1
+        order: stop-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+
+  snippets-service:
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SNIPPETS_OUTBOX_STREAM: snippet-searcher:${DEPLOY_ENV:?Definir DEPLOY_ENV}:events
+    networks: [default, redis_internal]
+    secrets:
+      - source: redis_password
+        target: spring.data.redis.password
+    deploy:
+      update_config:
+        order: stop-first
+
+  printscript-service:
+    deploy:
+      update_config:
+        order: stop-first
+
+configs:
+  redis_configuration:
+    file: ../redis/redis.conf
+  redis_entrypoint:
+    file: ../redis/entrypoint.sh
+  redis_healthcheck:
+    file: ../redis/healthcheck.sh
+
+secrets:
+  redis_password:
+    external: true
+
+networks:
+  redis_internal:
+    internal: true
+
+volumes:
+  redis_data:

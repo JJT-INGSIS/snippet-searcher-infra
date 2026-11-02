@@ -9,12 +9,16 @@ from stack_release import SERVICES
 CENTRAL_VERSION = 'v0.6.2'
 
 
-def require_updated_callers(environment, api_factory=GitHub, include_ui=False):
+def require_updated_callers(environment, api_factory=GitHub, include_ui=False, redis=False):
+    if redis:
+        from redis_cd import require_redis_cd
+        require_redis_cd()
     branch = 'dev' if environment == 'dev' else 'main'
+    required_version = 'v0.6.3' if redis else CENTRAL_VERSION
     central = re.compile(r'JJT-INGSIS/github-workflows/\.github/workflows/[^\s\'"]+')
     for name in (*SERVICES, *(['snippet-searcher-ui'] if include_ui else [])):
         workflows = ('frontend-ci.yml', 'cd.yml') if name == 'snippet-searcher-ui' else ('kotlin-service-pipeline.yml',)
-        expected = {f'JJT-INGSIS/github-workflows/.github/workflows/{workflow}@{CENTRAL_VERSION}' for workflow in workflows}
+        expected = {f'JJT-INGSIS/github-workflows/.github/workflows/{workflow}@{required_version}' for workflow in workflows}
         api = api_factory(f'JJT-INGSIS/{name}', os.environ.get('GH_TOKEN', ''))
         files = api.request(f'/contents/.github/workflows?ref={branch}')
         approved = False
@@ -29,7 +33,7 @@ def require_updated_callers(environment, api_factory=GitHub, include_ui=False):
             if entry['name'] == 'pipeline.yml' and expected <= set(references):
                 approved = True
         if not approved:
-            raise ValueError(f'{name}/{branch}: falta caller revisado {CENTRAL_VERSION}')
+            raise ValueError(f'{name}/{branch}: falta caller revisado {required_version}')
         page = 1
         while True:
             runs = api.request(f'/actions/runs?branch={branch}&per_page=100&page={page}')['workflow_runs']

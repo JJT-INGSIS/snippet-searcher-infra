@@ -440,6 +440,9 @@ Contrato de publicación, reglas y orden de integración: [github-workflows](htt
 
 ## CD por servicio — SNI-25
 
+Redis optativo, transición del CD, secretos, límites y recuperación:
+[manual SNI-56](docs/sni-56-redis.md). Su instalación no activa workers.
+
 El [manual SNI-25](docs/sni-25-cd.md) explica configuración, contrato de evidencia,
 actualización independiente, bloqueo compartido, journal y reconciliación SSH.
 Los scripts no crean infraestructura y no usan la comparación de stack completo
