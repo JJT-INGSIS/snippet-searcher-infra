@@ -13,10 +13,22 @@ from github_cd import operation_id, validate_request
 
 BUNDLE_SCRIPTS = ('deploy_service.py', 'github_cd.py', 'stack_release.py', 'wait_for_stack.py',
                   'verify_stack.py', 'internal_http.py', 'smoke_tests.py', 'bootstrap_swarm.py',
-                  'stack_runtime.py', 'rollout_checks.py', 'validate_asset_config.py', 'asset_probe.py')
+                  'stack_runtime.py', 'rollout_checks.py', 'validate_asset_config.py', 'asset_probe.py',
+                  'validate_nginx_config.py', 'redis_runtime.py', 'redis_cd.py', 'redis_preflight.py')
 BUNDLE_FILES = ('swarm/stack.yaml', 'swarm/stack.ingress.yaml', 'swarm/stack.tls.yaml', 'swarm/stack.asset.yaml',
                 'swarm/stack.ui.yaml', 'nginx/nginx.conf', 'nginx/templates/redirect.conf.template',
-                'nginx/templates/tls.conf.template', 'nginx/templates/routes.conf.template', 'nginx/validate-env.sh')
+                'nginx/templates/tls.conf.template', 'nginx/templates/routes.conf.template', 'nginx/validate-env.sh',
+                'swarm/stack.redis.yaml', 'redis/redis.conf', 'redis/entrypoint.sh', 'redis/healthcheck.sh')
+
+
+def create_bundle(destination):
+    root = Path(__file__).resolve().parent.parent
+    with tarfile.open(destination, 'w') as archive:
+        for relative in (*('scripts/' + name for name in BUNDLE_SCRIPTS), *BUNDLE_FILES):
+            path = root / relative
+            if path.is_symlink():
+                raise ValueError('No se permiten enlaces en el bundle')
+            archive.add(path, arcname=relative, recursive=False)
 
 
 def connection_options(host, user, port, directory):
@@ -56,17 +68,7 @@ def main():
         remote = f'/home/{user}/.local/share/snippet-searcher/cd/{revision}'
         subprocess.run([*ssh, destination, f'umask 077; mkdir -p {remote}'], check=True, timeout=30)
         bundle = directory / 'scripts.tar'
-        with tarfile.open(bundle, 'w') as archive:
-            for name in BUNDLE_SCRIPTS:
-                path = Path(__file__).resolve().parent / name
-                if path.is_symlink():
-                    raise ValueError('No se permiten enlaces en el bundle de scripts')
-                archive.add(path, arcname=f'scripts/{path.name}', recursive=False)
-            for relative in BUNDLE_FILES:
-                path = Path(__file__).resolve().parent.parent / relative
-                if path.is_symlink():
-                    raise ValueError('No se permiten enlaces en recursos del bundle')
-                archive.add(path, arcname=relative, recursive=False)
+        create_bundle(bundle)
         # Serialize bundle installation too: another service can use this revision.
         identity = operation_id(request)
         uploaded = f'{remote}/{identity}.tar'

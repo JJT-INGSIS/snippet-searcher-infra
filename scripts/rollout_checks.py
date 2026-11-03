@@ -14,7 +14,8 @@ def require_updated_callers(environment, api_factory=GitHub, include_ui=False, r
         from redis_cd import require_redis_cd
         require_redis_cd()
     branch = 'dev' if environment == 'dev' else 'main'
-    required_version = 'v0.6.3' if redis else CENTRAL_VERSION
+    from redis_cd import VERSION as REDIS_CENTRAL_VERSION
+    required_version = REDIS_CENTRAL_VERSION if redis else CENTRAL_VERSION
     central = re.compile(r'JJT-INGSIS/github-workflows/\.github/workflows/[^\s\'"]+')
     for name in (*SERVICES, *(['snippet-searcher-ui'] if include_ui else [])):
         workflows = ('frontend-ci.yml', 'cd.yml') if name == 'snippet-searcher-ui' else ('kotlin-service-pipeline.yml',)
