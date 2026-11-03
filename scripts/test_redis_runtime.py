@@ -53,9 +53,11 @@ class RedisRuntimeTests(unittest.TestCase):
         factory = test_expanded_release.RolloutGateTests().api
         with self.assertRaisesRegex(ValueError, 'antiguo'):
             require_updated_callers('dev', factory('v0.6.2'), redis=True)
-        require_updated_callers('dev', factory('v0.6.3'), redis=True)
+        with self.assertRaisesRegex(ValueError, 'antiguo'):
+            require_updated_callers('dev', factory('v0.6.3'), redis=True)
+        require_updated_callers('dev', factory('v0.6.4'), redis=True)
         with self.assertRaisesRegex(ValueError, 'activas'):
-            require_updated_callers('dev', factory('v0.6.3', active=True), redis=True)
+            require_updated_callers('dev', factory('v0.6.4', active=True), redis=True)
 
     def test_central_tag_must_pin_redis_aware_tools_not_the_legacy_sha(self):
         from redis_cd import require_redis_cd, LEGACY_REVISION

@@ -56,9 +56,9 @@ exacto y prueba la incompatibilidad. Un tag nuevo con el mismo pin tampoco sirve
    integrado; no usar una rama móvil ni inventar el SHA antes del merge.
 2. Cambiar `INFRA_REVISION` de `github-workflows/.github/workflows/cd.yml` a ese
    commit revisado, comprobar que la descarga de herramientas usa ese pin y
-   publicar `v0.6.3` después de sus checks. No mover el tag publicado `v0.6.2`.
+   publicar `v0.6.4` después de sus checks. No mover los tags publicados.
 3. Actualizar `.github/workflows/pipeline.yml` de Snippets, PrintScript,
-   Permissions y UI a `v0.6.3`, incluidas las dos referencias de UI. Mantener
+   Permissions y UI a `v0.6.4`, incluidas las dos referencias de UI. Mantener
    entradas y contratos. Todavía se despliega el release sin Redis en esta fase.
 4. Esperar todos los CD push/manual activos del ambiente. La instalación verifica
    callers, ausencia de ejecuciones activas y que el pin central contiene el
@@ -80,6 +80,22 @@ de registro, verificación y recuperación. Se acepta una breve interrupción de
 Snippets/PrintScript durante sus reemplazos, preservando Permissions y los demás.
 
 ## Memoria, disco y AOF lleno
+
+### Corrección del bundle SSH
+
+El primer CD de aplicación posterior a instalar Redis detectó que el archivo
+tar de `v0.6.3` no incluía `redis_runtime.py` y sus dependencias/recursos. El
+checkout completo y el despliegue manual sí los tenían, por lo que las pruebas
+anteriores no cubrían esta frontera. El fallo ocurrió al validar el registro
+previo, antes de actualizar la aplicación o crear su journal de operación.
+
+La corrección incorpora módulos Redis, validador NGINX, overlay y configs al
+bundle explícito. Las pruebas abren el tar real, comprueban imports locales
+incluidos los condicionales y ejecutan validación/render desde una extracción
+aislada, sin importar desde el repositorio ni usar el daemon Docker. Para
+distribuirla se requiere un nuevo pin revisado y `v0.6.4`: reejecutar el run viejo
+con `v0.6.3` no sustituye sus herramientas inmutables. Actualizar los cuatro
+callers antes de otra operación manual de infraestructura que exija el gate.
 
 El preflight exige 384 MiB de RAM disponible y 512 MiB libres en el filesystem
 Docker. Son mínimos de admisión, no cuota de disco ni capacidad garantizada.
