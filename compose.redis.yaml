@@ -30,6 +30,21 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+  printscript-service:
+    environment:
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      PRINTSCRIPT_OPERATIONS_ENABLED: ${PRINTSCRIPT_OPERATIONS_ENABLED:-false}
+      PRINTSCRIPT_OPERATIONS_DEPLOYMENT_MODE: single-stop-first
+    secrets:
+      - source: redis_password
+        target: spring.data.redis.password
+    networks: [default, redis_internal]
+    depends_on:
+      redis:
+        condition: service_healthy
+
 secrets:
   redis_password:
     file: ./secrets/redis_password

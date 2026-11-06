@@ -9,6 +9,13 @@ from stack_runtime import ROOT, render_release, validate_rendered
 from validate_asset_config import render
 
 
+def operations_environment():
+    return dict(SPRING_CONFIG_IMPORT='configtree:/run/secrets/',
+        SPRING_DATA_REDIS_HOST='redis', SPRING_DATA_REDIS_PORT='6379',
+        PRINTSCRIPT_OPERATIONS_ENABLED=os.environ.get('PRINTSCRIPT_OPERATIONS_ENABLED', 'false'),
+        PRINTSCRIPT_OPERATIONS_DEPLOYMENT_MODE='single-stop-first')
+
+
 def check(base, candidate, release):
     services = candidate['services']
     redis = services['redis']
@@ -18,6 +25,8 @@ def check(base, candidate, release):
         raise ValueError('Redis requiere red interna')
     if redis['image'] != REDIS_IMAGE or redis['deploy']['replicas'] != 1:
         raise ValueError('Redis requiere imagen revisada y una réplica')
+    if services['printscript-service']['deploy']['replicas'] != 1:
+        raise ValueError('Operaciones durables requieren un único proveedor stop-first')
     for name in ('redis', 'snippets-service', 'printscript-service'):
         deploy = services[name]['deploy']
         if deploy['update_config']['order'] != 'stop-first' or deploy['rollback_config']['order'] != 'stop-first':
@@ -32,6 +41,12 @@ def check(base, candidate, release):
         if name == 'snippets-service':
             original['environment'].update(SPRING_DATA_REDIS_HOST='redis', SPRING_DATA_REDIS_PORT='6379',
                 SNIPPETS_OUTBOX_STREAM=f'snippet-searcher:{release["environment"]}:events')
+            original['networks'] = {'default': {}, 'redis_internal': {}}
+            original.setdefault('secrets', []).append({'source': 'redis_password',
+                                                       'target': 'spring.data.redis.password'})
+        if name == 'printscript-service':
+            original.setdefault('environment', {}).update(operations_environment(),
+                OPERATIONS_NAMESPACE=f'printscript:{release["environment"]}:operations')
             original['networks'] = {'default': {}, 'redis_internal': {}}
             original.setdefault('secrets', []).append({'source': 'redis_password',
                                                        'target': 'spring.data.redis.password'})
@@ -67,6 +82,12 @@ def main():
             expected.setdefault('secrets', []).append({'source': 'redis_password',
                                                        'target': 'spring.data.redis.password'})
             expected['depends_on']['redis'] = {'condition': 'service_healthy', 'required': True}
+        if name == 'printscript-service':
+            expected.setdefault('environment', {}).update(operations_environment())
+            expected['networks'] = {'default': None, 'redis_internal': None}
+            expected.setdefault('secrets', []).append({'source': 'redis_password',
+                                                       'target': 'spring.data.redis.password'})
+            expected['depends_on'] = {'redis': {'condition': 'service_healthy', 'required': True}}
         if expected != changed:
             raise ValueError(f'Compose Redis modificó contratos/build/secrets ajenos: {name}')
     print('PASS Compose Redis: optativo, privado, contratos/build/secrets existentes conservados')

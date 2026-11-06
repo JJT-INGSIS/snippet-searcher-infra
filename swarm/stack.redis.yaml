@@ -60,6 +60,17 @@ services:
         order: stop-first
 
   printscript-service:
+    environment:
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      PRINTSCRIPT_OPERATIONS_ENABLED: ${PRINTSCRIPT_OPERATIONS_ENABLED:-false}
+      PRINTSCRIPT_OPERATIONS_DEPLOYMENT_MODE: single-stop-first
+      OPERATIONS_NAMESPACE: printscript:${DEPLOY_ENV:?Definir DEPLOY_ENV}:operations
+    networks: [default, redis_internal]
+    secrets:
+      - source: redis_password
+        target: spring.data.redis.password
     deploy:
       update_config:
         order: stop-first

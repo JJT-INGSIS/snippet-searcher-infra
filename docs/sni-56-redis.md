@@ -178,3 +178,25 @@ exposición; eviction/trimming por pérdida de entregas; replicación/Cluster po
 alcance y recursos; confiar sólo en AOF por su ventana de pérdida. Se acepta el
 trabajo operativo de espacio, backups y recuperación. No se agregan handlers,
 OAuth, dashboards ni políticas de retención en SNI-56.
+
+
+## Durable PrintScript operations (SNI-78, 2026-11-05)
+
+The opt-in Redis overlays now connect PrintScript to the private Redis network
+and mount the existing password via configtree, never a command-line argument.
+`PRINTSCRIPT_OPERATIONS_ENABLED` defaults to false. Enable it only with the new
+provider image and `PRINTSCRIPT_OPERATIONS_DEPLOYMENT_MODE=single-stop-first`.
+The Swarm namespace includes `DEPLOY_ENV`; retain one PrintScript replica and
+stop-first replacement. Terminal operation inputs/results have seven-day TTL;
+active records do not expire. Redis persistence/noeviction and memory limits
+remain applicable; storage exhaustion is an explicit error, not silent eviction.
+
+Deploy/enable the provider before the new Snippets workers, verify the operations
+API and matching execution budget, and drain/independently verify legacy held
+permits first. The new application preserves UNKNOWN for legacy synchronous
+attempts without identity. This is not a horizontal/multiple-provider recovery
+protocol. See PrintScript `docs/durable-operations.md` and Snippets
+`docs/durable-processing.md` for the approved lifecycle and verification.
+
+This change supplies runtime wiring only. It does not edit CD workflows, enable
+features on a VM, deploy an image or create Azure resources.
