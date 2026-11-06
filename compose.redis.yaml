@@ -6,7 +6,7 @@ services:
     volumes:
       - redis_data:/data
       - ./redis:/etc/redis:ro
-    tmpfs: [/run/redis:rw,noexec,nosuid,size=1m]
+    tmpfs: ["/run/redis:rw,noexec,nosuid,size=1m"]
     secrets: [redis_password]
     networks: [redis_internal]
     mem_limit: 384m
