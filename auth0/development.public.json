@@ -1,0 +1,19 @@
+{
+  "audience": "https://jjt-snippets-dev.duckdns.org/api",
+  "callback_path": "/auth/callback",
+  "callbacks": [
+    "http://127.0.0.1:5173/auth/callback",
+    "https://jjt-snippets-dev.duckdns.org/auth/callback"
+  ],
+  "client_id": "BDuvRyQ6ryyye08Bs9ZEfRzw7AsskFs6",
+  "domain": "jjt-snippet-searcher.us.auth0.com",
+  "issuer": "https://jjt-snippet-searcher.us.auth0.com/",
+  "logout_urls": [
+    "http://127.0.0.1:5173/",
+    "https://jjt-snippets-dev.duckdns.org/"
+  ],
+  "origins": [
+    "http://127.0.0.1:5173",
+    "https://jjt-snippets-dev.duckdns.org"
+  ]
+}

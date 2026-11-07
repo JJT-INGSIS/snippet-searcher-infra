@@ -11,6 +11,16 @@
 *.log
 secrets/
 .sni56/
+.sni71/
+
+# Auth0 IaC: state and plans may contain provider-returned credentials.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log
 
 __pycache__/
 *.pyc
