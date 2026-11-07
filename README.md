@@ -42,6 +42,12 @@ python3 -B scripts/verify_https.py
 
 ## Documentación de arquitectura
 
+[Contrato de autenticación y autorización — SNI-71](docs/architecture/authentication-authorization-contract.md):
+identidad, rutas, expiración y límites entre UI, Snippets, Permissions y workers.
+[Preparación de Auth0 con Terraform](auth0/README.md): módulo de desarrollo y
+pruebas sin tenant. Cuenta, parámetros reales, aplicación de IaC y login integrado
+todavía pendientes; no modifica el runtime ni el CD de los servicios.
+
 [Decisión de comunicación y procesamiento asíncrono — SNI-27](docs/architecture/adr-001-async-processing.md):
 HTTP síncrono por defecto; eventos de dominio, Redis Streams y outbox para cambios
 masivos de reglas, activación de parser y tests automáticos tras editar. Incluye
