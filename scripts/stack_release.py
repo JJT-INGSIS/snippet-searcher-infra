@@ -42,6 +42,28 @@ def storage_provider(manifest):
     return manifest.get('storage_provider', 'local')
 
 
+def auth_environment(manifest):
+    # Public API settings are part of the release, not the deploy runner's environment.
+    auth = manifest.get('auth', {})
+    if not isinstance(auth, dict) or set(auth) - {'mode', 'issuer', 'audience'}:
+        raise ValueError('Configuración de autenticación desconocida')
+    mode = auth.get('mode', 'dev' if manifest['environment'] == 'dev' else 'disabled')
+    if not isinstance(mode, str) or mode not in {'disabled', 'dev', 'auth0'} \
+            or (mode == 'dev' and manifest['environment'] != 'dev'):
+        raise ValueError('Modo de identidad incompatible con el ambiente')
+    issuer, audience = auth.get('issuer', ''), auth.get('audience', '')
+    if not isinstance(issuer, str) or not isinstance(audience, str):
+        raise ValueError('Issuer/audience deben ser texto')
+    if mode == 'auth0':
+        if not isinstance(issuer, str) or not re.fullmatch(r'https://[A-Za-z0-9.-]+/', issuer):
+            raise ValueError('Auth0 requiere issuer HTTPS exacto con slash final')
+        if not isinstance(audience, str) or not audience or audience.strip() != audience:
+            raise ValueError('Auth0 requiere audience explícita')
+    elif issuer or audience:
+        raise ValueError('Issuer/audience sólo corresponden al modo auth0')
+    return {'AUTH_MODE': mode, 'AUTH_ISSUER': issuer, 'AUTH_AUDIENCE': audience}
+
+
 def ui_configuration(manifest):
     actor = manifest.get('ui', {}).get('dev_actor', '')
     return {'environment': manifest['environment'],
@@ -107,7 +129,7 @@ def validate_manifest(manifest):
     database = manifest['database']['image'] if version == 2 else manifest.get('database_image')
     if not isinstance(database, str) or not re.fullmatch(rf'postgres:18\.6-bookworm@{DIGEST}', database):
         raise ValueError('PostgreSQL 18.6-bookworm requiere digest exacto')
-    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui')):
+    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui', 'auth')):
         raise ValueError('Ampliar el inventario requiere schema_version=2')
     if version == 2:
         if 'database_image' in manifest:
@@ -116,6 +138,7 @@ def validate_manifest(manifest):
     settings = {APPLICATIONS[name]['variable']: image for name, image in images.items()}
     settings.update(POSTGRES_IMAGE=database, DEPLOY_ENV=manifest['environment'],
                     SNIPPET_RELEASE=json.dumps(manifest, separators=(',', ':')))
+    settings.update(auth_environment(manifest))
     return settings
 
 
@@ -216,6 +239,8 @@ def select_release(requested, previous, change_infrastructure=False):
         selected['images'][name] = requested['images'][name]
     if 'ui' in requested:
         selected['ui'] = deepcopy(requested['ui'])
+    if 'auth' in requested:
+        selected['auth'] = deepcopy(requested['auth'])
     validate_manifest(selected)
     return selected
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 
 from stack_release import (DATABASE_SERVICES, NGINX_FILES, SERVICES, expected_images,
-                           infrastructure, storage_provider, ui_environment, validate_manifest)
+                           auth_environment, infrastructure, storage_provider, ui_environment, validate_manifest)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -119,6 +119,12 @@ def verify_service_configuration(release, docker_json, application=None):
     if application != 'ui':
         snippets = docker_json('service', 'inspect', f'{stack}_snippets-service')[0]
         env = dict(entry.split('=', 1) for entry in snippets['Spec']['TaskTemplate']['ContainerSpec'].get('Env', []))
+        expected_auth = auth_environment(release)
+        # Legacy records/tasks have no AUTH_* variables. Preserve that transition,
+        # but require exact values after an explicit auth configuration is recorded.
+        if 'auth' in release or 'AUTH_MODE' in env:
+            if any(env.get(key, '') != value for key, value in expected_auth.items()):
+                raise ValueError('Configuración efectiva de autenticación distinta del registro')
         if env.get('STORAGE_PROVIDER', 'local') != storage_provider(release):
             raise ValueError('Proveedor efectivo distinto del registro')
         if storage_provider(release) == 'asset':

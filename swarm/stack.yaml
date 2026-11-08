@@ -24,6 +24,9 @@ services:
     image: ${SNIPPETS_IMAGE:?Definir SNIPPETS_IMAGE}
     environment:
       SPRING_PROFILES_ACTIVE: ${DEPLOY_ENV:?Definir DEPLOY_ENV}
+      AUTH_MODE: ${AUTH_MODE:-disabled}
+      AUTH_ISSUER: ${AUTH_ISSUER:-}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
       SPRING_CONFIG_IMPORT: configtree:/run/secrets/
       SPRING_DATASOURCE_URL: jdbc:postgresql://snippets-db:5432/snippets
       SPRING_DATASOURCE_USERNAME: snippets
