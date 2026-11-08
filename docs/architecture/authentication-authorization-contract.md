@@ -194,7 +194,9 @@ No modifica automáticamente application.properties ni app-config.json.
 
 Para backend se propone `AUTH_DOMAIN`, `AUTH_AUDIENCE` y `AUTH_MODE`; en UI un
 modo `auth0` con `domain`, `clientId`, `audience` en configuración runtime pública.
-SNI-72/73 deben documentar las propiedades reales al implementarlas. La imagen
+SNI-72 usa `AUTH_ISSUER` (URL completa y slash final), `AUTH_AUDIENCE` y `AUTH_MODE`;
+ver [configuración de la API](authentication-api-runtime.md). SNI-73 documentará
+las propiedades reales de UI al implementarlas. La imagen
 de UI continúa reusable, sin client secret y sin rebuild por ambiente.
 
 ## Entregas y aceptación
