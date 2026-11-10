@@ -1,5 +1,10 @@
 # SNI-82 — Salud de bases, Redis y storage
 
+La instalación DEV aprobada el 10/11/2026 se documenta en
+[runtime/README.md](runtime/README.md): agente independiente fuera de Swarm y colector
+privado. El bundle original de abajo sigue describiendo sus colectores; la recepción
+en New Relic continúa pendiente de una clave de ingesta accesible.
+
 Bundle candidato, probado localmente el 09/11/2026. No instala el agente de SNI-80,
 no configura una cuenta New Relic, no modifica CD ni se aplica automáticamente a
 DEV/PROD. **Recepción/entidades en New Relic pendientes** de instalar/verificar el agente de

@@ -1,0 +1,8 @@
+integrations:
+  - name: nri-docker
+    env:
+      USE_DOCKER_API: true
+      DOCKER_API_VERSION: "1.44"
+    when:
+      file_exists: /var/run/docker.sock
+    interval: 60s
