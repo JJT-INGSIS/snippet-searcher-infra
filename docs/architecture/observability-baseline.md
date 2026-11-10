@@ -1,6 +1,6 @@
 # SNI-79 — Base de observabilidad
 
-Estado: relevamiento en curso. Fuente de requisitos: presentación de observabilidad
+Estado: relevamiento inicial documentado. Fuente de requisitos: presentación de observabilidad
 de la cátedra, decisiones del equipo y tickets SNI-79–88. El diagrama describe
 componentes y conexiones disponibles en el proyecto; su presencia en cada VM se
 acredita por separado, no por aparecer en este archivo.
@@ -115,8 +115,8 @@ en estado `Running` no acredita que responda una operación de negocio.
 ## Matriz de fallos y cobertura propuesta
 
 Las señales y umbrales son propuestas de trabajo, no alertas ya instaladas.
-Los responsables de implementación remiten a tickets; el responsable de responder
-a cada incidente se acuerda con el equipo al configurar el workflow de alertas.
+Los responsables de implementación remiten a tickets; responde quien esté disponible,
+sin guardias ni rotación on-call.
 Los ensayos y la evidencia de la defensa se detallan en la preparación de
 [SNI-87](../observability/sni-87-failure-acceptance.md).
 
@@ -175,10 +175,24 @@ piloto. No activar dos mecanismos de envío para el mismo log.
 
 ## Responsables y criterios iniciales de incidentes
 
-Asignación propuesta según los tickets actuales. Es el responsable técnico que
-prepara la cobertura, no una guardia confirmada. El destinatario efectivo del
-aviso y su respaldo se acuerdan con el equipo en SNI-84/86. Cada regla se prueba
-en DEV antes de fijar un umbral definitivo.
+Los responsables técnicos son Juanchi para APM, trazas, logs y jobs asíncronos;
+Thiago para infraestructura, PostgreSQL, Redis, storage y ensayos de fallos; y
+Juanfran para Synthetics, dashboards, SLI/SLO, alertas y notificaciones. No son
+guardias: las alertas son compartidas y responde quien esté disponible. Cada regla
+se prueba en DEV antes de fijar un umbral definitivo.
+
+| Severidad | Ejemplo | Destino previsto |
+| --- | --- | --- |
+| Crítica | API caída, synthetic funcional fallando o procesamiento esencial detenido de forma sostenida | Correo a los tres y llamada si la integración gratuita está validada y autorizada |
+| Warning | Outbox acumulado, jobs retrasados, latencia o saturación sostenidas | Correo a los tres, sin llamada |
+| Informativa | Deploys y eventos operativos normales | Registro o dashboard |
+
+El destino grupal propuesto es un único destino de correo con las tres direcciones;
+debe configurarse y verificarse en SNI-84/86. No llamar por errores HTTP esperados,
+fallos aislados ni apagados intencionales de DEV. Silenciar DEV durante esos apagados;
+las llamadas de prueba se habilitan explícitamente, y las de PROD sólo después de
+validación y autorización. Para cada alerta documentar condición, severidad, ambiente,
+responsable técnico, destino, dashboard, primer diagnóstico y condición de resolución.
 
 | Incidente agrupado | Condición propuesta para empezar | Responsable técnico propuesto | Primera acción |
 | --- | --- | --- | --- |
@@ -205,10 +219,10 @@ de mantenimiento antes de apagar DEV; no se ha creado ningún silenciamiento.
 | Organización/cuenta New Relic | Cuenta `8718557`, creada por el usuario el 09/11/2026. La pantalla del plan muestra 100 GB de ingesta y un usuario Full Platform incluidos en el tramo gratuito; revisar uso y condiciones vigentes en la cuenta |
 | Región y accesos | El usuario seleccionó United States y figura como Full Platform. Confirmó que agregó a Juanchi y Thiago como Basic; verificar aceptación, grupo User y permisos efectivos al empezar sus tickets. Basic tiene limitaciones en vistas APM/infra |
 | Claves y aprovisionamiento | Cuenta creada; definir entrega segura y separar clave de ingesta de permisos de administración. Aún no se han creado ni distribuido credenciales en SNI-79 |
-| Ingesta, retención y logs | Pantalla del plan muestra 0/100 GB ingeridos al consultar; pendiente medir piloto y acordar presupuesto y retención |
+| Ingesta, retención y logs | Pantalla del plan muestra 0/100 GB ingeridos al consultar; referencia inicial revisable de 10 GB/mes. Medir piloto y verificar retención y facturación efectiva |
 | Synthetics | Revisar checks incluidos y costo antes de fijar frecuencia y ubicaciones |
-| Teléfono | Propuesta inicial push; confirmar si la cátedra exige SMS o llamada |
-| Defensa | Confirmar ambiente, tiempo máximo de detección y responsable de cada aviso |
+| Teléfono | Se busca una llamada real automática durante la defensa. Primera opción: Twilio Free Trial, condicionado a verificar gratuidad, disponibilidad para el celular argentino y una integración segura con deduplicación. Alternativa: push y correo si no resulta viable gratis; no se realizaron llamadas |
+| Defensa | Ensayos controlados en DEV de indisponibilidad, resultado funcional incorrecto, worker detenido y, si es viable y se autoriza, llamada. Definir tiempo máximo de detección y teléfono designado |
 | DEV apagado | Definir ventana y procedimiento de silenciamiento para apagados esperados |
 | SLO | Acordar ventana y objetivos cuando haya mediciones; no asumir que ejemplos de clase son compromisos |
 
@@ -229,7 +243,7 @@ esa prueba habrá que acordar frecuencia temporal, presupuesto y umbral, y usar
 además un check de disponibilidad adecuado. No se ha configurado ningún monitor
 ni se ha aprobado una frecuencia definitiva.
 
-Para iniciar el piloto se propone una meta interna revisable de **10 GB/mes**
+Para iniciar el piloto se adopta como referencia interna revisable **10 GB/mes**
 de ingesta total, con avisos de consumo al acercarse a 5 GB y 8 GB. Estas cifras
 son un presupuesto operativo propuesto y no un límite automático ni garantía de
 ausencia de cargos. Confirmar en el plan qué mecanismos de alertas o límites están
@@ -254,3 +268,27 @@ y [claves](https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/).
 
 Coordinar las respuestas con el usuario/equipo. Una duda abierta no impide iniciar
 instrumentación local, diagramas o un piloto con valores revisables.
+
+### Evaluación inicial de llamadas para la defensa
+
+Twilio documenta una prueba de 30 días, sin tarjeta, con 75 minutos de voz;
+Argentina figura entre los países admitidos. El destinatario debe estar verificado
+y pertenecer al país de registro. La cuenta utiliza un número de origen de prueba.
+Estas condiciones y la entrega al celular elegido se verificarán en la cuenta antes
+de efectuar llamadas, exclusivamente con autorización del usuario.
+
+PagerDuty documenta integración nativa con New Relic y 100 notificaciones SMS o
+telefónicas mensuales en Free, pero su tabla no incluye Argentina para llamadas en
+cuentas trial y no confirma de forma inequívoca el caso de una cuenta Free nueva.
+Por ello se prioriza evaluar Twilio sin asumir que la llamada ya está garantizada.
+
+La propuesta para SNI-84 es un workflow de New Relic con webhook autenticado y una
+función mínima hacia Twilio Voice, sin nuevo microservicio de negocio. Debe aceptar
+sólo alertas críticas autorizadas y el destinatario configurado, mantener secretos
+fuera del repositorio, aplicar deduplicación durable y límite de frecuencia, y poder
+desactivarse. Confirmar que la función y el almacenamiento necesario estén disponibles
+sin costo en la cuenta antes de adoptarlos; si no, usar correo y push. No comprar,
+activar servicios pagos ni llamar sin autorización. Fuentes: [Twilio Trial](https://www.twilio.com/docs/usage/trials),
+[Twilio Voice](https://www.twilio.com/docs/usage/trials/try-out-voice),
+[precios de PagerDuty](https://www.pagerduty.com/pricing/) y
+[países admitidos por PagerDuty](https://docs.pagerduty.com/incident-management/notifications/supported-countries).
