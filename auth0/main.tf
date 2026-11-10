@@ -54,3 +54,25 @@ resource "auth0_connection_client" "ui" {
   connection_id = var.database_connection_id
   client_id     = auth0_client.ui.id
 }
+
+# The existing M2M application and its Management API grant must be imported,
+# not recreated: its current secret is already in use by the team.
+resource "auth0_client" "dev_directory" {
+  name        = "snippet-searcher-dev-directory"
+  app_type    = "non_interactive"
+  grant_types = ["client_credentials"]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "auth0_client_grant" "dev_directory_management" {
+  client_id = auth0_client.dev_directory.id
+  audience  = "https://${var.tenant_domain}/api/v2/"
+  scopes    = ["read:users"]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
