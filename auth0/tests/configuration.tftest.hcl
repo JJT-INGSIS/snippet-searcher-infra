@@ -31,6 +31,20 @@ run "development_login_contract" {
   }
 }
 
+run "development_directory_least_privilege" {
+  command = plan
+
+  assert {
+    condition     = auth0_client.dev_directory.app_type == "non_interactive" && toset(auth0_client.dev_directory.grant_types) == toset(["client_credentials"])
+    error_message = "The directory must use a dedicated machine-to-machine client."
+  }
+
+  assert {
+    condition     = auth0_client_grant.dev_directory_management.audience == "https://fixture.us.auth0.com/api/v2/" && toset(auth0_client_grant.dev_directory_management.scopes) == toset(["read:users"])
+    error_message = "The directory may only read users from the tenant Management API."
+  }
+}
+
 run "reject_wildcard_callback_origin" {
   command = plan
   variables {

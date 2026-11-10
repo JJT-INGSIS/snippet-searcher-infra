@@ -13,9 +13,12 @@ login de UI ni la seguridad de Snippets. Ver el
 - Asociación de esta SPA a una conexión de usuarios Auth0 existente. Usa el
   recurso singular `auth0_connection_client`, sin reemplazar las asociaciones
   de otras aplicaciones. No administrar esa misma conexión con el recurso plural.
+- Aplicación M2M de directorio DEV y su autorización a Management API con el
+  único scope `read:users`. La instancia creada manualmente debe importarse
+  antes de cualquier apply: no crear una segunda aplicación ni un segundo grant.
 
 No administra tenant global, usuarios/contraseñas, roles por snippet, miembros del
-dashboard, conexiones sociales, M2M de negocio, refresco offline ni producción.
+dashboard, conexiones sociales, secretos M2M, refresco offline ni producción.
 La base de credenciales de usuarios pertenece a Auth0. El nombre dev no demuestra
 por sí solo que el tenant elegido sea correcto: revisarlo antes de plan/apply.
 
@@ -150,6 +153,60 @@ confundirse con una integración activa: falta configurar y probar backend/UI.
 El SDK hará PKCE; el módulo no garantiza el comportamiento de un cliente que
 implemente otro flujo por su cuenta. Sin refresh grants, la renovación puede
 requerir interacción; no hay promesa de renovación silenciosa permanente.
+
+## Adoptar la aplicación de directorio DEV existente — SNI-74
+
+La aplicación `snippet-searcher-dev-directory` y su autorización a Management
+API se crearon en el dashboard. Su credencial ya fue compartida con el responsable
+de SNI-74: **no crearla de nuevo ni rotar su secreto**. Terraform sólo administra
+el cliente y su grant; no solicita ni publica el Client Secret. El acceso de
+Thiago al dashboard se administra por separado.
+
+Antes de cualquier plan o apply del módulo modificado:
+
+1. Conservar una copia protegida del estado local existente y comprobar el tenant
+   exacto. No imprimir ni publicar el estado, planes o respuestas completas del
+   proveedor: pueden contener datos sensibles. No usar un estado vacío.
+2. En Auth0, identificar sin mostrar secretos el Client ID de la aplicación M2M
+   existente y el ID `cgr_...` del grant existente para
+   `https://jjt-snippet-searcher.us.auth0.com/api/v2/`. Confirmar que el grant
+   contiene únicamente `read:users` y que se refiere al cliente correcto. El
+   ID del grant se puede consultar en Applications → APIs → expandir la API.
+3. Comprobar que la credencial del operador Terraform puede leer clientes y
+   client grants. El bootstrap original no concedía `read:client_grants`;
+   no agregar permisos automáticamente. Cualquier ampliación debe ser mínima y
+   revisarse antes de actuar.
+4. Con las credenciales del operador cargadas únicamente en el proceso protegido,
+   importar ambos recursos usando sus IDs reales, no secretos:
+
+   ```powershell
+   terraform '-chdir=auth0' import '-var-file=development.tfvars' 'auth0_client.dev_directory' '<client-id-existente>'
+   terraform '-chdir=auth0' import '-var-file=development.tfvars' 'auth0_client_grant.dev_directory_management' '<grant-id-existente>'
+   ```
+
+   Si falla alguna importación, detenerse: no ejecutar apply ni reimportar a
+   ciegas. El import modifica el estado local, no crea recursos remotos.
+5. Ejecutar un plan guardado localmente y revisar que **no cree, reemplace,
+   elimine o modifique** el cliente, su grant, su credencial, la SPA/API ni la
+   conexión. Investigar cualquier diferencia antes de considerar un apply; no
+   publicar el plan ni su salida JSON. Verificar también que el permiso efectivo
+   siga siendo exclusivamente `read:users`.
+
+El runbook de SNI-71 usa la credencial administrativa de Terraform, distinta de
+la credencial runtime de directorio. El estado puede contener datos sensibles
+aunque este módulo no declare el secreto. Referencias: [import de cliente](https://registry.terraform.io/providers/auth0/auth0/1.56.0/docs/resources/client)
+y [import de grant](https://registry.terraform.io/providers/auth0/auth0/1.56.0/docs/resources/client_grant).
+
+### Resultado de adopción — 10/11/2026
+
+Se importaron al estado local existente el cliente DEV y su grant existente,
+después de respaldar el estado y comprobar la audience y el único scope
+`read:users`. Se añadió `read:client_grants` al operador Terraform para permitir
+la lectura de ese recurso. Un plan posterior no propuso cambios sobre los seis
+recursos administrados. El plan señaló diferencias de estado previas en atributos
+del cliente UI sin proponer cambios remotos; revisarlas si afectan futuros planes.
+No se ejecutó apply ni se rotaron secretos. Los planes siguientes necesitan
+conservar el permiso de lectura mientras se administre el grant con este operador.
 
 ## Fuentes
 
