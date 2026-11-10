@@ -1,7 +1,7 @@
 # SNI-82 — Relevamiento de salud de dependencias
 
 Revisión de fuentes: 09/11/2026, infra dev `773e1ae`.
-Estado: **inventario de configuración; diseño de recolección pendiente de Thiago**.
+Estado: **recolector/probe aprobados; permisos PostgreSQL pendientes. Bundle probado localmente; ingesta real pendiente de SNI-79/80**.
 No acredita el estado efectivo de las VMs, instrumentación ni recepción en New Relic.
 
 ## Componentes que debe distinguir la cobertura
@@ -36,8 +36,8 @@ La compatibilidad del recolector elegido se deberá probar con esas versiones.
 - Conexiones y sesiones PostgreSQL no son utilización del pool JDBC. El pool pertenece
   a la instrumentación de las aplicaciones; no se inventará esa medida desde SQL.
 - SNI-86 consume las señales para dashboards/alertas; no se crean políticas duplicadas.
-- El synthetic funcional de SNI-85 cubre la aplicación. El alcance del probe local
-  de SNI-82 está pendiente: volumen desde infraestructura o adaptador desde Snippets.
+- El synthetic funcional de SNI-85 cubre la aplicación. El probe local
+  de SNI-82 opera sobre el volumen desde infraestructura; no amplía el adaptador de Snippets.
 - SNI-87 ensaya fallas con ventana/datos de prueba y notificación reales. Todavía no
   hay evidencia de New Relic que permita ejecutar ni cerrar esa aceptación.
 - SNI-88 promueve una configuración revisada a PROD. No se activa producción como
@@ -54,14 +54,17 @@ se accederá directamente a datos de usuarios.
 No hay agente New Relic, integraciones, roles de monitoreo de bases, usuario Redis
 separado ni credencial de ingesta declarados en el dev revisado. No se usarán las
 credenciales de aplicación/administración como sustituto de las de observabilidad.
-La selección de recolector y alcance del probe está consultada a Thiago. Después
-se documentarán permisos mínimos, cadencia, timeouts, pérdida de señal y cobertura
-comprobada, separando pruebas locales de ingesta real.
+Thiago aprobó el 09/11/2026 integraciones oficiales New Relic + probe de storage,
+y probe del volumen con synthetic funcional separado. El bundle, permisos,
+cadencia parametrizada, límites y evidencia están en [el runbook](../../observability/README.md).
+La cuenta/agente y la recepción por ambiente todavía deben verificarse con SNI-79/80.
 
 Marco de análisis: capítulos 2 (trade-offs) y 21 (decisiones), según el
 [índice editorial de Fundamentals of Software Architecture, 2nd ed.](https://www.oreilly.com/library/view/fundamentals-of-software/9781098175504/).
-La comparación de integraciones oficiales con Collector es una propuesta del
-proyecto, todavía no una decisión aprobada ni una recomendación atribuida al libro.
+Se eligieron integraciones oficiales frente a Collector para reducir procesos y
+configuración propia, aceptando dependencia de New Relic. El probe del volumen
+evita ampliar Snippets, a costo de no recorrer su adaptador; SNI-85 conserva ese
+chequeo funcional. Son elecciones de Thiago, no recomendaciones atribuidas al libro.
 
 Referencias técnicas consultadas:
 [PostgreSQL New Relic](https://docs.newrelic.com/install/postgresql/),

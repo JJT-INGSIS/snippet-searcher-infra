@@ -1,0 +1,13 @@
+{
+  "version": "1.18.18",
+  "assets": {
+    "amd64": {
+      "url": "https://github.com/newrelic/nri-flex/releases/download/v1.18.18/nri-flex_linux_1.18.18_amd64.tar.gz",
+      "sha256": "ad2928c077e340cbfb353006ce09d9e186533c57e58f2491dda63f1d5a60fd2f"
+    },
+    "arm64": {
+      "url": "https://github.com/newrelic/nri-flex/releases/download/v1.18.18/nri-flex_linux_1.18.18_arm64.tar.gz",
+      "sha256": "02dd773217f15d2e3e12260e807184823470ef79eb4c986798215d1075e4e5fb"
+    }
+  }
+}
