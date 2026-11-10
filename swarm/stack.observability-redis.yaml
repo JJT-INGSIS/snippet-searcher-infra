@@ -1,0 +1,17 @@
+# Add only after reviewing the DEV candidate. Does not enable an agent or modify CD.
+version: "3.8"
+services:
+  redis:
+    networks:
+      redis_internal:
+        aliases: ["${DEPLOY_ENV:?Definir DEPLOY_ENV}-redis"]
+    secrets:
+      - source: obs_redis_password
+        target: obs_redis_password
+secrets:
+  obs_redis_password:
+    external: true
+
+networks:
+  redis_internal:
+    internal: true

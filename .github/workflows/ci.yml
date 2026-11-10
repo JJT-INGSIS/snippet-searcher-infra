@@ -74,6 +74,9 @@ jobs:
       - name: Test HTTP verification, evidence and deployment recovery
         run: python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
 
+      - name: Verify native dependency collectors and isolated storage faults (no New Relic account)
+        run: python3 -B scripts/verify_observability.py --architecture amd64 --evidence "$RUNNER_TEMP/sni82-evidence.json"
+
       - name: Verify real Asset and Azurite persistence in an isolated project
         run: python3 -B scripts/verify_asset_persistence.py
 
