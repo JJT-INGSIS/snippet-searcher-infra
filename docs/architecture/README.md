@@ -1,73 +1,28 @@
 # Arquitectura y flujos de Snippet Searcher
 
-Diagramas editables en Mermaid, basados en la consigna, las US1–16 y las decisiones del equipo. Describen el diseño propuesto; no afirman que estos componentes ya estén integrados en el Compose actual.
+Los diagramas de flujo de esta carpeta conservan decisiones y propuestas de su
+momento. Algunos estados de implementación son históricos. Para el inventario
+actual de componentes y conexiones, con evidencia y verificaciones pendientes por
+ambiente, consultar [la base de observabilidad SNI-79](observability-baseline.md).
 
-[ADR-001 / SNI-27](adr-001-async-processing.md): arquitectura híbrida aprobada el
-29/10/2026. HTTP síncrono por defecto y eventos con Redis Streams + outbox para los
-tres casos acordados. [Diseño mínimo](async-processing-design.md): contratos,
-recuperación y trabajo posterior. Implementación asíncrona pendiente.
+[ADR-001 / SNI-27](adr-001-async-processing.md) establece HTTP síncrono por defecto
+y Redis Streams con outbox para los casos asíncronos acordados. El
+[diseño mínimo](async-processing-design.md) explica sus contratos y recuperación.
+Las capacidades de outbox, trabajos y consumidores existen en el código integrado;
+su habilitación efectiva se comprueba por ambiente.
 
-## Cómo leerlos
-
-- **Acordado:** snippets coordina los casos de uso; permissions posee ownership y sharing; Language es interno de snippets y delega por HTTP al servicio del lenguaje.
-- **Aprobado, pendiente de implementar:** Redis Streams, Consumer Groups y outbox para US12/15, revalidación por activación administrativa de parser y US16. PostgreSQL conserva trabajos, progreso y resultados.
-- **Estado por componente:** Auth0 y US11–16 siguen separados. Storage local y adaptador Asset ya existen; seleccionar Asset en Azure es otra operación. US8–10 tiene motor/cliente integrado y entregas de coordinación/UI con estado propio en SNI-48/49/51/53; los diagramas no certifican aceptación conjunta.
-- **Diseño de reglas:** owner + lenguaje + versión, original como revisión del usuario y formateado como derivado. Concretar contratos funcionales en la implementación; PrintScript mantiene capacidades HTTP y carece de BD de negocio propia.
-
-Los perfiles de las User Stories no son roles de autorización. Ningún servicio accede a la base de otro.
-
-## Componentes
-
-```mermaid
-flowchart LR
-    ui["UI provista por la cátedra"]
-    auth["Auth0 y gestión de usuarios - FUTURO"]
-    storage["SnippetContentStorage: local o Asset"]
-
-    subgraph snippets["snippets-service"]
-        cases["API y casos de uso"]
-        language["Language: lenguaje, versión y capacidad"]
-        outbox["Publicador de outbox - FUTURO"]
-        background["Procesamiento de fondo - FUTURO"]
-    end
-
-    permissions["permissions-service"]
-    printscript["printscript-service: validar, ejecutar, formatear y lintear"]
-    snippetsDb[("BD exclusiva de snippets")]
-    permissionsDb[("BD exclusiva de permissions")]
-    redis[("Redis Streams interno - FUTURO")]
-
-    ui -->|"Operaciones de snippets"| cases
-    ui -.->|"Autenticación futura"| auth
-    cases -.->|"Integración futura de identidad y directorio"| auth
-    cases -->|"Ownership, acceso y sharing por HTTP"| permissions
-    permissions --> permissionsDb
-    cases --> snippetsDb
-    cases --> language
-    language -->|"HTTP: código, versión y parámetros"| printscript
-    cases -->|"Guardar y recuperar contenido"| storage
-    cases -.->|"Cambio, trabajo y outbox: commit local"| snippetsDb
-    snippetsDb -.->|"Hechos confirmados"| outbox
-    outbox -.->|"Publicar después del commit"| redis
-    redis -.->|"Consumer Group"| background
-    background -.->|"Snapshots, progreso y resultados durables"| snippetsDb
-    background -.->|"ACK tras persistir"| redis
-    background -.->|"IDs propios para reglas"| permissions
-    background -.->|"Procesamiento de cada snippet"| language
-    background -.->|"Contenido de revisión retenida"| storage
-```
-
-PrintScript recibe código y parámetros; no posee snippets ni consume Redis. El
-estado transitorio del intérprete se distingue de la persistencia de trabajos y
-resultados en Snippets. SNI-48 tiene auditoría durable interna aprobada y entrega
-en revisión al consultar Linear el 29/10; verificar integración antes de reutilizarla.
+Snippets coordina los casos de uso y contiene Language. Permissions mantiene
+ownership y sharing en su propia base. PrintScript expone operaciones de lenguaje
+por HTTP y puede usar Redis para operaciones recuperables cuando están habilitadas.
+La configuración define si Snippets usa storage local o Asset. La preparación y
+activación de Auth0 también se verifican por separado en cada ambiente.
 
 ## Flujos principales
 
 Para US8–10, consultar el [contrato de ejecución incremental
 (SNI-45)](./execution-contract.md) y sus [fixtures](../contracts/execution-v1.json).
-Documenta las decisiones aprobadas por Thiago y sus trade-offs; no afirma
-que existan los endpoints ni que la ejecución integrada esté implementada.
+Documenta los contratos y decisiones de ejecución. La evidencia de integración
+y despliegue se verifica en los tickets y releases correspondientes.
 
 | Flujo | Fuente | Diagrama |
 | --- | --- | --- |
@@ -83,10 +38,10 @@ que existan los endpoints ni que la ejecución integrada esté implementada.
 ## Recordatorios
 
 - Parser inválido impide guardar; incumplir lint es un resultado; un test fallido nunca revierte el update.
-- HTTP síncrono para operaciones puntuales. US12/15, activación de parser y US16 usan el diseño aprobado de eventos + Redis Streams + outbox; su implementación sigue pendiente.
+- HTTP síncrono para operaciones puntuales. US12/15, activación de parser y US16 usan eventos con Redis Streams y outbox cuando sus componentes están habilitados.
 - US9/10 necesitan salida incremental; la sesión interactiva además recibe inputs durante la ejecución.
 - Conservar original y formateado. Asociar resultados a revisión de código, reglas y procesador; no publicar resultados obsoletos como actuales.
 - El contrato con la UI para US1–7 está en [ui-integration.md de Snippets](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/ui-integration.md) (SNI-26).
-- Antes de implementar, concretar contratos de UI/reglas, retención de revisiones, identidad del procesador y capacidad compartida; reutilizar la abstracción de storage existente.
+- Verificar contratos de UI/reglas, retención de revisiones, identidad del procesador y capacidad compartida en el código y release efectivos.
 
 Para actualizar un diagrama, editar su bloque `mermaid`. Los enlaces entre archivos son relativos; desde Google Docs se utilizan enlaces absolutos de GitHub a estos mismos archivos.
