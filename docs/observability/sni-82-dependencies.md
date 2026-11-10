@@ -1,7 +1,7 @@
 # SNI-82 — Relevamiento de salud de dependencias
 
 Revisión de fuentes: 09/11/2026, infra dev `773e1ae`.
-Estado: **recolector/probe aprobados; permisos PostgreSQL pendientes. Bundle probado localmente; ingesta real pendiente de SNI-79/80**.
+Estado: **recolector, probe y permisos PostgreSQL aprobados. Bundle probado localmente; ingesta real pendiente del agente SNI-80**.
 No acredita el estado efectivo de las VMs, instrumentación ni recepción en New Relic.
 
 ## Componentes que debe distinguir la cobertura
@@ -70,3 +70,13 @@ Referencias técnicas consultadas:
 [PostgreSQL New Relic](https://docs.newrelic.com/install/postgresql/),
 [Redis New Relic](https://docs.newrelic.com/docs/infrastructure/host-integrations/host-integrations-list/redis/redis-integration/),
 [Flex](https://docs.newrelic.com/docs/infrastructure/host-integrations/host-integrations-list/flex-integration-tool-build-your-own-integration/).
+
+## Aprobación de permisos — 10/11/2026
+
+Thiago eligió `pg_read_all_stats` y credencial dedicada, con query monitoring
+desactivado, frente a una función protegida limitada al conteo de bloqueos. Se
+acepta acceso de la credencial a metadatos/textos SQL sin enviarlos a New Relic,
+a cambio de conservar la integración estándar y evitar un objeto SECURITY DEFINER
+propio. No se otorgaron permisos en las VMs. La base común SNI-79 ya está
+[integrada](../architecture/observability-baseline.md); el agente y la recepción
+efectiva siguen pendientes de SNI-80.

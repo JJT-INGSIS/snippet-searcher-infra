@@ -2,7 +2,8 @@
 
 Bundle candidato, probado localmente el 09/11/2026. No instala el agente de SNI-80,
 no configura una cuenta New Relic, no modifica CD ni se aplica automáticamente a
-DEV/PROD. **Recepción/entidades en New Relic pendientes** de SNI-79/80. No se marca
+DEV/PROD. **Recepción/entidades en New Relic pendientes** de instalar/verificar el agente de
+SNI-80. SNI-79 ya está integrado: ver la [base común](../docs/architecture/observability-baseline.md). No se marca
 SNI-82 Done sólo por renderizar este bundle o ejecutar colectores standalone.
 
 ## Decisiones y frontera
@@ -76,10 +77,12 @@ no sólo el status del proceso.
 
 ## Identidad, redes y permisos
 
-La propuesta PostgreSQL `pg_read_all_stats` está **pendiente de elección de Thiago**
-frente a una función protegida que exponga sólo el conteo de bloqueos. El SQL
-actual fue probado exclusivamente en QA; no es una autorización para otorgarlo
-en DEV/PROD. Las dos decisiones generales anteriores sí están aprobadas.
+Thiago aprobó el 10/11/2026 `pg_read_all_stats` con credencial dedicada y query
+monitoring desactivado. Se descartó la función SECURITY DEFINER restringida para
+evitar un objeto SQL adicional que mantener y revisar. Se acepta que la credencial
+pueda consultar metadatos/textos SQL, aunque el colector no los envíe. No permite
+leer tablas de aplicación. El perfil fue probado en QA; su instalación efectiva
+en cada ambiente todavía requiere revisar sus credenciales y ejecutar el runbook.
 
 
 - `environment`, `service`, `version` son dimensiones acotadas. No incluir snippet,

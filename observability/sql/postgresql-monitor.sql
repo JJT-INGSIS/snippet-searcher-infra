@@ -1,5 +1,5 @@
--- Compatibility candidate: PostgreSQL statistics-role choice is pending Thiago.
--- Run only in isolated QA until that decision and the environment review are complete.
+-- Approved by Thiago on 2026-11-10: dedicated pg_read_all_stats monitoring role.
+-- Apply only after the environment/credential review; this file does not deploy itself.
 -- Execute explicitly as the database operator, once per separate PostgreSQL instance.
 -- psql -v database=snippets (or permissions), password supplied only in environment.
 \set ON_ERROR_STOP on

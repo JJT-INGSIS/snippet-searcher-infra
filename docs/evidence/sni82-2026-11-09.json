@@ -139,5 +139,13 @@
     "scripts/verify_observability.py": "ed9324b7e3569cd74ef5e92743379009bc674a198050fdfde77d36fccca2647c",
     "scripts/install_observability_integrations.py": "d2836415f0cd32d9b8c6d287c9f13cd542c59670cae68ce14d496c0869ff656e",
     "redis/entrypoint.sh": "09d73c6335824d258fd801c5a0d44bd5a09e33f7578821fd511c23ec543292e2"
+  },
+  "permissionsApproval": {
+    "date": "2026-11-10",
+    "by": "Thiago",
+    "profile": "Dedicated pg_read_all_stats; query monitoring disabled",
+    "alternativeRejected": "Restricted SECURITY DEFINER function",
+    "acceptedCost": "Monitoring credential can inspect session metadata and SQL text; collector does not ingest it",
+    "liveEnvironmentsApplied": false
   }
 }
