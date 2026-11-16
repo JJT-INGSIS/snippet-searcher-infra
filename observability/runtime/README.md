@@ -119,3 +119,41 @@ con `You do not have permission to create this key.`. No se creó ni obtuvo una 
 válida, por lo tanto **el agente no se inició y la ingesta no está acreditada**.
 La cuenta necesita que su administrador cree/entregue la clave por un canal privado.
 Auth0 queda pospuesto por indicación del usuario; no se cambian sus recursos/permisos.
+
+## Compatibilidad con despliegues de aplicaciones
+
+El provisionamiento inicial reemplaza el entrypoint Redis y agrega un secreto de
+monitor y alias privados. El verificador anterior de CD exigía la configuración
+anterior exacta, por lo que rechazaba ese runtime incluso antes de actualizar la
+imagen de una aplicación. `observability_deployment.py` reconoce únicamente el
+marcador DEV `sni82-runtime-v1`, valida por SHA-256 el contenido del entrypoint
+revisado y comprueba los alias de las dos bases y Redis. `redis_runtime.py` acepta
+esa sustitución y el secreto adicional exacto, conservando las verificaciones de
+red privada, puertos, límites, orden de reemplazo y credenciales de aplicación.
+No lee la licencia ni contraseñas y no modifica el registro de release.
+
+Los despliegues independientes siguen actualizando sólo la imagen solicitada.
+Reaplicar el stack completo con este monitor instalado se rechaza **antes del
+render y de cualquier mutación de `apply_release`**: el manifiesto todavía no
+representa estos recursos y podría borrar los alias/configuración al reaplicarlo.
+No se habilita automáticamente observabilidad ni se admite este runtime en PROD.
+
+La alternativa de tolerar cualquier config/secreto adicional ocultaría cambios
+desconocidos; extender ahora el manifiesto y promoverlo en todos los workflows
+implicaría una migración operativa más amplia. Se eligió compatibilidad de lectura
+acotada al runtime aprobado. Beneficio: CD independiente compatible sin modificar
+permisos. Costo: acoplamiento a esa revisión exacta y bloqueo de reaplicaciones
+completas hasta reconciliar explícitamente su manifiesto. El marco de análisis de
+alternativas y registro de decisiones es el de capítulos 2/21 del índice del libro
+referenciado arriba; esta solución concreta es una decisión del proyecto.
+
+El bundle SSH incluye el módulo nuevo. La compatibilidad sólo estará activa
+cuando el workflow central use una revisión de infra que lo contenga; un commit
+local o merge sin actualizar esa referencia no cambia el CD instalado. Antes de
+promover, validar los checks y el piloto DEV; no cambiar tags/protecciones ni
+desplegar PROD como parte de esta corrección.
+
+Verificación local: 228 tests aprobados, incluidos runtime observado compatible,
+rechazo de config alterada/secreto extra/alias perdido, conservación del registro,
+ausencia de activación implícita y rechazo de reaplicación antes de mutaciones.
+No se ejecutó despliegue en VM en esta corrección.
