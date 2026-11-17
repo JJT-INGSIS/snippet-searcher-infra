@@ -64,6 +64,15 @@ def check_api(response, expected):
     json.loads(body)
 
 
+def check_bearer_required(response):
+    status, headers, body = response
+    require(status == 401, 'Auth0 debe rechazar acceso sin bearer válido')
+    require((header(headers, 'WWW-Authenticate') or '').startswith('Bearer'), 'Falta desafío Bearer')
+    if body:
+        require('json' in (header(headers, 'Content-Type') or ''), 'Error de API no debe ser HTML')
+        json.loads(body)
+
+
 def port_closed(host, port):
     try:
         with socket.create_connection((host, port), timeout=3):
@@ -93,11 +102,15 @@ def verify(environment):
         require(not re.search(rb'(?:src|href)=["\']http://', body), 'HTML carga recursos por HTTP')
     runtime = check_runtime(environment, request(host, '/app-config.json'))
     check_api(request(host, '/api/languages'), 200)
+    if runtime.get('identity', {}).get('mode') == 'auth0':
+        for headers in ({}, {'X-Dev-Actor-Id': 'dev-juanfran'}):
+            check_bearer_required(request(host, '/api/snippets?page=0&page_size=10', headers=headers))
     if environment == 'prod':
         for headers in ({}, {'X-Dev-Actor-Id': 'dev-juanfran'}):
             check_api(request(host, '/api/snippets?page=0&page_size=10', headers=headers), 401)
     for path in ('/api/actuator', '/api/actuator/health', '/api/permissions', '/api/assets'):
-        headers = {'X-Dev-Actor-Id': runtime['identity']['actorId']} if environment == 'dev' else {}
+        identity = runtime.get('identity', {})
+        headers = {'X-Dev-Actor-Id': identity['actorId']} if identity.get('mode') == 'dev' else {}
         require(request(host, path, headers=headers)[0] in (401, 403, 404), f'Ruta interna expuesta: {path}')
     blocked = request(host, '/api/languages', headers={'Origin': 'https://untrusted.invalid'})
     # Empty policy leaves public responses readable only same-origin; an explicit
