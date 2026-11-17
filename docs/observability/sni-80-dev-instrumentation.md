@@ -112,9 +112,39 @@ Aprobadas por Juan el 16/11/2026 («dale, aprobadas las 9»).
 - Referencia de SNI-79: 10 GB/mes, con avisos a 5 y 8 GB. La medición de O7 se anota
   en este documento.
 
+## Forwarder de logs
+
+| Pieza | Valor |
+| --- | --- |
+| Imagen | `fluent/fluent-bit:5.1.5@sha256:2740f387…e7b4` (multi-arquitectura) |
+| Contenedor | `snippet-observability-dev-logs`, fuera de Swarm, `restart: unless-stopped` |
+| Privilegios | Raíz de solo lectura, sin capacidades, `no-new-privileges`, sin socket de Docker |
+| Montajes | `/var/log/journal` y `/etc/machine-id` en solo lectura; config, parser e include de licencia en solo lectura; volumen propio para cursores y buffer |
+| Límites | 128 MiB, 0,25 CPU; 8 MiB en memoria por entrada de NGINX, 2 MiB por entrada de host; buffer en disco de hasta 256 MiB |
+| Lectura | Desde el final del journal (`Read_From_Tail`): no reenvía historia vieja al arrancar |
+| Envío | `nrlogs` a `log-api.newrelic.com` (cuenta US), gzip, hasta 5 reintentos |
+| Archivos | [fluent-bit.conf](../../observability/logs/fluent-bit.conf), [parsers-ingress.conf](../../observability/logs/parsers-ingress.conf), [forwarder.compose.yaml](../../observability/logs/forwarder.compose.yaml) |
+
+[start_log_forwarder_dev.py](../../scripts/start_log_forwarder_dev.py), con `sudo`:
+
+| Acción | Qué hace |
+| --- | --- |
+| `start` | Exige `agent.json` (no crea una licencia), copia los archivos a `/opt/snippet-observability/dev/logs-v1` (si ya existen, tienen que ser idénticos), genera el include de licencia 0600 sin pisar uno existente, levanta el contenedor y comprueba que corre |
+| `remove` | `docker compose down` sin `-v` y borra solo el include de licencia; conserva el volumen de estado y los archivos instalados |
+
+`--environment prod` existe pero no se aplica en este ticket: falla mientras no haya
+un `agent.json` de PROD (SNI-88).
+
 ## Reversión
 
-Pendiente: se completa con los scripts del paso 5.
+| Qué | Cómo |
+| --- | --- |
+| Forwarder | `sudo python3 scripts/start_log_forwarder_dev.py remove` |
+| Log JSON de NGINX | Desplegar la revisión anterior de `nginx_main` y `nginx_routes` con el CD; el driver vuelve a `json-file` quitando `logging` del stack |
+| Muestra de Swarm | Volver la integración a `swarm.sh` en el runtime instalado |
+
+No usar `down -v`, podas globales ni borrar volúmenes de aplicación. Al terminar una
+sesión, detener y desasignar la VM en Azure.
 
 ## Verificación
 

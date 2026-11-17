@@ -1,0 +1,32 @@
+name: snippet-observability-${SNIPPET_ENVIRONMENT:?Definir el ambiente}-logs
+services:
+  forwarder:
+    image: fluent/fluent-bit:5.1.5@sha256:2740f387f6e68fab66d28e4fa6a853387b9cab6ffb4cb78958f69bba4eb0e7b4
+    container_name: snippet-observability-${SNIPPET_ENVIRONMENT}-logs
+    hostname: vm-snippet-${SNIPPET_ENVIRONMENT}
+    command: [/fluent-bit/bin/fluent-bit, -c, /fluent-bit/etc/fluent-bit.conf]
+    environment:
+      SNIPPET_ENVIRONMENT: ${SNIPPET_ENVIRONMENT}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    volumes:
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - /etc/snippet-observability/${SNIPPET_ENVIRONMENT}/logs-license.conf:/fluent-bit/etc/license.conf:ro
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./parsers-ingress.conf:/fluent-bit/etc/parsers-ingress.conf:ro
+      - state:/fluent-bit/state
+    mem_limit: 128m
+    cpus: 0.25
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "2"}
+    labels:
+      environment: ${SNIPPET_ENVIRONMENT}
+      service: log-forwarder
+      version: sni80-logs-v1
+volumes:
+  state:
+    name: snippet-observability-${SNIPPET_ENVIRONMENT}-logs-state

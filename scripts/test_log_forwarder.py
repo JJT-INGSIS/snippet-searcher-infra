@@ -56,7 +56,8 @@ def filters_for(tag):
 
 def compose():
     result = subprocess.run(["docker", "compose", "-f", str(LOGS / "forwarder.compose.yaml"), "config",
-                             "--format", "json"], capture_output=True, text=True, check=True, timeout=30)
+                             "--format", "json"], capture_output=True, text=True, check=True, timeout=30,
+                            env={**os.environ, "SNIPPET_ENVIRONMENT": "dev"})
     return json.loads(result.stdout)["services"]["forwarder"]
 
 
@@ -113,13 +114,15 @@ class ForwarderContainerTests(unittest.TestCase):
         self.assertTrue(service["read_only"])
         self.assertEqual(service["cap_drop"], ["ALL"])
         self.assertNotIn("privileged", service)
-        self.assertNotIn("environment", service)
+        self.assertEqual(service["environment"], {"SNIPPET_ENVIRONMENT": "dev"})
         self.assertIn("mem_limit", service)
         self.assertIn("cpus", service)
         self.assertEqual(service["restart"], "unless-stopped")
         mounts = {item["target"]: item for item in service["volumes"]}
         self.assertNotIn("/var/run/docker.sock", mounts)
-        for target in ("/var/log/journal", "/run/log/journal", "/etc/machine-id",
+        self.assertEqual(mounts[forwarder.LICENSE_INCLUDE_TARGET]["source"],
+                         "/etc/snippet-observability/dev/logs-license.conf")
+        for target in ("/var/log/journal", "/etc/machine-id",
                        forwarder.LICENSE_INCLUDE_TARGET, "/fluent-bit/etc/fluent-bit.conf"):
             with self.subTest(target=target):
                 self.assertTrue(mounts[target].get("read_only"))
@@ -147,7 +150,7 @@ class LicenseIncludeTests(unittest.TestCase):
             self.assertEqual(target.read_text(), "@SET A=b\n")
 
     def test_agent_license_path_is_the_one_from_sni82(self):
-        self.assertEqual(str(forwarder.AGENT_CONFIGURATION), LICENSE_FILE)
+        self.assertEqual(str(forwarder.agent_configuration("dev")), LICENSE_FILE)
 
 
 if __name__ == "__main__":
