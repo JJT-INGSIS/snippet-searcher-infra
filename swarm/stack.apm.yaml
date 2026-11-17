@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  snippets-service:
+    environment:
+      NEW_RELIC_ENABLED: "true"
+      NEW_RELIC_ENVIRONMENT: ${DEPLOY_ENV:?Definir DEPLOY_ENV}
+    secrets:
+      - source: newrelic_license
+        target: newrelic_license
+  permissions-service:
+    environment:
+      NEW_RELIC_ENABLED: "true"
+      NEW_RELIC_ENVIRONMENT: ${DEPLOY_ENV:?Definir DEPLOY_ENV}
+    secrets:
+      - source: newrelic_license
+        target: newrelic_license
+  printscript-service:
+    environment:
+      NEW_RELIC_ENABLED: "true"
+      NEW_RELIC_ENVIRONMENT: ${DEPLOY_ENV:?Definir DEPLOY_ENV}
+    secrets:
+      - source: newrelic_license
+        target: newrelic_license
+secrets:
+  newrelic_license:
+    external: true
+    name: snippet-observability-${DEPLOY_ENV:?Definir DEPLOY_ENV}-newrelic-license

@@ -126,6 +126,14 @@ def reconcile_infrastructure(state, swarm):
     previous, candidate = operation['previous'], operation['candidate']
     validate_manifest(previous)
     validate_manifest(candidate)
+    if operation.get('scope'):
+        from scoped_deploy import SCOPES, ScopedSwarm
+        scope = operation['scope']
+        if scope not in SCOPES:
+            raise ValueError('Alcance de infraestructura desconocido')
+        SCOPES[scope][1](previous, candidate)
+        if getattr(swarm, 'scope', None) != scope:
+            swarm = ScopedSwarm(swarm.environment, previous, scope)
     swarm.check_manager()
     if operation.get('kind') != 'infrastructure' or previous['environment'] != candidate['environment'] \
             or candidate['environment'] != swarm.environment:
@@ -185,6 +193,8 @@ def deploy_infrastructure(state, requested, swarm, gate):
     if previous.get('checks') != {'convergence': 'passed', 'sql_and_internal_http': 'passed'}:
         raise ValueError('La base anterior no está confirmada; reconciliar antes del corte')
     candidate = select_release(requested, previous, change_infrastructure=True)
+    if getattr(swarm, 'scope', None):
+        swarm.rule(previous, candidate)
     if recovered_operation and candidate == previous:
         return recovered_operation  # Reconciliation already verified this exact state.
     require_images(swarm, previous)
@@ -206,6 +216,8 @@ def deploy_infrastructure(state, requested, swarm, gate):
     identity = 'infra-' + uuid4().hex
     operation = {'kind': 'infrastructure', 'state': 'updating', 'previous': upgrade_release(previous),
                  'candidate': candidate, 'started_at': datetime.now(timezone.utc).isoformat()}
+    if getattr(swarm, 'scope', None):
+        operation['scope'] = swarm.scope
     (state / 'operations').mkdir(mode=0o700, exist_ok=True)
     write_record(state / 'operations' / f'{identity}.json', operation)
     write_record(state / 'pending.json', {'operation': identity})
@@ -266,14 +278,46 @@ def main():
     parser.add_argument('--ui-image', help='Sólo plan: incorporar UI por su digest real; no actualiza una UI instalada')
     parser.add_argument('--ui-dev-actor', help='Sólo plan: actor público explícito de dev; vacío deshabilita identidad')
     parser.add_argument('--dev-record', type=Path, help='Registro confirmado de dev para promocionar los mismos digests')
+    parser.add_argument('--proxy-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar configs de NGINX y desplegar únicamente ese servicio')
+    parser.add_argument('--apm-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar apm y desplegar únicamente los servicios Java')
+    parser.add_argument('--apm', choices=('on', 'off'), help='Sólo plan: activar o desactivar APM en los servicios Java')
+    parser.add_argument('--auth-only', action='store_true',
+                        help='Con --infrastructure: cambiar sólo identidad de Snippets y UI en DEV')
+    parser.add_argument('--auth0-dev', action='store_true', help='Sólo plan: parámetros públicos Auth0 DEV verificados')
     args = parser.parse_args()
+    scope = 'auth' if args.auth_only else 'proxy' if args.proxy_only else 'apm' if args.apm_only else None
+    if sum((args.proxy_only, args.apm_only, args.auth_only)) > 1:
+        parser.error('Los alcances proxy-only, apm-only y auth-only no se combinan')
+    if scope and not (args.mode == 'deploy' and args.infrastructure):
+        parser.error('Los alcances parciales sólo acompañan a deploy --infrastructure')
+    if args.apm and args.mode != 'plan':
+        parser.error('--apm sólo acompaña a plan')
+    if args.auth0_dev and (args.mode != 'plan' or args.apm or args.ui_dev_actor is not None):
+        parser.error('--auth0-dev sólo acompaña a plan sin otros cambios de identidad/APM')
     manifest = json.loads(args.manifest.read_text())
     selected = validate_manifest(manifest)
     if args.mode == 'plan':
         if args.config_version < 1:
             raise ValueError('La revisión de config debe ser positiva')
-        print(json.dumps(plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
-                                      args.ui_image, args.ui_dev_actor, args.tls, args.install_redis), indent=2))
+        planned = plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
+                               args.ui_image, args.ui_dev_actor, args.tls, args.install_redis)
+        if args.apm:
+            planned['apm'] = {'enabled': args.apm == 'on'}
+            validate_manifest(planned)
+        if args.auth0_dev:
+            if manifest['environment'] != 'dev' or 'ui' not in manifest['images']:
+                raise ValueError('--auth0-dev requiere DEV con UI instalada')
+            public = json.loads((ROOT / 'auth0/development.public.json').read_text())
+            proxy = infrastructure(manifest).get('nginx', {})
+            if not proxy.get('tls') or 'https://' + proxy.get('hostname', '') not in public['origins']:
+                raise ValueError('El ingreso DEV debe coincidir con una origin HTTPS aprobada en Auth0')
+            planned['auth'] = {key: public[key] for key in ('issuer', 'audience')}
+            planned['auth']['mode'] = 'auth0'
+            planned['ui'] = {'auth': {key: public[key] for key in ('domain', 'client_id', 'audience')}}
+            validate_manifest(planned)
+        print(json.dumps(planned, indent=2))
         return
     if args.mode == "check":
         print(json.dumps(selected, indent=2))
@@ -322,6 +366,9 @@ def main():
             if args.infrastructure:
                 if previous is None or args.service:
                     raise ValueError('Infra requiere bootstrap confirmado y no combina --service')
+                if scope:
+                    from scoped_deploy import ScopedSwarm
+                    swarm = ScopedSwarm(manifest['environment'], previous, scope)
                 deploy_infrastructure(state, manifest, swarm,
                     lambda target: require_updated_callers(target, include_ui='ui' in manifest['images'],
                                                           redis='redis' in infrastructure(manifest)))

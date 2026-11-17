@@ -6,6 +6,9 @@ from pathlib import Path
 
 import observability_config
 
+RELEASE_FILE = "/host/home/azureuser/.local/state/snippet-searcher/{environment}/release.json"
+SWARM_TIMEOUT = "20s"
+
 
 def integrations(config):
     observability_config.validate(config)
@@ -56,13 +59,20 @@ def integrations(config):
     swarm = {
         "name": "nri-flex",
         "interval": str(config["intervalSeconds"]) + "s",
-        "timeout": "10s",
+        "timeout": SWARM_TIMEOUT,
         "config": {
             "name": "snippet-swarm",
             "apis": [
                 {
                     "event_type": "SnippetSwarmSample",
-                    "commands": [{"run": "/bin/sh /opt/runtime/swarm.sh"}],
+                    "commands": [
+                        {
+                            "run": "python3 /opt/runtime/swarm_sample.py --environment "
+                            + config["environment"]
+                            + " --release "
+                            + RELEASE_FILE.format(environment=config["environment"])
+                        }
+                    ],
                 }
             ],
         },

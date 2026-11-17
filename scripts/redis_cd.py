@@ -6,7 +6,7 @@ import re
 import urllib.request
 
 LEGACY_REVISION = '9fcc49204260566667171cdde320eea8f81c965d'
-VERSION = 'v0.6.4'
+VERSION = 'v0.6.6'
 
 
 def read_file(repository, path, revision):
@@ -33,6 +33,10 @@ def require_redis_cd(reader=read_file):
             ('scripts/stack_runtime.py', 'redis_transition'),
             ('scripts/stack_release.py', "'redis'"),
             ('scripts/ssh_deploy.py', "'redis_runtime.py'"),
+            ('scripts/ssh_deploy.py', "'apm_runtime.py'"),
+            ('scripts/stack_release.py', 'UI_AUTH_DOMAIN'),
+            ('scripts/scoped_deploy.py', 'def require_auth_only('),
+            ('scripts/internal_http.py', 'PASS API Auth0 exige bearer'),
             ('swarm/stack.redis.yaml', 'redis_password')):
         if marker not in reader('snippet-searcher-infra', path, revision):
             raise ValueError('El SHA del CD no contiene el contrato Redis requerido')

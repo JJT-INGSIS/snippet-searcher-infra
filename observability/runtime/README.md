@@ -227,3 +227,62 @@ Verificación local: 228 tests aprobados, incluidos runtime observado compatible
 rechazo de config alterada/secreto extra/alias perdido, conservación del registro,
 ausencia de activación implícita y rechazo de reaplicación antes de mutaciones.
 No se ejecutó despliegue en VM en esta corrección.
+
+## Entrega para SNI-86 tras el piloto v0.6.5
+
+La nota anterior describe la implementación del fix. El piloto posterior sí terminó:
+Permissions #29, PrintScript #34, Snippets #72 y UI #24 se integraron secuencialmente
+y completaron build, publicación, despliegue y registro de evidencia DEV. La
+[evidencia consolidada](../../docs/evidence/sni82-cd-pilot-2026-11-16.json) conserva
+runs, digests, cuatro journals `verified`, ausencia de operación pendiente,
+compatibilidad del monitor y recepción externa posterior a los despliegues.
+Fecha local: 16/11; timestamps finales UTC: 17/11 entre 01:52 y 02:01.
+
+**SNI-86 puede usar ahora las señales de dependencias.** No necesita esperar a
+que SNI-87 pruebe sus alertas: esa espera formaría el ciclo
+SNI-82 → SNI-86 → SNI-87 → cierre operativo de SNI-82. Mantener las brechas
+visibles permite avanzar en dashboards sin dar por verificada la aceptación completa.
+
+| Consumir en dashboards/diagnóstico | Identidad y significado |
+| --- | --- |
+| `PostgresqlInstanceSample`, `PostgresqlDatabaseSample`, `PgCustomQuerySample` | Cada base separada por `entityName` y `label.environment/service/version`; bloqueos son SQL, no utilización del pool JDBC |
+| `RedisSample` | `instance:dev-redis:6379`, mismas etiquetas nativas; observar memoria/persistencia y frescura, sin sustituir ausencia por cero |
+| `SnippetStorageSample` | `environment/service/version`, filtrar `up IS NOT NULL`; `contentOk` sólo en `storage-local`; los otros tres probes miden filesystem |
+| `SnippetSwarmSample` | Inventario de tareas e imágenes; no certifica el recorrido funcional ni sustituye logs/trazas |
+
+Las [consultas ya verificadas](dependencies-dev.nrql) tienen cadencia de 60 s.
+La consulta de conexiones devuelve `db.connections=11`, `db.maxconnections=100`
+y `db.deadlocksPerSecond=0` en cada base en el rango del piloto. Redis devuelve
+`system.usedMemoryBytes=1093752`, `system.maxmemoryBytes=134217728` y ambos estados
+AOF `ok`. Son observaciones históricas, no umbrales elegidos ni valores actuales.
+`keyset()` y las consultas reales confirmaron los nombres/tipos: el estado AOF es
+un string y las conexiones del servidor no representan ocupación del pool JDBC.
+Para revisar el piloto con DEV apagada, usar un rango histórico explícito:
+`SINCE '2026-11-17 01:50:00 +0000' UNTIL '2026-11-17 01:57:00 +0000'`.
+No interpretar el rango móvil sin muestras como salud ni como una falla inesperada
+durante mantenimiento. Los umbrales y el tratamiento de mantenimiento pertenecen
+a SNI-86; aquí no se inventan ni se duplican sus condiciones.
+
+La aceptación local del helper conserva `newRelicIngestionVerified: false` porque
+no consulta New Relic. La comprobación externa se registra en otro campo, con las
+filas observadas. El fixture local verificó escritura, lectura, integridad y borrado;
+no se activó Asset/Azurite. DEV terminó **Detenido (desasignado)**; PROD no se tocó.
+
+Pendientes que no se presentan como entregados: JDBC/pool y trazas reales (SNI-81),
+logs/diagnóstico completo de host y NGINX (SNI-80), y recepción de fallas/alertas/aviso
+en la ventana de SNI-86/87. Los ensayos aislados de SNI-82 siguen siendo evidencia de
+QA, no de notificaciones DEV. SNI-82 conserva su estado hasta cerrar su integración;
+su entrega de señales ya no es un bloqueo de entrada para SNI-86.
+
+## SNI-80: logs, muestra de Swarm y `runtime-v2` (17/11/2026)
+
+Los pendientes de SNI-80 mencionados arriba quedaron aplicados en DEV; el detalle y la
+evidencia están en [`docs/observability/sni-80-dev-instrumentation.md`](../../docs/observability/sni-80-dev-instrumentation.md).
+
+| Cambio | Efecto sobre este runtime |
+| --- | --- |
+| `runtime-v2` | `upgrade_observability_runtime_dev.py` copia `runtime-v1` sin modificarlo, agrega `swarm_sample.py` y `stack_release.py` y recrea el agente con la misma licencia, volumen y proyecto Compose. `revert` vuelve a `runtime-v1` |
+| `SnippetSwarmSample` | Suma `expectedImage`, `imageState`, `failedTasks`, `lastError`, `lastExitCode` y `oomKilled`; el `service` de cada fila llega como atributo directo |
+| Forwarder de logs | Contenedor aparte `snippet-observability-dev-logs` (Fluent Bit oficial) que reutiliza la licencia de `agent.json` mediante un include root 0600; no modifica el agente |
+| Marcador | `/etc/snippet-observability/dev/provisioned` sigue en `sni82-runtime-v1`: la compatibilidad de CD de este runbook no cambia |
+| NGINX | Se actualizó con `deploy --infrastructure --proxy-only`, que despliega solo `nginx` y respeta el rechazo a reaplicar el stack completo |

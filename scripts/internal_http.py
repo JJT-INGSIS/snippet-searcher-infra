@@ -38,15 +38,14 @@ def verify(stack):
         from smoke_tests import main
         if main() != 0:
             raise RuntimeError("Fallaron contratos HTTP de dev")
-        key = str(uuid4())
-        status, created = request('http://snippets-service:8080/snippets', 'POST',
-            {'name': 'infra-bootstrap-probe', 'description': None, 'language': 'printscript', 'version': '1.0', 'code': 'println(1);'},
-            {'Idempotency-Key': key, 'X-Dev-Actor-Id': 'infra-bootstrap-probe'})
-        assert status == 201 and created.get('id')
-        print(f"PASS Snippets creation/internal clients SQL/storage id={created['id']}", flush=True)
-        status, owner = request(permissions + '/ownership/' + created['id'])
-        assert status == 200 and owner['ownerId'] == 'infra-bootstrap-probe'
-        print('PASS Snippets to Permissions ownership', flush=True)
+        from stack_release import auth_environment
+        if auth_environment(release or {'environment': 'dev'})['AUTH_MODE'] == 'auth0':
+            for headers in ({}, {'X-Dev-Actor-Id': 'infra-bootstrap-probe'}):
+                status, _ = request('http://snippets-service:8080/snippets', headers=headers)
+                assert status == 401
+            print('PASS API Auth0 exige bearer y rechaza header dev; login real requiere navegador', flush=True)
+        else:
+            verify_dev_creation(permissions)
     else:
         status, _ = request(permissions + '/ownership/' + str(uuid4()))
         assert status == 404
@@ -55,6 +54,18 @@ def verify(stack):
         verify_asset(release, stack)
     if application is None and release.get('infrastructure', {}).get('nginx'):
         verify_ingress(release)
+
+
+def verify_dev_creation(permissions):
+    key = str(uuid4())
+    status, created = request('http://snippets-service:8080/snippets', 'POST',
+        {'name': 'infra-bootstrap-probe', 'description': None, 'language': 'printscript', 'version': '1.0', 'code': 'println(1);'},
+        {'Idempotency-Key': key, 'X-Dev-Actor-Id': 'infra-bootstrap-probe'})
+    assert status == 201 and created.get('id')
+    print(f"PASS Snippets creation/internal clients SQL/storage id={created['id']}", flush=True)
+    status, owner = request(permissions + '/ownership/' + created['id'])
+    assert status == 200 and owner['ownerId'] == 'infra-bootstrap-probe'
+    print('PASS Snippets to Permissions ownership', flush=True)
 
 
 def verify_asset(release, stack):
