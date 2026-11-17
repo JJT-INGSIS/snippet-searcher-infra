@@ -36,9 +36,21 @@ def require_apm_only(previous, release):
         raise ValueError("La actualización de APM sólo admite cambiar el campo apm")
 
 
+def without_background(release):
+    result = upgrade_release(release)
+    result.pop("background", None)
+    return result
+
+
+def require_background_only(previous, release):
+    if without_background(previous) != without_background(release):
+        raise ValueError("La actualización del procesamiento de fondo sólo admite cambiar el campo background")
+
+
 SCOPES = {
     "proxy": (frozenset({PROXY}), require_proxy_only),
     "apm": (frozenset(SERVICES), require_apm_only),
+    "background": (frozenset({"snippets-service", "printscript-service"}), require_background_only),
 }
 
 
