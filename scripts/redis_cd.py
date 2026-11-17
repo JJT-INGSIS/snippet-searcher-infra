@@ -6,7 +6,7 @@ import re
 import urllib.request
 
 LEGACY_REVISION = '9fcc49204260566667171cdde320eea8f81c965d'
-VERSION = 'v0.6.4'
+VERSION = 'v0.6.5'
 
 
 def read_file(repository, path, revision):
