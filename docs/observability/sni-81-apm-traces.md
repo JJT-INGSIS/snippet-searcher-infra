@@ -2,7 +2,7 @@
 
 Revisión de fuentes: 17/11/2026. Snippets `9b8be24`, Permissions `356c42c`, PrintScript
 `34417c3`, gradle-conventions `4a51ae0`, infra `e34c41f`.
-Estado: **en desarrollo. Diseño aprobado; nada aplicado todavía.**
+Estado: **aplicado y verificado en DEV (17/11/2026). PROD sin aplicar (SNI-88).**
 
 Instrumenta las tres JVM con APM para que un alta real por el ingreso se pueda seguir
 con un único Trace ID en Snippets, PrintScript y Permissions, con logs del mismo pedido.
@@ -173,5 +173,37 @@ Observaciones:
 
 ### DEV
 
-Pendiente. Con el colector falso se verifican localmente la traza compartida, los logs
-y los errores; en DEV se repite contra New Relic real.
+17/11/2026, horarios en UTC.
+
+| Paso | Resultado |
+| --- | --- |
+| Imágenes | PRs snippets #73, permissions #30 y printscript #35 desplegados por su CD con APM desactivado (Permissions necesitó un re-run por un `429` de Maven Central); infra #56 mergeado |
+| Secreto | `create_apm_license_secret.py`: `snippet-observability-dev-newrelic-license` desde `agent.json` |
+| Activación | Plan `--apm on` y `deploy --infrastructure --apm-only`: solo los tres servicios Java; verificación SQL, Permissions, UI y proxy en PASS; los 8 servicios `1/1`; agentes conectados como `<servicio> (dev)` a las 16:35 |
+| Alta real por el ingreso | 201, `X-Request-ID: bf32ceb5a286517d4f0545efd9ecee60` → transacción de Snippets `traceId 124cd1d367b6804c467d9acd307f6a32`, `sampled: true`, `outcome: success`, 76 ms |
+| Traza compartida | Spans de la misma traza: Snippets 55, PrintScript 48, Permissions 18. `Snippets/creation/prepare` 19 ms (con `External/printscript-service`), `content` 8 ms, `owner` 14 ms (con `External/permissions-service` y `Datastore/statement/Postgres/snippet_ownership/insert` en Permissions), `confirm` 3 ms |
+| Logs del pedido | Con un solo ID: la línea `nginx-ingress` (`route: api`, `status: 201`, `request_id`) y los logs de Snippets por `trace.id` |
+| Permissions caído | `scale=0` de 16:46:29 a 16:48:29; alta 502 `X-Request-ID: 336656d10c81834ac20b91206e08f845` → `outcome: technical`, `error: true`; `prepare` y `content` sin error y `External/UnknownHost/JavaHttpClient/failed` bajo `Snippets/creation/owner`; logs: `nginx-ingress` 502, `WARN … PERMISSIONS_UNAVAILABLE` y `Request completed with status 502` con `context.request.id` |
+| Pool (SNI-82) | `Metric` con `Database Connection/HikariCP/HikariPool-1/{Busy Count[connections], Threads Awaiting Count[connections], Connection Timeout, …}` por `appName` |
+| Memoria | Snippets 324 → 413 MiB, Permissions 292 → 344 MiB, PrintScript 230 → 335 MiB, de 768 MiB; CPU ~0,1 % |
+| Ingesta inicial | 30 min: Span 2.100 eventos / 1.947 KB, Transaction 143 / 104 KB, Log 94 / 45 KB, TransactionError 3 / 3 KB (~3 GB/mes con la VM siempre encendida). 115 de las 143 transacciones eran healthchecks de Swarm (PrintScript `GET /`, Permissions `/actuator/health`) |
+| Healthchecks | Permissions #31 y PrintScript #36 agregan `HealthcheckTransactionFilter`, como Snippets. Después del deploy, 5 minutos sin tráfico: una sola transacción (`languages (GET)`, el synthetic) y ningún healthcheck |
+| Cierre | VM detenida y desasignada |
+
+### Consultas
+
+| Para qué | NRQL |
+| --- | --- |
+| Del `X-Request-ID` a la traza | `SELECT traceId, outcome, duration FROM Transaction WHERE request.id = '<X-Request-ID>' SINCE 1 hour ago` |
+| Recorrido entre servicios | `SELECT appName, name, duration * 1000 FROM Span WHERE trace.id = '<traceId>' AND (name LIKE 'Snippets/%' OR name LIKE 'External/%' OR name LIKE 'Datastore/%') SINCE 1 hour ago` |
+| Logs del pedido | `SELECT entity.name, logtype, status, level, message FROM Log WHERE trace.id = '<traceId>' OR request_id = '<X-Request-ID>' SINCE 1 hour ago`; el MDC llega como `context.request.id`, `context.outcome`, … |
+| Errores técnicos contra rechazos | `SELECT count(*) FROM Transaction WHERE appName = 'snippets-service (dev)' FACET outcome SINCE 1 day ago` |
+| Pool | `SELECT latest(newrelic.timeslice.value) FROM Metric WHERE appName = '<servicio> (dev)' AND metricTimesliceName LIKE 'Database Connection/HikariCP/%' FACET metricTimesliceName SINCE 30 minutes ago` |
+
+### Pendientes y observaciones
+
+- El forwarder de logs de SNI-80 pasó de 8,8 MiB a 74,5 MiB de 128 MiB después de varias
+  horas: revisarlo antes de que llegue al tope.
+- Con una dependencia caída, el agente agrega un `CompletionException` en una transacción
+  `Unknown`; es ruido del hilo interno del `HttpClient`.
+- Alertas sobre estas señales: SNI-86. Ensayo con aviso real: SNI-87. PROD: SNI-88.
