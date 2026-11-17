@@ -162,6 +162,29 @@ actual, que tiene `runtime-v1`, se aplica con
 | `upgrade` | Copia `runtime-v1` a `runtime-v2` sin tocar el original, agrega `swarm_sample.py` y `stack_release.py`, vuelve a generar `integrations.json` con versión `sni80-runtime-v2` y recrea el agente con el mismo proyecto Compose, licencia y volumen de estado |
 | `revert` | Recrea el agente con `runtime-v1`; `runtime-v2` queda para inspección |
 
+## Aplicar el NGINX nuevo con el monitoreo instalado
+
+Desde SNI-82 (PR #52), `deploy --infrastructure` se niega a reaplicar el stack
+completo en DEV mientras está instalado el monitoreo: el release no registra los alias
+de las bases y Redis, ni el entrypoint y el secreto de monitoreo de Redis, y
+reaplicarlos los borraría. El cambio de este ticket solo toca NGINX, así que se agrega
+un camino acotado:
+
+```bash
+sudo -n python3 -B scripts/bootstrap_swarm.py deploy candidate-dev.json --infrastructure --proxy-only
+```
+
+| Regla | Detalle |
+| --- | --- |
+| Qué se permite | Solo cambiar los nombres y hashes de configs ya registradas de NGINX; cualquier otro cambio respecto del release confirmado (imágenes, hostname, TLS, componentes, storage, UI, auth, configs nuevas o quitadas) se rechaza antes de tocar Docker |
+| Qué se despliega | Un documento de stack con **solo** el servicio `nginx`, sin `--prune`: bases, Redis, alias y demás servicios no se tocan |
+| Diario y verificación | Los mismos de `deploy --infrastructure`: lock compartido con el CD, `pending.json`, verificación del inventario completo y recibo |
+| Recuperación | Si la verificación falla, vuelve a desplegar solo `nginx` con el release anterior; el driver `journald` sale del stack del checkout y se mantiene |
+| Plan | `bootstrap_swarm.py plan` con `--nginx-host`, `--tls` y `--config-version 2`: renombra solo las configs cuyo contenido cambió (`nginx_main`, `nginx_routes`); si `v2` ya existe con otro contenido, el deploy falla y se usa la versión siguiente |
+
+Es la misma técnica que el corte de Redis (despliegue parcial sin `--prune`). Reconciliar
+el manifiesto con el monitoreo sigue siendo un pendiente de SNI-82.
+
 ## Consultas de pérdida de señal y diagnóstico
 
 Son consultas, no alertas: las alertas son de SNI-86. La ventana sigue a SNI-79
