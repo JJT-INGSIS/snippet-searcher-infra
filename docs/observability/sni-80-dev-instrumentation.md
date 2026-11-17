@@ -27,8 +27,8 @@ en la matriz de fallas, ingreso, VM, agente y despliegue son de Juanchi.
 | Pedido de ingreso | Log JSON de NGINX | `Log` con `logtype=nginx-ingress` | Errores y latencia por ruta y upstream; correlación por `request_id` |
 | OOM del kernel | journald, transporte `kernel` | `Log` con `logtype=host-kernel` | Distinguir un OOM de otra caída |
 | Eventos de Docker | journald, unidad `docker.service` | `Log` con `logtype=host-docker` | Reinicios y errores del motor |
-| Tareas fallidas | `swarm.sh` | `SnippetSwarmSample` (campos nuevos) | Último error, código de salida, 137 = OOM |
-| Versión esperada | `swarm.sh` + release confirmado | `SnippetSwarmSample` (campos nuevos) | Detectar un deploy que no convergió |
+| Tareas fallidas | `swarm_sample.py` | `SnippetSwarmSample` (campos nuevos) | Último error, código de salida, 137 = OOM |
+| Versión esperada | `swarm_sample.py` + release confirmado | `SnippetSwarmSample` (campos nuevos) | Detectar un deploy que no convergió |
 | Pérdida de señal | Ausencia de `SystemSample` / `SnippetSwarmSample` / `Log` | Consultas NRQL | Base de las alertas de SNI-86 |
 
 ### Log de ingreso
@@ -59,12 +59,24 @@ flowchart LR
   docker --> fb["Fluent Bit (fuera de Swarm)"]
   fb -->|Log API| nr["New Relic 8718557"]
   agent["Agente de infraestructura"] -->|SystemSample, ContainerSample, SnippetSwarmSample| nr
-  release["swarm/dev-release.json"] -.->|imagen esperada| agent
+  release["release.json confirmado por el CD"] -.->|imagen esperada| agent
 ```
 
 Fluent Bit corre como contenedor aparte, fuera de Swarm, igual que el agente: si el
-stack cae, el forwarder sigue informando. Lee la licencia del mismo archivo que el
-agente, montado en solo lectura; no hay una segunda copia ni una clave nueva.
+stack cae, el forwarder sigue informando. Usa la imagen oficial de Fluent Bit
+(`fluent/fluent-bit:5.1.5`, fijada por digest), que ya trae la salida `nrlogs` de New
+Relic y la lectura de journald; la imagen de New Relic solo agrega ese mismo plugin.
+NGINX pasa a escribir en journald (driver `journald`, tag `snippet-ingress`), así
+Fluent Bit lee una sola fuente y no necesita el socket de Docker.
+
+No hay clave nueva. Al arrancar, un script como root lee la licencia de `agent.json`
+y genera `/etc/snippet-observability/dev/logs-license.conf` (root, 0600, sin pisar
+uno existente), que Fluent Bit monta en solo lectura. La licencia no queda en la
+imagen, en el Compose, en variables de entorno ni en el repo.
+
+La muestra de Swarm pasa de `swarm.sh` a `swarm_sample.py` (el agente ya trae
+Python), que reutiliza `expected_images` del CD para comparar contra el release
+confirmado en `~azureuser/.local/state/snippet-searcher/dev/release.json`.
 
 ## Decisiones
 
@@ -72,7 +84,7 @@ Aprobadas por Juan el 16/11/2026 («dale, aprobadas las 9»).
 
 | # | Decisión | Alternativa descartada | Costo aceptado |
 | --- | --- | --- | --- |
-| O1 | Fluent Bit con la imagen oficial de New Relic, contenedor fuera de Swarm, reutilizando el archivo de licencia de la VM | Cambiar el agente a la instalación nativa con forwarder incluido | Un contenedor más que operar |
+| O1 | Fluent Bit oficial con su salida `nrlogs`, contenedor fuera de Swarm, reutilizando la licencia de la VM | Cambiar el agente a la instalación nativa con forwarder incluido; imagen de New Relic con el mismo plugin | Un contenedor más y un archivo derivado de la licencia |
 | O2 | Solo líneas de acceso de NGINX y, de journald, OOM del kernel y eventos de Docker | Todos los logs de contenedores | Los logs de las aplicaciones quedan para SNI-81 |
 | O3 | Log JSON de NGINX con ruta, upstream y tiempos, sin query, IP ni credenciales; `X-Request-ID` generado y devuelto al cliente | Mantener el formato `clave=valor` y parsearlo | Cambia el formato que otros scripts podrían leer |
 | O4 | `SnippetSwarmSample` suma tareas fallidas recientes, último error y código de salida; OOM del kernel por log | Un colector nuevo para tareas | Una llamada más a la API de Docker por intervalo |
@@ -88,7 +100,7 @@ Aprobadas por Juan el 16/11/2026 («dale, aprobadas las 9»).
 - SNI-81: APM, trazas y logs de las aplicaciones. Este ticket deja el `request_id`
   del ingreso listo para correlacionar.
 - SNI-82: el agente y el colector ya instalados; no se cambia su configuración salvo
-  `swarm.sh`.
+  `swarm.sh`, que se reemplaza por `swarm_sample.py`.
 - SNI-86: dashboards, SLO y alertas sobre estas señales.
 - SNI-87: ensayo de fallas.
 
