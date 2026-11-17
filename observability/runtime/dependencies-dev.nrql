@@ -9,6 +9,22 @@ FROM PostgresqlInstanceSample, PgCustomQuerySample, RedisSample
 FACET eventType(), entityName
 SINCE 10 minutes ago LIMIT MAX
 
+-- Conexiones del servidor PostgreSQL, NO ocupación del pool JDBC de la JVM.
+-- Nombres comprobados con keyset() y consulta real sobre el piloto final.
+SELECT latest(db.connections), latest(db.maxconnections),
+  latest(db.deadlocksPerSecond)
+FROM PostgresqlDatabaseSample WHERE label.environment = 'dev'
+FACET entityName, label.service
+SINCE 10 minutes ago LIMIT MAX
+
+-- Redis: memoria y estado de escritura/rewrite AOF. Estados son strings.
+SELECT latest(system.usedMemoryBytes), latest(system.maxmemoryBytes),
+  latest(db.aofLastWriteStatus), latest(db.aofLastBgrewriteStatus),
+  latest(net.connectedClients)
+FROM RedisSample WHERE label.environment = 'dev'
+FACET entityName, label.service
+SINCE 10 minutes ago LIMIT MAX
+
 -- Storage: separar muestras de salud de metadatos del agente sin up.
 -- contentOk sólo aplica al probe de contenido, no a los de filesystem.
 SELECT count(*), latest(up), latest(contentOk), latest(availableBytes),
