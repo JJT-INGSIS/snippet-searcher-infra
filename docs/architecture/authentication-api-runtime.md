@@ -47,6 +47,10 @@ variables AUTH_*.
 
 ## Activación posterior
 
+La activación integrada de UI/API en DEV y el alcance que preserva el monitor
+se documentan en [SNI-74](../sni-74-dev-auth0.md). La preparación antigua de abajo
+no registra una activación remota ejecutada.
+
 Integrar estos archivos no activa Auth0. Antes del corte DEV se necesita:
 
 1. SNI-73 listo para emitir bearer en HTTP/NDJSON y manejar reautenticación.

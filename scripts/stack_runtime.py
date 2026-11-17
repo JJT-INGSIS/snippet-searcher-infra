@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 
 from stack_release import (DATABASE_SERVICES, NGINX_FILES, SERVICES, expected_images,
-                           apm_enabled, auth_environment, infrastructure, storage_provider, ui_environment,
+                           apm_enabled, auth_environment, cors_environment, infrastructure, storage_provider, ui_environment,
                            validate_manifest)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -130,6 +130,9 @@ def verify_service_configuration(release, docker_json, application=None):
         if 'auth' in release or 'AUTH_MODE' in env:
             if any(env.get(key, '') != value for key, value in expected_auth.items()):
                 raise ValueError('Configuración efectiva de autenticación distinta del registro')
+        if 'auth' in release.get('ui', {}):
+            if any(env.get(key, '') != value for key, value in cors_environment(release).items()):
+                raise ValueError('Origen CORS efectivo distinto del ingreso UI registrado')
         if env.get('STORAGE_PROVIDER', 'local') != storage_provider(release):
             raise ValueError('Proveedor efectivo distinto del registro')
         if storage_provider(release) == 'asset':
