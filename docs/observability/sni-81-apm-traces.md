@@ -122,6 +122,22 @@ Hallazgos que ajustan los pasos siguientes:
   (paso 8); el RSS del Mac no sirve de referencia.
 - El colector falso sirve también para la verificación local del paso 8.
 
+## Activación en infra (P3, P4)
+
+| Pieza | Detalle |
+| --- | --- |
+| Release | Campo `apm: {"enabled": true|false}`, solo en releases v2. Ausente equivale a `false`. Las versiones anteriores del CD no lo rechazan y lo conservan al registrar deploys de imagen |
+| Overlay | [`swarm/stack.apm.yaml`](../../swarm/stack.apm.yaml): `NEW_RELIC_ENABLED=true`, `NEW_RELIC_ENVIRONMENT=<ambiente>` y el secreto `newrelic_license` en Snippets, Permissions y PrintScript; se agrega al render solo con `apm.enabled` |
+| Secreto | `snippet-observability-<ambiente>-newrelic-license`, creado una vez con `sudo python3 scripts/create_apm_license_secret.py`: lee la licencia de `agent.json` (la misma del agente y del forwarder), la pasa a Docker por stdin, no la imprime y no reemplaza un secreto existente |
+| Plan | `bootstrap_swarm.py plan … --apm on` (o `off`) |
+| Deploy | `deploy --infrastructure --apm-only`: igual que `--proxy-only` (SNI-80), pero acepta solo cambios del campo `apm` y despliega únicamente los tres servicios Java, sin `--prune`; bases, Redis, NGINX, UI y los alias del monitoreo no se tocan. Ambos alcances viven en [`scoped_deploy.py`](../../scripts/scoped_deploy.py) |
+| Verificación | `verify_service_configuration` controla en cada deploy que la variable, el ambiente y el secreto efectivos coincidan con `apm`; en un deploy de aplicación, solo en ese servicio |
+
+Cambio respecto de P3: la etiqueta `version` queda en `unknown`. Los deploys de aplicaciones
+solo cambian la imagen (`docker service update --image`) y no las variables, así que una
+versión puesta por variable quedaría desactualizada. La imagen efectiva de cada servicio ya
+está en `SnippetSwarmSample` (`image`, `imageState`) desde SNI-80.
+
 ## Verificación
 
 Pendiente. Con el colector falso se verifican localmente la traza compartida, los logs

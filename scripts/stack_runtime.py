@@ -7,7 +7,8 @@ from pathlib import Path
 import subprocess
 
 from stack_release import (DATABASE_SERVICES, NGINX_FILES, SERVICES, expected_images,
-                           auth_environment, infrastructure, storage_provider, ui_environment, validate_manifest)
+                           apm_enabled, auth_environment, infrastructure, storage_provider, ui_environment,
+                           validate_manifest)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -29,6 +30,8 @@ def render_release(release):
     if 'ui' in release['images']:
         files.append('swarm/stack.ui.yaml')
         settings.update(ui_environment(release))
+    if apm_enabled(release):
+        files.append('swarm/stack.apm.yaml')
     settings['STORAGE_PROVIDER'] = storage_provider(release)
     asset = release.get('asset', {})
     for name, default in (('container', 'snippets'), ('connect_timeout', '2s'), ('read_timeout', '5s'),
@@ -108,6 +111,8 @@ def require_configs(release, docker_json, create=False):
 
 def verify_service_configuration(release, docker_json, application=None):
     stack = f'snippet-searcher-{release["environment"]}'
+    from apm_runtime import require_apm_configuration
+    require_apm_configuration(release, docker_json, application)
     if 'redis' in infrastructure(release):
         from redis_runtime import verify_effective
         verify_effective(release, docker_json, application)

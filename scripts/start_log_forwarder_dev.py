@@ -40,14 +40,18 @@ def runtime_directory(environment):
     return Path(RUNTIME.format(environment=environment))
 
 
-def license_include(raw):
+def agent_license(raw):
     try:
         key = json.loads(raw).get("license_key")
     except (ValueError, AttributeError):
         raise ValueError("Agent configuration is not valid JSON") from None
     if not isinstance(key, str) or not LICENSE_PATTERN.fullmatch(key):
         raise ValueError("Agent configuration has no valid ingest license")
-    return "@SET " + LICENSE_VARIABLE + "=" + key + "\n"
+    return key
+
+
+def license_include(raw):
+    return "@SET " + LICENSE_VARIABLE + "=" + agent_license(raw) + "\n"
 
 
 def write_private(path, content):

@@ -129,7 +129,7 @@ def validate_manifest(manifest):
     database = manifest['database']['image'] if version == 2 else manifest.get('database_image')
     if not isinstance(database, str) or not re.fullmatch(rf'postgres:18\.6-bookworm@{DIGEST}', database):
         raise ValueError('PostgreSQL 18.6-bookworm requiere digest exacto')
-    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui', 'auth')):
+    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui', 'auth', 'apm')):
         raise ValueError('Ampliar el inventario requiere schema_version=2')
     if version == 2:
         if 'database_image' in manifest:
@@ -139,7 +139,15 @@ def validate_manifest(manifest):
     settings.update(POSTGRES_IMAGE=database, DEPLOY_ENV=manifest['environment'],
                     SNIPPET_RELEASE=json.dumps(manifest, separators=(',', ':')))
     settings.update(auth_environment(manifest))
+    apm_enabled(manifest)
     return settings
+
+
+def apm_enabled(manifest):
+    apm = manifest.get('apm', {'enabled': False})
+    if not isinstance(apm, dict) or set(apm) != {'enabled'} or type(apm['enabled']) is not bool:
+        raise ValueError('Configuración APM desconocida')
+    return apm['enabled']
 
 
 def validate_components(manifest):
@@ -241,6 +249,8 @@ def select_release(requested, previous, change_infrastructure=False):
         selected['ui'] = deepcopy(requested['ui'])
     if 'auth' in requested:
         selected['auth'] = deepcopy(requested['auth'])
+    if 'apm' in requested:
+        selected['apm'] = deepcopy(requested['apm'])
     validate_manifest(selected)
     return selected
 
