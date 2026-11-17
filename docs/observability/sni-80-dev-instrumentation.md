@@ -135,13 +135,73 @@ Aprobadas por Juan el 16/11/2026 («dale, aprobadas las 9»).
 `--environment prod` existe pero no se aplica en este ticket: falla mientras no haya
 un `agent.json` de PROD (SNI-88).
 
+## Muestra de Swarm
+
+[swarm_sample.py](../../observability/runtime/swarm_sample.py) corre dentro del agente cada
+60 segundos y emite una fila por servicio del stack `snippet-searcher-dev`:
+
+| Campo | Contenido |
+| --- | --- |
+| `service`, `image` | Nombre corto e imagen de la especificación vigente |
+| `expectedImage`, `imageState` | Imagen del release confirmado; `match`, `mismatch` o `unknown` (sin release o servicio fuera de él, como `certbot`) |
+| `running`, `desired` | Tareas corriendo y réplicas deseadas |
+| `failedTasks` | Tareas `failed` o `rejected` en los últimos 10 minutos |
+| `lastError`, `lastExitCode` | De la falla más reciente; el error se recorta a 200 caracteres |
+| `oomKilled` | 1 si alguna de esas fallas salió con 137 |
+
+La comparación usa el digest cuando las dos referencias lo tienen. Un nombre de servicio
+o imagen con caracteres inesperados hace fallar la muestra entera: no se emiten datos a
+medias. No lee environment, secretos ni la especificación completa.
+
+En una VM nueva, `prepare_observability_dev.py` ya instala el script. En la VM de DEV
+actual, que tiene `runtime-v1`, se aplica con
+[upgrade_observability_runtime_dev.py](../../scripts/upgrade_observability_runtime_dev.py):
+
+| Acción | Qué hace |
+| --- | --- |
+| `upgrade` | Copia `runtime-v1` a `runtime-v2` sin tocar el original, agrega `swarm_sample.py` y `stack_release.py`, vuelve a generar `integrations.json` con versión `sni80-runtime-v2` y recrea el agente con el mismo proyecto Compose, licencia y volumen de estado |
+| `revert` | Recrea el agente con `runtime-v1`; `runtime-v2` queda para inspección |
+
+## Consultas de pérdida de señal y diagnóstico
+
+Son consultas, no alertas: las alertas son de SNI-86. La ventana sigue a SNI-79
+(3–5 minutos, con muestras cada 60 segundos). Antes de fijarlas, comprobar los nombres
+de atributo con `keyset()` (paso 8): las etiquetas de las integraciones pueden llegar
+como `label.environment` en vez de `environment`.
+
+| Para qué | NRQL |
+| --- | --- |
+| Host sin señal | `SELECT count(*) FROM SystemSample WHERE environment = 'dev' SINCE 5 minutes ago` → 0 |
+| Muestra de Swarm sin señal | `SELECT count(*) FROM SnippetSwarmSample WHERE environment = 'dev' SINCE 5 minutes ago` → 0 |
+| Forwarder sin señal | `SELECT count(*) FROM Log WHERE logtype = 'nginx-ingress' AND environment = 'dev' SINCE 5 minutes ago` → 0 con el synthetic de SNI-84 activo |
+| Servicio sin réplicas | `SELECT latest(running), latest(desired) FROM SnippetSwarmSample WHERE environment = 'dev' FACET service SINCE 5 minutes ago` |
+| Versión que no convergió | `SELECT latest(imageState), latest(image), latest(expectedImage) FROM SnippetSwarmSample WHERE environment = 'dev' FACET service SINCE 10 minutes ago` |
+| Reinicios y OOM | `SELECT max(failedTasks), max(oomKilled), latest(lastError) FROM SnippetSwarmSample WHERE environment = 'dev' FACET service SINCE 30 minutes ago` |
+| OOM del kernel | `SELECT message FROM Log WHERE logtype = 'host-kernel' AND environment = 'dev' SINCE 1 day ago` |
+| Errores y latencia por ruta | `SELECT percentage(count(*), WHERE status >= 500), percentile(request_time, 95) FROM Log WHERE logtype = 'nginx-ingress' FACET route TIMESERIES SINCE 1 hour ago` |
+| Upstream caído | `SELECT count(*) FROM Log WHERE logtype = 'nginx-ingress' AND status IN (502, 503, 504) FACET route, upstream_status SINCE 1 hour ago` |
+| Un pedido puntual | `SELECT * FROM Log WHERE request_id = '<X-Request-ID de la respuesta>'` |
+| Ingesta (O7) | `SELECT sum(GigabytesIngested) FROM NrConsumption WHERE productLine = 'DataPlatform' FACET usageMetric SINCE 1 day ago` |
+
+### Etapa del CD
+
+| Etapa | Cómo se ve | Dónde mirar |
+| --- | --- | --- |
+| GitHub Actions | El workflow falla; en la VM nada cambia y `imageState` sigue en `match` con la imagen anterior | La ejecución del workflow |
+| GHCR | La tarea nueva queda `rejected` con un error de imagen | `failedTasks` y `lastError` |
+| SSH / VM | El workflow falla en el paso remoto; el release confirmado no cambia | Log del workflow y `logs/` del estado del CD en la VM |
+| Actualización en Swarm | Tareas `failed`, posible rollback automático | `failedTasks`, `lastExitCode`, `oomKilled` |
+| Convergencia | `running < desired`, o `mismatch` sostenido después de confirmar el release | `SnippetSwarmSample` por servicio |
+
+Los marcadores de deploy de New Relic quedan como propuesta aparte (O5).
+
 ## Reversión
 
 | Qué | Cómo |
 | --- | --- |
 | Forwarder | `sudo python3 scripts/start_log_forwarder_dev.py remove` |
 | Log JSON de NGINX | Desplegar la revisión anterior de `nginx_main` y `nginx_routes` con el CD; el driver vuelve a `json-file` quitando `logging` del stack |
-| Muestra de Swarm | Volver la integración a `swarm.sh` en el runtime instalado |
+| Muestra de Swarm | `sudo python3 scripts/upgrade_observability_runtime_dev.py revert`: el agente vuelve a `runtime-v1` y a `swarm.sh` |
 
 No usar `down -v`, podas globales ni borrar volúmenes de aplicación. Al terminar una
 sesión, detener y desasignar la VM en Azure.

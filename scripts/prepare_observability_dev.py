@@ -51,10 +51,13 @@ def prepare():
         "collector.stack.yaml",
         "docker-config.yml",
         "swarm.sh",
+        "swarm_sample.py",
         "images.lock.json",
     ):
         shutil.copy2(REPO / "observability/runtime" / name, ROOT / name)
         (ROOT / name).chmod(0o644)
+    shutil.copy2(REPO / "scripts/stack_release.py", ROOT / "stack_release.py")
+    (ROOT / "stack_release.py").chmod(0o644)
     (ROOT / "probes").mkdir()
     for name in ("asset_probe.py", "storage_health.py", "observability_config.py"):
         shutil.copy2(REPO / "scripts" / name, ROOT / "probes" / name)
