@@ -66,7 +66,7 @@ Aprobadas por Juan el 17/11/2026 («dale, aprobadas las 9»).
 | `Transaction` por servicio | Agente: Tomcat y Spring MVC | Latencia, throughput y errores por endpoint |
 | `Span` con `trace.id` compartido | Agente: `HttpClient` de la JDK con W3C `traceparent` | Recorrido del alta entre los tres servicios |
 | Spans de base de datos | Agente: JDBC de PostgreSQL | Persistencia de Snippets y Permissions, SQL ofuscado |
-| Pool de conexiones | Agente: HikariCP | Lo que pide SNI-82; nombres a confirmar en DEV |
+| Pool de conexiones | Agente: HikariCP, `Database Connection/HikariCP/<pool>/…` | Lo que pide SNI-82; nombres vistos en la prueba local, a confirmar en DEV |
 | Spans propios del alta | `@Trace` | Preparación, storage, dueño y confirmación |
 | `request.id` | Filtro de Snippets | Unir el log de NGINX con la transacción |
 | `outcome` | Snippets | Separar código inválido y denegaciones de errores técnicos |
@@ -91,8 +91,38 @@ Aprobadas por Juan el 17/11/2026 («dale, aprobadas las 9»).
 - Trazas a través de Redis Streams quedan afuera: el alta es síncrona por HTTP; los
   workers tienen transacciones propias.
 
+## Prueba de compatibilidad (P1), 17/11/2026
+
+Agente `newrelic-agent-9.5.0.jar` de Maven Central, SHA-256
+`411587286dbb83b06fcdd042ad1c9c1818655831366717aef3611962ea2c1b73` (igual al publicado).
+Los tres servicios de `dev` corrieron con el agente contra un **colector falso local**:
+un servidor HTTPS con certificado propio (`ca_bundle_path`) que responde `preconnect` y
+`connect` como New Relic y guarda cada envío. Licencia falsa; nada salió de la máquina.
+
+| Caso | Resultado |
+| --- | --- |
+| Alta exitosa | 201. Una sola traza (`traceId` compartido) con transacciones `snippets (POST)`, `validate (POST)` y `linting (POST)` de PrintScript y `ownership/{snippetId} (PUT)` de Permissions, cada una con la de Snippets como padre |
+| Spans del alta | Controlador de Snippets, llamadas externas por `JavaHttpClient/send` con URL y estado, `HikariDataSource/getConnection` y sentencias PostgreSQL con valores ofuscados (`?`) en Snippets y Permissions |
+| Código inválido | 422; error `HttpClientError 422` con `error.expected: true` (`expected_status_codes: 400-499`) |
+| Permissions caído | 502 `dependency-failure`; error `HttpServerError 502` no esperado; span `External/UnknownHost/JavaHttpClient/failed`; el log `stays pending: PERMISSIONS_UNAVAILABLE` llegó con el mismo `trace.id` |
+| Logs | Reenviados por el módulo `logback-classic-1.5.20`; dentro de un pedido llevan `trace.id` y `span.id` sin cambiar código |
+| Pool | Métricas `Database Connection/HikariCP/HikariPool-1/{Busy Count, Idle Count, Total Count, Max Pool Size, Threads Awaiting Count, …}` (para SNI-82) |
+| Muestreo | Las raíces salen `sampled: true` con el muestreo adaptativo; la 9.5 solo permite forzar el de padres remotos (`sampler.remote_parent_sampled: always_on`), que se usa para que los tramos de PrintScript y Permissions sigan a Snippets |
+
+Conclusión: **P1 se mantiene.** Spring MVC 7 y Tomcat 11 generan transacciones con el
+nombre del controlador y `traceparent` se propaga por el `HttpClient` de la JDK.
+
+Hallazgos que ajustan los pasos siguientes:
+
+- El storage local no aparece como span: solo las sentencias de `retained_content`.
+  Confirma `@Trace` en `content.store` y en los demás tramos del alta (P5).
+- Con la dependencia caída el span externo queda como `UnknownHost`, sin URL: el
+  `@Trace` de `owner.register` es lo que nombra el tramo que falló.
+- La memoria con el agente tiene que medirse en contenedor con el tope de 768 MiB
+  (paso 8); el RSS del Mac no sirve de referencia.
+- El colector falso sirve también para la verificación local del paso 8.
+
 ## Verificación
 
-Pendiente. En local, sin licencia, el agente no se conecta y no genera trazas
-distribuidas: ahí se verifican carga, instrumentación, logs y filtro. El Trace ID
-compartido se comprueba en DEV.
+Pendiente. Con el colector falso se verifican localmente la traza compartida, los logs
+y los errores; en DEV se repite contra New Relic real.
