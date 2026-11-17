@@ -1,8 +1,13 @@
 # SNI-82 — Relevamiento de salud de dependencias
 
 Revisión de fuentes: 09/11/2026, infra dev `773e1ae`.
-Estado: **recolector, probe y permisos PostgreSQL aprobados. Bundle probado localmente; ingesta real pendiente del agente SNI-80**.
-No acredita el estado efectivo de las VMs, instrumentación ni recepción en New Relic.
+El inventario siguiente describe las fuentes del 09/11, no el estado actual de las VMs.
+**Actualización operativa del 16/11:** ingesta real DEV y compatibilidad de CD
+verificadas después de los cuatro despliegues `v0.6.5`. SNI-86 ya puede consumir
+estas señales sin esperar la aceptación de fallas/avisos de SNI-87. Ver la
+[entrega operativa](../../observability/runtime/README.md#entrega-para-sni-86-tras-el-piloto-v065)
+y su evidencia. JDBC/pool sigue siendo una señal de aplicación de SNI-81;
+no se deduce de sesiones SQL ni se declara disponible.
 
 ## Componentes que debe distinguir la cobertura
 
