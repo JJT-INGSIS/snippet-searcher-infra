@@ -268,16 +268,28 @@ def main():
     parser.add_argument('--dev-record', type=Path, help='Registro confirmado de dev para promocionar los mismos digests')
     parser.add_argument('--proxy-only', action='store_true',
                         help='Con --infrastructure: sólo cambiar configs de NGINX y desplegar únicamente ese servicio')
+    parser.add_argument('--apm-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar apm y desplegar únicamente los servicios Java')
+    parser.add_argument('--apm', choices=('on', 'off'), help='Sólo plan: activar o desactivar APM en los servicios Java')
     args = parser.parse_args()
-    if args.proxy_only and not (args.mode == 'deploy' and args.infrastructure):
-        parser.error('--proxy-only sólo acompaña a deploy --infrastructure')
+    scope = 'proxy' if args.proxy_only else 'apm' if args.apm_only else None
+    if args.proxy_only and args.apm_only:
+        parser.error('--proxy-only y --apm-only no se combinan')
+    if scope and not (args.mode == 'deploy' and args.infrastructure):
+        parser.error('--proxy-only y --apm-only sólo acompañan a deploy --infrastructure')
+    if args.apm and args.mode != 'plan':
+        parser.error('--apm sólo acompaña a plan')
     manifest = json.loads(args.manifest.read_text())
     selected = validate_manifest(manifest)
     if args.mode == 'plan':
         if args.config_version < 1:
             raise ValueError('La revisión de config debe ser positiva')
-        print(json.dumps(plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
-                                      args.ui_image, args.ui_dev_actor, args.tls, args.install_redis), indent=2))
+        planned = plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
+                               args.ui_image, args.ui_dev_actor, args.tls, args.install_redis)
+        if args.apm:
+            planned['apm'] = {'enabled': args.apm == 'on'}
+            validate_manifest(planned)
+        print(json.dumps(planned, indent=2))
         return
     if args.mode == "check":
         print(json.dumps(selected, indent=2))
@@ -326,9 +338,9 @@ def main():
             if args.infrastructure:
                 if previous is None or args.service:
                     raise ValueError('Infra requiere bootstrap confirmado y no combina --service')
-                if args.proxy_only:
-                    from proxy_update import ProxySwarm
-                    swarm = ProxySwarm(manifest['environment'], previous)
+                if scope:
+                    from scoped_deploy import ScopedSwarm
+                    swarm = ScopedSwarm(manifest['environment'], previous, scope)
                 deploy_infrastructure(state, manifest, swarm,
                     lambda target: require_updated_callers(target, include_ui='ui' in manifest['images'],
                                                           redis='redis' in infrastructure(manifest)))
