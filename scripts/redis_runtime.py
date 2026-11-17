@@ -40,7 +40,9 @@ def config_files(release):
 
 
 def verify_effective(release, docker_json, application=None):
+    from observability_deployment import installed, redis_configs, require_aliases
     stack = f'snippet-searcher-{release["environment"]}'
+    monitored = installed(release['environment'])
     # Independent deploys preserve the installed Redis component, even for UI/Permissions.
     current = docker_json('service', 'inspect', f'{stack}_redis')[0]
     spec = current['Spec']
@@ -58,11 +60,17 @@ def verify_effective(release, docker_json, application=None):
            for item in container.get('Env', [])):
         raise ValueError('Credencial Redis en environment inspeccionable')
     configs = {item['ConfigName'] for item in container.get('Configs', [])}
-    expected = {item['name'] for item in release['infrastructure']['redis']['configs'].values()}
-    if configs != expected:
+    registered = release['infrastructure']['redis']['configs']
+    effective = redis_configs(registered, container, docker_json) if monitored else registered
+    expected = {item['name'] for item in effective.values()}
+    if configs != expected or len(container.get('Configs', [])) != len(expected):
         raise ValueError('Redis no conserva configs registradas')
     secrets = {(item['SecretName'], item['File']['Name']) for item in container.get('Secrets', [])}
-    if secrets != {('redis_password', 'redis_password')}:
+    expected_secrets = {('redis_password', 'redis_password')}
+    if monitored:
+        expected_secrets = expected_secrets | {('obs_redis_password', 'obs_redis_password')}
+        require_aliases(stack, docker_json)
+    if secrets != expected_secrets or len(container.get('Secrets', [])) != len(expected_secrets):
         raise ValueError('Redis no usa el secreto por archivo')
     if spec['TaskTemplate'].get('Resources', {}).get('Limits', {}).get('MemoryBytes') != 384 * 1024 * 1024:
         raise ValueError('Redis no conserva el límite de memoria')

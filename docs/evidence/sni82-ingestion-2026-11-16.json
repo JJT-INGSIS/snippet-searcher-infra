@@ -1,0 +1,332 @@
+{
+  "date": "2026-11-16",
+  "environment": "dev",
+  "host": "vm-snippet-dev",
+  "version": "sni82-runtime-v1",
+  "agentStartedAt": "2026-11-16T19:39:50.52625735Z",
+  "newRelicIngestionVerified": true,
+  "source": "Authenticated New Relic UI query results and Azure Run Command output",
+  "secretHandling": {
+    "licenseIncludedInEvidence": false,
+    "transport": "Encrypted for a temporary root-only RSA key on DEV; plaintext supplied only to reviewed starter stdin",
+    "temporaryTransportKeyRemoved": true,
+    "agentConfigurationMode": "0600",
+    "rotationRequiredBecauseSharedInChat": true
+  },
+  "agentPointSample": {
+    "cpuPercent": 0.03,
+    "memoryMiB": 136,
+    "memoryLimitMiB": 384,
+    "sustainedMeasurement": false
+  },
+  "applicationServices": {
+    "nginx": {
+      "running": 1,
+      "desired": 1
+    },
+    "permissions-db": {
+      "running": 1,
+      "desired": 1
+    },
+    "permissions-service": {
+      "running": 1,
+      "desired": 1
+    },
+    "printscript-service": {
+      "running": 1,
+      "desired": 1
+    },
+    "redis": {
+      "running": 1,
+      "desired": 1
+    },
+    "snippets-db": {
+      "running": 1,
+      "desired": 1
+    },
+    "snippets-service": {
+      "running": 1,
+      "desired": 1
+    },
+    "ui": {
+      "running": 1,
+      "desired": 1
+    }
+  },
+  "nativeReception": {
+    "query": "SELECT count(*), latest(label.environment), latest(label.service), latest(label.version), latest(blocked_sessions), latest(timestamp) FROM PostgresqlInstanceSample, PgCustomQuerySample, RedisSample FACET eventType(), entityName SINCE 10 minutes ago LIMIT MAX",
+    "account": 8718557,
+    "beginTime": "2026-11-16T19:30:52Z",
+    "endTime": "2026-11-16T19:40:52Z",
+    "queryGuid": "9b4ef82d-d554-11eb-fa56-01e5663819a7",
+    "facets": [
+      {
+        "identity": [
+          "PgCustomQuerySample",
+          "pg-instance:dev-permissions-db:5432"
+        ],
+        "values": {
+          "count": 1,
+          "label.environment": "dev",
+          "label.service": "permissions-db",
+          "label.version": "sni82-runtime-v1",
+          "blocked_sessions": 0,
+          "timestamp": 1794858000000
+        }
+      },
+      {
+        "identity": [
+          "PgCustomQuerySample",
+          "pg-instance:dev-snippets-db:5432"
+        ],
+        "values": {
+          "count": 1,
+          "label.environment": "dev",
+          "label.service": "snippets-db",
+          "label.version": "sni82-runtime-v1",
+          "blocked_sessions": 0,
+          "timestamp": 1794858000000
+        }
+      },
+      {
+        "identity": [
+          "PostgresqlInstanceSample",
+          "pg-instance:dev-permissions-db:5432"
+        ],
+        "values": {
+          "count": 1,
+          "label.environment": "dev",
+          "label.service": "permissions-db",
+          "label.version": "sni82-runtime-v1",
+          "blocked_sessions": null,
+          "timestamp": 1794858000000
+        }
+      },
+      {
+        "identity": [
+          "PostgresqlInstanceSample",
+          "pg-instance:dev-snippets-db:5432"
+        ],
+        "values": {
+          "count": 1,
+          "label.environment": "dev",
+          "label.service": "snippets-db",
+          "label.version": "sni82-runtime-v1",
+          "blocked_sessions": null,
+          "timestamp": 1794858000000
+        }
+      },
+      {
+        "identity": [
+          "RedisSample",
+          "instance:dev-redis:6379"
+        ],
+        "values": {
+          "count": 1,
+          "label.environment": "dev",
+          "label.service": "redis",
+          "label.version": "sni82-runtime-v1",
+          "blocked_sessions": null,
+          "timestamp": 1794858000000
+        }
+      }
+    ]
+  },
+  "storageReception": {
+    "query": "SELECT count(*), latest(up), latest(contentOk), latest(availableBytes), latest(timestamp) FROM SnippetStorageSample WHERE up IS NOT NULL FACET environment, service, version SINCE 10 minutes ago LIMIT MAX",
+    "account": 8718557,
+    "beginTime": "2026-11-16T19:32:11Z",
+    "endTime": "2026-11-16T19:42:11Z",
+    "queryGuid": "d5f61bb2-fffe-a798-db15-21addca07fbe",
+    "facets": [
+      {
+        "identity": [
+          "dev",
+          "redis-disk",
+          "sni82-runtime-v1"
+        ],
+        "values": {
+          "count": 3,
+          "up": 1,
+          "contentOk": null,
+          "availableBytes": 19918626816,
+          "timestamp": 1794858121000
+        }
+      },
+      {
+        "identity": [
+          "dev",
+          "snippets-db-disk",
+          "sni82-runtime-v1"
+        ],
+        "values": {
+          "count": 3,
+          "up": 1,
+          "contentOk": null,
+          "availableBytes": 19918618624,
+          "timestamp": 1794858120000
+        }
+      },
+      {
+        "identity": [
+          "dev",
+          "storage-local",
+          "sni82-runtime-v1"
+        ],
+        "values": {
+          "count": 3,
+          "up": 1,
+          "contentOk": 1,
+          "availableBytes": 19918618624,
+          "timestamp": 1794858121000
+        }
+      },
+      {
+        "identity": [
+          "dev",
+          "permissions-db-disk",
+          "sni82-runtime-v1"
+        ],
+        "values": {
+          "count": 2,
+          "up": 1,
+          "contentOk": null,
+          "availableBytes": 19918626816,
+          "timestamp": 1794858121000
+        }
+      }
+    ]
+  },
+  "localAcceptanceUnmodified": {
+    "timestamp": "2026-11-16T19:40:40.758029+00:00",
+    "environment": "dev",
+    "version": "sni82-runtime-v1",
+    "native": {
+      "snippets-db": {
+        "metricCount": 4,
+        "eventTypes": [
+          "PgCustomQuerySample",
+          "PostgresqlDatabaseSample",
+          "PostgresqlInstanceSample"
+        ]
+      },
+      "permissions-db": {
+        "metricCount": 4,
+        "eventTypes": [
+          "PgCustomQuerySample",
+          "PostgresqlDatabaseSample",
+          "PostgresqlInstanceSample"
+        ]
+      },
+      "redis": {
+        "metricCount": 2,
+        "eventTypes": [
+          "RedisKeyspaceSample",
+          "RedisSample"
+        ]
+      }
+    },
+    "storage": [
+      {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-runtime-v1",
+        "kind": "local",
+        "availableBytes": 19918684160,
+        "totalBytes": 30084825088,
+        "availableInodes": 3582833,
+        "writeOk": 1,
+        "readOk": 1,
+        "contentOk": 1,
+        "deleteOk": 1,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 4.227
+      },
+      {
+        "environment": "dev",
+        "service": "snippets-db-disk",
+        "version": "sni82-runtime-v1",
+        "kind": "filesystem",
+        "availableBytes": 19918684160,
+        "totalBytes": 30084825088,
+        "availableInodes": 3582833,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 0.035
+      },
+      {
+        "environment": "dev",
+        "service": "permissions-db-disk",
+        "version": "sni82-runtime-v1",
+        "kind": "filesystem",
+        "availableBytes": 19918684160,
+        "totalBytes": 30084825088,
+        "availableInodes": 3582833,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 0.032
+      },
+      {
+        "environment": "dev",
+        "service": "redis-disk",
+        "version": "sni82-runtime-v1",
+        "kind": "filesystem",
+        "availableBytes": 19918684160,
+        "totalBytes": 30084825088,
+        "availableInodes": 3582833,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 0.034
+      }
+    ],
+    "agentDispatchVerified": true,
+    "pinnedAgentFlexVerified": [
+      {
+        "name": "snippet-storage-local",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-snippets-db-disk",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-permissions-db-disk",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-redis-disk",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-swarm",
+        "eventType": "SnippetSwarmSample",
+        "metricCount": 9
+      }
+    ],
+    "newRelicIngestionVerified": false
+  },
+  "localAcceptanceNote": "The local helper does not query New Relic and deliberately reports ingestion false. External reception is independently verified above.",
+  "previousFaultEvidence": {
+    "path": "sni82-2026-11-09.json",
+    "environment": "isolated QA",
+    "notDevFaultEvidence": true
+  },
+  "limits": [
+    "Active DEV storage is local; Asset/Azurite not activated or proven by this run.",
+    "No shared DEV dependency was stopped to induce a failure; DEV failure/recovery acceptance remains pending.",
+    "JDBC/pool/APM belongs to SNI-81; no fabricated SQL substitute.",
+    "SNI-80 logs/alerts and CD preservation coordination remain separate.",
+    "PROD not started, modified or verified in this run."
+  ],
+  "issueState": "In Progress",
+  "sessionEnd": {
+    "devAzureState": "Detenido (desasignado)",
+    "verifiedAtUtc": "2026-11-16T19:44:49Z",
+    "prodTouched": false
+  }
+}

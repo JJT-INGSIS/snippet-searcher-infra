@@ -159,6 +159,8 @@ def verify_service_configuration(release, docker_json, application=None):
 
 
 def apply_release(release, docker_json, redis_transition=False):
+    from observability_deployment import require_reconciled_stack
+    require_reconciled_stack(release['environment'])
     rendered = render_release(release)
     if redis_transition:
         # Never --prune: leave every unrelated service untouched, including its task template.
