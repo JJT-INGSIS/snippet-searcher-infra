@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-17",
+  "ticket": "SNI-88",
+  "status": "PREPARATION_ONLY",
+  "environment": "prod",
+  "vmStarted": false,
+  "deployed": false,
+  "inventorySource": "docs/architecture/observability-baseline.md (remote read-only inspection 2026-11-09; not current runtime proof)",
+  "candidate": "observability/config.prod-local.example.json",
+  "activeTopologyAssumption": {
+    "storage": "local",
+    "redis": false,
+    "asset": false,
+    "mustRecheckBeforeDeployment": true
+  },
+  "localChecks": {
+    "genericRenderer": "PASS",
+    "integrations": 5,
+    "allLabelsProd": true,
+    "privateDatabaseAliasesProd": true,
+    "redisNotCollected": true,
+    "credentialValuesIncluded": false,
+    "infraSuite": {
+      "python": "3.12",
+      "tests": 228,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  "operationalRuntime": {
+    "status": "NOT_ADAPTED",
+    "devSpecificDispatcherStillRejectsProd": true,
+    "cdCompatibilityProdVerified": false
+  },
+  "blockers": [
+    "SNI-87 alert/device/recovery acceptance not executed",
+    "SNI-83/85/86 effective inputs pending; SNI-81 integrated in DEV, not yet verified in PROD",
+    "fresh PROD inventory and reviewed deployment window",
+    "environment-specific OAuth, secrets and operational adaptation"
+  ],
+  "acceptance": {
+    "newRelicProdReception": "NOT_EXECUTED",
+    "authenticatedFunctionalSynthetic": "NOT_EXECUTED",
+    "traceLogsPool": "NOT_EXECUTED",
+    "dashboardsSloWorkflow": "NOT_EXECUTED",
+    "notificationRecovery": "NOT_EXECUTED",
+    "sustainedConsumption": "NOT_EXECUTED"
+  },
+  "sourceRevision": "61abc3a"
+}
