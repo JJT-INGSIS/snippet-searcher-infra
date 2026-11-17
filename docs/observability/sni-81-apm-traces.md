@@ -140,5 +140,38 @@ está en `SnippetSwarmSample` (`image`, `imageState`) desde SNI-80.
 
 ## Verificación
 
+### Local, 17/11/2026
+
+Imágenes reales construidas desde las ramas de los tres servicios, con tope de 768 MiB,
+`NEW_RELIC_ENABLED=true`, licencia falsa montada en `/run/secrets/newrelic_license` y el
+agente apuntando al colector falso (mismo método que la prueba de compatibilidad).
+
+| Caso | Resultado |
+| --- | --- |
+| Arranque | Los tres agentes conectados por `start-service.sh` como `<servicio> (local)`; la línea de Java es `-javaagent … -jar /app/app.jar`; la licencia no aparece en logs, variables del contenedor ni argumentos |
+| Alta (`X-Request-ID` de NGINX) | 201; un solo `traceId` con `snippets (POST)`, `validate (POST)`, `linting` de PrintScript y `ownership/{snippetId} (PUT)` de Permissions con su `INSERT` ofuscado; spans `Snippets/creation/prepare`, `content`, `owner` y `confirm`; la transacción lleva `request.id` y `outcome: success` |
+| Listado y share | `GET /snippets` y `PUT /snippets/{snippetId}/shares/{userId}` con `outcome: success`, `request.id` y la línea «shared» del caso de uso |
+| Código inválido | 422; error esperado con `outcome: rejected` |
+| Share de un snippet ajeno | 404; `outcome: not-found`, sin error |
+| Permissions caído | 502; error `HttpServerError 502` no esperado con `outcome: technical`; el span `Snippets/creation/owner` concentra los 2 s del intento; el `WARN … PERMISSIONS_UNAVAILABLE` lleva el mismo `trace.id` y `request.id` |
+| `X-Request-ID` falso | Ignorado: no aparece en ningún envío |
+| Healthcheck | Transacción descartada y sin línea de log (corregido: Spring lo resuelve con la ruta comodín `/**`) |
+| Logs | JSON en consola con `operation`, `outcome`, `duration.ms` y `request.id`; reenviados por el agente con `trace.id`, `span.id` y solo esas claves del MDC |
+| Privacidad | Ningún envío contiene código del snippet |
+| Memoria (Snippets recién arrancado) | 335 MiB sin agente, 511 MiB con agente, de 768 MiB |
+| Desactivado | Sin ninguna línea de New Relic: arranca como antes |
+
+Observaciones:
+
+- El `connect` del agente incluye su configuración con la licencia: va solo al colector
+  de New Relic, que es quien la emite.
+- Con una dependencia caída, el `HttpClient` de la JDK falla en un hilo propio y el agente
+  agrega un error `CompletionException` en una transacción `Unknown`, sin `request.id`.
+  El error del pedido está en la transacción de Snippets; ese otro es ruido conocido.
+- El agente suma unos 175 MiB al arrancar. Queda margen dentro de 768 MiB; en DEV se mide
+  con uso real antes de decidir si hace falta subir el tope.
+
+### DEV
+
 Pendiente. Con el colector falso se verifican localmente la traza compartida, los logs
 y los errores; en DEV se repite contra New Relic real.
