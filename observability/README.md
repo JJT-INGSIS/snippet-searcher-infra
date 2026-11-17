@@ -1,5 +1,9 @@
 # SNI-82 — Salud de bases, Redis y storage
 
+La preparación separada de PROD está en
+[SNI-88](../docs/observability/sni-88-production-rollout.md). Su ejemplo de
+configuración no activa el runtime DEV en otra VM ni acredita recepción PROD.
+
 La instalación DEV aprobada el 10/11/2026 se documenta en
 [runtime/README.md](runtime/README.md): agente independiente fuera de Swarm y colector
 privado. El bundle original de abajo sigue describiendo sus colectores; la recepción
