@@ -273,3 +273,16 @@ logs/diagnóstico completo de host y NGINX (SNI-80), y recepción de fallas/aler
 en la ventana de SNI-86/87. Los ensayos aislados de SNI-82 siguen siendo evidencia de
 QA, no de notificaciones DEV. SNI-82 conserva su estado hasta cerrar su integración;
 su entrega de señales ya no es un bloqueo de entrada para SNI-86.
+
+## SNI-80: logs, muestra de Swarm y `runtime-v2` (17/11/2026)
+
+Los pendientes de SNI-80 mencionados arriba quedaron aplicados en DEV; el detalle y la
+evidencia están en [`docs/observability/sni-80-dev-instrumentation.md`](../../docs/observability/sni-80-dev-instrumentation.md).
+
+| Cambio | Efecto sobre este runtime |
+| --- | --- |
+| `runtime-v2` | `upgrade_observability_runtime_dev.py` copia `runtime-v1` sin modificarlo, agrega `swarm_sample.py` y `stack_release.py` y recrea el agente con la misma licencia, volumen y proyecto Compose. `revert` vuelve a `runtime-v1` |
+| `SnippetSwarmSample` | Suma `expectedImage`, `imageState`, `failedTasks`, `lastError`, `lastExitCode` y `oomKilled`; el `service` de cada fila llega como atributo directo |
+| Forwarder de logs | Contenedor aparte `snippet-observability-dev-logs` (Fluent Bit oficial) que reutiliza la licencia de `agent.json` mediante un include root 0600; no modifica el agente |
+| Marcador | `/etc/snippet-observability/dev/provisioned` sigue en `sni82-runtime-v1`: la compatibilidad de CD de este runbook no cambia |
+| NGINX | Se actualizó con `deploy --infrastructure --proxy-only`, que despliega solo `nginx` y respeta el rechazo a reaplicar el stack completo |

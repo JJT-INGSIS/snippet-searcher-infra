@@ -1,7 +1,7 @@
 # SNI-80 — Instrumentar la VM de DEV, Swarm y el ingreso NGINX
 
-Revisión de fuentes: 16/11/2026, infra dev `7dc6ca4`.
-Estado: **en desarrollo. Diseño aprobado; nada aplicado todavía en la VM.**
+Revisión de fuentes: 16/11/2026, infra dev `7dc6ca4`; aplicado en DEV el 17/11/2026 desde `1db4634`.
+Estado: **aplicado y verificado en DEV (17/11/2026). PROD sin aplicar (SNI-88).**
 
 Completa lo que el runtime de SNI-82 dejó pendiente
 ([runbook](../../observability/runtime/README.md)): logs del ingreso y del host,
@@ -27,7 +27,7 @@ en la matriz de fallas, ingreso, VM, agente y despliegue son de Juanchi.
 | Pedido de ingreso | Log JSON de NGINX | `Log` con `logtype=nginx-ingress` | Errores y latencia por ruta y upstream; correlación por `request_id` |
 | OOM del kernel | journald, transporte `kernel` | `Log` con `logtype=host-kernel` | Distinguir un OOM de otra caída |
 | Eventos de Docker | journald, unidad `docker.service` | `Log` con `logtype=host-docker` | Reinicios y errores del motor |
-| Tareas fallidas | `swarm_sample.py` | `SnippetSwarmSample` (campos nuevos) | Último error, código de salida, 137 = OOM |
+| Tareas fallidas | `swarm_sample.py` | `SnippetSwarmSample` (campos nuevos) | Último error y código de salida; 137 es SIGKILL, el OOM se confirma con `host-kernel` |
 | Versión esperada | `swarm_sample.py` + release confirmado | `SnippetSwarmSample` (campos nuevos) | Detectar un deploy que no convergió |
 | Pérdida de señal | Ausencia de `SystemSample` / `SnippetSwarmSample` / `Log` | Consultas NRQL | Base de las alertas de SNI-86 |
 
@@ -147,7 +147,7 @@ un `agent.json` de PROD (SNI-88).
 | `running`, `desired` | Tareas corriendo y réplicas deseadas |
 | `failedTasks` | Tareas `failed` o `rejected` en los últimos 10 minutos |
 | `lastError`, `lastExitCode` | De la falla más reciente; el error se recorta a 200 caracteres |
-| `oomKilled` | 1 si alguna de esas fallas salió con 137 |
+| `oomKilled` | 1 si alguna de esas fallas salió con 137 (SIGKILL). Lo produce un OOM, pero también un `docker kill` o un apagado que supera el timeout: es una señal para investigar y se confirma con el log `host-kernel` |
 
 La comparación usa el digest cuando las dos referencias lo tienen. Un nombre de servicio
 o imagen con caracteres inesperados hace fallar la muestra entera: no se emiten datos a
@@ -194,23 +194,25 @@ fija una infra con el contrato Redis completo; `v0.6.4` ahora se rechaza como ca
 ## Consultas de pérdida de señal y diagnóstico
 
 Son consultas, no alertas: las alertas son de SNI-86. La ventana sigue a SNI-79
-(3–5 minutos, con muestras cada 60 segundos). Antes de fijarlas, comprobar los nombres
-de atributo con `keyset()` (paso 8): las etiquetas de las integraciones pueden llegar
-como `label.environment` en vez de `environment`.
+(3–5 minutos, con muestras cada 60 segundos). Los nombres se comprobaron con `keyset()`
+en DEV: en `Log` y `SnippetSwarmSample`, `environment` y `service` llegan como atributos
+directos y el `service` de cada fila no lo pisa el atributo fijo del agente; las
+etiquetas de la integración quedan aparte como `label.environment`, `label.service` y
+`label.version`. `imageState IS NOT NULL` deja afuera muestras del `swarm.sh` anterior.
 
 | Para qué | NRQL |
 | --- | --- |
 | Host sin señal | `SELECT count(*) FROM SystemSample WHERE environment = 'dev' SINCE 5 minutes ago` → 0 |
 | Muestra de Swarm sin señal | `SELECT count(*) FROM SnippetSwarmSample WHERE environment = 'dev' SINCE 5 minutes ago` → 0 |
-| Forwarder sin señal | `SELECT count(*) FROM Log WHERE logtype = 'nginx-ingress' AND environment = 'dev' SINCE 5 minutes ago` → 0 con el synthetic de SNI-84 activo |
-| Servicio sin réplicas | `SELECT latest(running), latest(desired) FROM SnippetSwarmSample WHERE environment = 'dev' FACET service SINCE 5 minutes ago` |
-| Versión que no convergió | `SELECT latest(imageState), latest(image), latest(expectedImage) FROM SnippetSwarmSample WHERE environment = 'dev' FACET service SINCE 10 minutes ago` |
-| Reinicios y OOM | `SELECT max(failedTasks), max(oomKilled), latest(lastError) FROM SnippetSwarmSample WHERE environment = 'dev' FACET service SINCE 30 minutes ago` |
+| Forwarder sin señal | `SELECT count(*) FROM Log WHERE logtype = 'nginx-ingress' AND environment = 'dev' SINCE 5 minutes ago` → 0. Solo vale con tráfico constante (synthetic de SNI-84): sin pedidos también da 0 |
+| Servicio sin réplicas | `SELECT latest(running), latest(desired) FROM SnippetSwarmSample WHERE environment = 'dev' AND imageState IS NOT NULL FACET service SINCE 5 minutes ago`: `running < desired` es una caída; `desired = 0` es un servicio apagado a mano (`scale=0` baja las dos) |
+| Versión que no convergió | `SELECT latest(imageState), latest(image), latest(expectedImage) FROM SnippetSwarmSample WHERE environment = 'dev' AND imageState IS NOT NULL FACET service SINCE 10 minutes ago` |
+| Reinicios y OOM | `SELECT max(failedTasks), max(oomKilled), latest(lastError) FROM SnippetSwarmSample WHERE environment = 'dev' AND imageState IS NOT NULL FACET service SINCE 30 minutes ago` |
 | OOM del kernel | `SELECT message FROM Log WHERE logtype = 'host-kernel' AND environment = 'dev' SINCE 1 day ago` |
 | Errores y latencia por ruta | `SELECT percentage(count(*), WHERE status >= 500), percentile(request_time, 95) FROM Log WHERE logtype = 'nginx-ingress' FACET route TIMESERIES SINCE 1 hour ago` |
 | Upstream caído | `SELECT count(*) FROM Log WHERE logtype = 'nginx-ingress' AND status IN (502, 503, 504) FACET route, upstream_status SINCE 1 hour ago` |
 | Un pedido puntual | `SELECT * FROM Log WHERE request_id = '<X-Request-ID de la respuesta>'` |
-| Ingesta (O7) | `SELECT sum(GigabytesIngested) FROM NrConsumption WHERE productLine = 'DataPlatform' FACET usageMetric SINCE 1 day ago` |
+| Ingesta (O7) | `SELECT count(*), bytecountestimate() / 1000 AS 'KB' FROM Log, SnippetSwarmSample SINCE 30 minutes ago FACET eventType()`; total de la cuenta con `SELECT sum(GigabytesIngested) FROM NrConsumption WHERE productLine = 'DataPlatform' FACET usageMetric SINCE 1 day ago` (llega con demora) |
 
 ### Etapa del CD
 
@@ -229,12 +231,73 @@ Los marcadores de deploy de New Relic quedan como propuesta aparte (O5).
 | Qué | Cómo |
 | --- | --- |
 | Forwarder | `sudo python3 scripts/start_log_forwarder_dev.py remove` |
-| Log JSON de NGINX | Desplegar la revisión anterior de `nginx_main` y `nginx_routes` con el CD; el driver vuelve a `json-file` quitando `logging` del stack |
+| Log JSON de NGINX | Plan con los archivos anteriores de `nginx/` y `--config-version 3` (vuelve a contenido viejo con nombre nuevo) y `deploy --infrastructure --proxy-only`; para volver a `json-file`, quitar `logging` de `stack.ingress.yaml` en ese checkout. Las configs `v1` siguen creadas en Swarm |
 | Muestra de Swarm | `sudo python3 scripts/upgrade_observability_runtime_dev.py revert`: el agente vuelve a `runtime-v1` y a `swarm.sh` |
 
 No usar `down -v`, podas globales ni borrar volúmenes de aplicación. Al terminar una
 sesión, detener y desasignar la VM en Azure.
 
+## Aplicar en DEV
+
+Orden usado el 17/11/2026, todo con la VM encendida por Juan y por SSH como `azureuser`.
+El orden importa: Fluent Bit no arranca si el journal no tiene entradas de NGINX (con
+`Read_From_Tail` y sin cursor, un filtro sin coincidencias no recibe nada hasta reiniciar).
+
+1. Clonar la rama en `~/sni80-infra` y verificar el commit.
+2. Plan: `python3 -B scripts/bootstrap_swarm.py plan ~/.local/state/snippet-searcher/dev/release.json --nginx-host jjt-snippets-dev.duckdns.org --tls --config-version 2 > ~/sni80-candidate-dev.json`.
+3. `sudo -n python3 -B scripts/bootstrap_swarm.py deploy ~/sni80-candidate-dev.json --infrastructure --proxy-only`.
+4. Hacer un pedido y comprobar `sudo journalctl --no-pager -q -n 2 -o cat CONTAINER_TAG=snippet-ingress`.
+5. `sudo python3 -B scripts/start_log_forwarder_dev.py start`.
+6. `sudo python3 -B scripts/upgrade_observability_runtime_dev.py upgrade`.
+7. Detener y desasignar la VM.
+
+En DEV el 443 solo admite las IPs del equipo (regla `AllowTeamWeb`, ver
+[SNI-39](../sni-39-dns-red.md)). Desde otra IP el pedido queda colgado; para probar sin
+tocar el NSG: `curl --resolve jjt-snippets-dev.duckdns.org:443:127.0.0.1 https://jjt-snippets-dev.duckdns.org/api/languages`
+desde la VM, que pasa por el mismo NGINX, certificado y `server_name`.
+
 ## Verificación
 
-Pendiente.
+| Qué | Resultado |
+| --- | --- |
+| Tests | 272 pruebas de `scripts/`: log JSON y `X-Request-ID`, forwarder (config, contenedor, licencia, arranque), muestra de Swarm, actualización del runtime, `--proxy-only` y callers `v0.6.5` |
+| NGINX real local | `verify_nginx.py`: líneas JSON con los 12 campos, las tres rutas, sin query, y el `X-Request-ID` de la respuesta igual al que recibe el upstream |
+| Forwarder local | `verify_log_forwarder.py`: NGINX real → journald aislado → contenedor de Fluent Bit de producción; solo campos permitidos, línea mal formada descartada, solo OOM del kernel y warnings de Docker, sin historia, query, campos del driver ni licencia |
+| Muestra en la imagen del agente | Los tests de `swarm_sample.py` pasan con el Python 3.14 de `newrelic/infrastructure` |
+
+### DEV, 17/11/2026 (UTC)
+
+| Paso | Resultado |
+| --- | --- |
+| Estado inicial | Marcador `sni82-runtime-v1`, 8 servicios `1/1`, release confirmado con las 5 configs de NGINX en `v1`, sin operaciones pendientes |
+| Primer deploy | Frenado en el control de callers (`v0.6.4` contra `v0.6.5`) antes de tocar nada; corregido en `redis_cd.py` |
+| Deploy `--proxy-only` | `exit 0`; verificación SQL, Permissions, UI y proxy/TLS internos en PASS; `nginx_main` y `nginx_routes` en `v2`; driver `journald` con tag `snippet-ingress`; alias `dev-snippets-db`, `dev-permissions-db` y `dev-redis` intactos |
+| Pedido real | `X-Request-ID: d7a4d780…` en la respuesta y la misma línea JSON en journald con `route: api`, `status: 200` |
+| Forwarder | Arrancado a las 14:03; include de licencia `-rw------- root root`; sin errores |
+| Logs en New Relic | `keyset()` de `Log`: solo los 12 campos permitidos, `logtype`, `environment`, `service` y los que agrega New Relic; sin IP, `CONTAINER_*` ni `_HOSTNAME`; `status`, `request_time` y `bytes_sent` numéricos |
+| Agente `runtime-v2` | Recreado a las 14:07 con etiqueta `sni80-runtime-v2`; 8 servicios `match`, `1/1`, sin fallas; en New Relic una fila por servicio con `FACET service` |
+| Caída de UI | `scale=0` de 14:08:54 a 14:13:41: `SnippetSwarmSample` con `running` y `desired` en 0 de 14:08 a 14:12 y de vuelta en 1; `Log` con 7 pedidos `502/502` y 1 `504/504` en `route = 'ui'`, y `200` al restaurar |
+| Agente detenido | 14:16:23 a 14:21:25: `SnippetSwarmSample` en 0 durante 5 minutos y `SystemSample` durante 6; `Log` siguió llegando (2 por minuto), el forwarder no depende del agente |
+| Cierre | VM detenida y desasignada |
+
+### Medición (O7)
+
+| Qué | Antes | Después |
+| --- | --- | --- |
+| Agente | 0,03 % CPU, 138,7 MiB | 0,06–0,08 % CPU, 135,2 MiB (16,6 MiB recién reiniciado) |
+| Fluent Bit | — | 0,11–0,14 % CPU, 8,5–8,8 MiB de 128 MiB; 44 KB de estado en disco |
+| `SnippetSwarmSample` | — | ~1,1 KB por evento, 8 por minuto: ~0,39 GB/mes con la VM encendida todo el mes |
+| `Log` de NGINX | — | ~0,44 KB por pedido: ~13 MB/mes con 1.000 pedidos por día, ~0,13 GB con 10.000 |
+| Kernel y Docker | — | 0 eventos en la ventana medida |
+
+En el peor caso SNI-80 suma ~0,4–0,5 GB/mes, un 5 % de los 10 GB de referencia y lejos
+del aviso de 5 GB. La mayor parte del peso de la muestra son los atributos que el agente
+agrega a todo evento. DEV pasa la mayor parte del tiempo desasignada, así que el
+consumo real es menor.
+
+### Pendientes
+
+- Alertas sobre estas consultas: SNI-86.
+- Ensayo de fallas con aviso real: SNI-87.
+- PROD: inventario propio y `agent.json` de PROD (SNI-88).
+- Reconciliar el manifiesto con el monitoreo de SNI-82, para volver a usar `deploy --infrastructure` completo.
