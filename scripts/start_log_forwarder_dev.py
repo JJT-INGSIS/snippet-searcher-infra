@@ -23,6 +23,8 @@ OWNER_ONLY = 0o600
 SHARED_READ = 0o644
 SHARED_DIRECTORY = 0o755
 COMPOSE_SECONDS = 180
+JOURNAL_SECONDS = 30
+JOURNAL_MATCHES = ("CONTAINER_TAG=snippet-ingress", "_TRANSPORT=kernel", "_SYSTEMD_UNIT=docker.service")
 DESCRIPTION = "Start or remove the log forwarder outside Swarm, reusing the agent license"
 
 
@@ -74,12 +76,26 @@ def compose(environment, *arguments, capture=False):
     return result.stdout.strip() if capture else None
 
 
+def journal_has(match):
+    result = subprocess.run(["journalctl", "--quiet", "--no-pager", "--lines", "1", "--output", "cat", match],
+                            check=True, timeout=JOURNAL_SECONDS, capture_output=True, text=True)
+    return bool(result.stdout.strip())
+
+
+def missing_journal_sources():
+    return [match for match in JOURNAL_MATCHES if not journal_has(match)]
+
+
 def start(environment):
     source = agent_configuration(environment)
     if not source.is_file():
         raise ValueError("The agent license is missing; no new license is created here")
     if license_file(environment).exists():
         raise ValueError("A forwarder license include already exists; remove the forwarder first")
+    missing = missing_journal_sources()
+    if missing:
+        raise ValueError("The journal has no entries yet for " + ", ".join(missing)
+                         + "; deploy NGINX with the journald driver first")
     install_runtime(environment)
     write_private(license_file(environment), license_include(source.read_text()))
     compose(environment, "up", "-d")

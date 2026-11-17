@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import start_log_forwarder_dev as forwarder
 
@@ -85,6 +86,8 @@ class ForwarderConfigTests(unittest.TestCase):
         self.assertEqual(len(parsers), 1)
         self.assertEqual(value(parsers[0], "key_name"), "MESSAGE")
         self.assertEqual(value(parsers[0], "reserve_data"), None)
+        grep = [value(item, "regex") for item in filters_for("ingress") if value(item, "name") == "grep"]
+        self.assertEqual(grep, ["request_id ^[a-f0-9]{32}$"])
 
     def test_each_stream_keeps_only_allowlisted_fields(self):
         for tag, keys in (("ingress", INGRESS_KEYS), ("kernel", HOST_KEYS), ("docker", HOST_KEYS)):
@@ -148,6 +151,12 @@ class LicenseIncludeTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 forwarder.write_private(target, "@SET A=c\n")
             self.assertEqual(target.read_text(), "@SET A=b\n")
+
+    def test_start_requires_entries_for_every_journal_input(self):
+        self.assertEqual(set(forwarder.JOURNAL_MATCHES), set(JOURNAL_FILTERS.values()))
+        with patch("start_log_forwarder_dev.journal_has", side_effect=lambda match: "kernel" in match):
+            self.assertEqual(forwarder.missing_journal_sources(),
+                             ["CONTAINER_TAG=snippet-ingress", "_SYSTEMD_UNIT=docker.service"])
 
     def test_agent_license_path_is_the_one_from_sni82(self):
         self.assertEqual(str(forwarder.agent_configuration("dev")), LICENSE_FILE)
