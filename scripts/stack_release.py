@@ -65,13 +65,45 @@ def auth_environment(manifest):
 
 
 def ui_configuration(manifest):
-    actor = manifest.get('ui', {}).get('dev_actor', '')
+    ui = manifest.get('ui', {})
+    actor = ui.get('dev_actor', '')
+    if 'auth' in ui:
+        auth = ui['auth']
+        if not isinstance(auth, dict) or set(auth) != {'domain', 'client_id', 'audience'} or actor:
+            raise ValueError('UI requiere parámetros públicos Auth0 completos y sin actor dev')
+        domain, client, audience = (auth[key] for key in ('domain', 'client_id', 'audience'))
+        if not isinstance(domain, str) or len(domain) > 253 or '..' in domain or '.' not in domain \
+                or not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?', domain):
+            raise ValueError('Domain Auth0 de UI inválido')
+        if not isinstance(client, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,128}', client):
+            raise ValueError('Client ID público de UI inválido')
+        if not isinstance(audience, str) or len(audience) > 512 \
+                or not re.fullmatch(r'https://[A-Za-z0-9._~:/-]+', audience):
+            raise ValueError('Audience Auth0 de UI inválida')
+        api = auth_environment(manifest)
+        if api != {'AUTH_MODE': 'auth0', 'AUTH_ISSUER': 'https://' + domain + '/', 'AUTH_AUDIENCE': audience}:
+            raise ValueError('Auth0 de UI y API deben corresponder al mismo ambiente')
+        return {'environment': manifest['environment'], 'identity': {
+            'mode': 'auth0', 'domain': domain, 'clientId': client, 'audience': audience}}
     return {'environment': manifest['environment'],
             'identity': {'mode': 'dev', 'actorId': actor} if actor else {'mode': 'disabled'}}
 
 
 def ui_environment(manifest):
-    return {'APP_ENV': manifest['environment'], 'UI_DEV_ACTOR': manifest.get('ui', {}).get('dev_actor', '')}
+    identity = ui_configuration(manifest)['identity']
+    return {'APP_ENV': manifest['environment'], 'UI_DEV_ACTOR': identity.get('actorId', ''),
+            'UI_AUTH_DOMAIN': identity.get('domain', ''), 'UI_AUTH_CLIENT_ID': identity.get('clientId', ''),
+            'UI_AUTH_AUDIENCE': identity.get('audience', '')}
+
+
+def cors_environment(manifest):
+    origin = ''
+    if 'auth' in manifest.get('ui', {}):
+        proxy = infrastructure(manifest).get('nginx', {})
+        if not proxy.get('tls'):
+            raise ValueError('UI Auth0 remota requiere el ingreso HTTPS registrado')
+        origin = 'https://' + proxy['hostname']
+    return {'SNIPPETS_CORS_ALLOWED_ORIGINS': origin}
 
 
 def expected_images(manifest):
@@ -139,6 +171,7 @@ def validate_manifest(manifest):
     settings.update(POSTGRES_IMAGE=database, DEPLOY_ENV=manifest['environment'],
                     SNIPPET_RELEASE=json.dumps(manifest, separators=(',', ':')))
     settings.update(auth_environment(manifest))
+    settings.update(cors_environment(manifest))
     apm_enabled(manifest)
     settings.update(background_environment(manifest))
     return settings
@@ -198,12 +231,13 @@ def validate_components(manifest):
     if 'ui' in manifest['images'] and 'nginx' not in components:
         raise ValueError('UI requiere entrada NGINX explícita')
     ui = manifest.get('ui', {})
-    if not isinstance(ui, dict) or set(ui) - {'dev_actor'} or (ui and 'ui' not in manifest['images']):
+    if not isinstance(ui, dict) or set(ui) - {'dev_actor', 'auth'} or (ui and 'ui' not in manifest['images']):
         raise ValueError('Configuración UI desconocida o sin aplicación instalada')
     actor = ui.get('dev_actor', '')
     if not isinstance(actor, str) or (actor and (manifest['environment'] != 'dev' or
             not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@|/-]{0,127}', actor))):
         raise ValueError('Identidad UI de desarrollo inválida o habilitada en prod')
+    ui_configuration(manifest)
     if 'nginx' in components:
         proxy = components['nginx']
         host = proxy.get('hostname', '')

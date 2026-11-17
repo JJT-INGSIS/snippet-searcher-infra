@@ -126,6 +126,14 @@ def reconcile_infrastructure(state, swarm):
     previous, candidate = operation['previous'], operation['candidate']
     validate_manifest(previous)
     validate_manifest(candidate)
+    if operation.get('scope'):
+        from scoped_deploy import SCOPES, ScopedSwarm
+        scope = operation['scope']
+        if scope not in SCOPES:
+            raise ValueError('Alcance de infraestructura desconocido')
+        SCOPES[scope][1](previous, candidate)
+        if getattr(swarm, 'scope', None) != scope:
+            swarm = ScopedSwarm(swarm.environment, previous, scope)
     swarm.check_manager()
     if operation.get('kind') != 'infrastructure' or previous['environment'] != candidate['environment'] \
             or candidate['environment'] != swarm.environment:
@@ -185,6 +193,8 @@ def deploy_infrastructure(state, requested, swarm, gate):
     if previous.get('checks') != {'convergence': 'passed', 'sql_and_internal_http': 'passed'}:
         raise ValueError('La base anterior no está confirmada; reconciliar antes del corte')
     candidate = select_release(requested, previous, change_infrastructure=True)
+    if getattr(swarm, 'scope', None):
+        swarm.rule(previous, candidate)
     if recovered_operation and candidate == previous:
         return recovered_operation  # Reconciliation already verified this exact state.
     require_images(swarm, previous)
@@ -206,6 +216,8 @@ def deploy_infrastructure(state, requested, swarm, gate):
     identity = 'infra-' + uuid4().hex
     operation = {'kind': 'infrastructure', 'state': 'updating', 'previous': upgrade_release(previous),
                  'candidate': candidate, 'started_at': datetime.now(timezone.utc).isoformat()}
+    if getattr(swarm, 'scope', None):
+        operation['scope'] = swarm.scope
     (state / 'operations').mkdir(mode=0o700, exist_ok=True)
     write_record(state / 'operations' / f'{identity}.json', operation)
     write_record(state / 'pending.json', {'operation': identity})
@@ -280,16 +292,21 @@ def main():
                         help='Con --infrastructure: sólo cambiar background y desplegar únicamente Snippets y PrintScript')
     parser.add_argument('--publisher', choices=('on', 'off'), help='Sólo plan: publicador del outbox')
     parser.add_argument('--consumer', choices=('on', 'off'), help='Sólo plan: consumidor de eventos')
+    parser.add_argument('--auth-only', action='store_true',
+                        help='Con --infrastructure: cambiar sólo identidad de Snippets y UI en DEV')
+    parser.add_argument('--auth0-dev', action='store_true', help='Sólo plan: parámetros públicos Auth0 DEV verificados')
     args = parser.parse_args()
     scopes = [name for name, chosen in (('proxy', args.proxy_only), ('apm', args.apm_only),
-                                         ('background', args.background_only)) if chosen]
+                                         ('background', args.background_only), ('auth', args.auth_only)) if chosen]
     if len(scopes) > 1:
-        parser.error('--proxy-only, --apm-only y --background-only no se combinan')
+        parser.error('Los alcances proxy-only, apm-only, background-only y auth-only no se combinan')
     scope = scopes[0] if scopes else None
     if scope and not (args.mode == 'deploy' and args.infrastructure):
-        parser.error('--proxy-only, --apm-only y --background-only sólo acompañan a deploy --infrastructure')
+        parser.error('Los alcances parciales sólo acompañan a deploy --infrastructure')
     if (args.apm or args.publisher or args.consumer) and args.mode != 'plan':
         parser.error('--apm, --publisher y --consumer sólo acompañan a plan')
+    if args.auth0_dev and (args.mode != 'plan' or args.apm or args.ui_dev_actor is not None):
+        parser.error('--auth0-dev sólo acompaña a plan sin otros cambios de identidad/APM')
     manifest = json.loads(args.manifest.read_text())
     selected = validate_manifest(manifest)
     if args.mode == 'plan':
@@ -301,6 +318,16 @@ def main():
             planned['apm'] = {'enabled': args.apm == 'on'}
         if args.publisher or args.consumer:
             planned['background'] = switched_background(planned, publisher=args.publisher, consumer=args.consumer)
+        if args.auth0_dev:
+            if manifest['environment'] != 'dev' or 'ui' not in manifest['images']:
+                raise ValueError('--auth0-dev requiere DEV con UI instalada')
+            public = json.loads((ROOT / 'auth0/development.public.json').read_text())
+            proxy = infrastructure(manifest).get('nginx', {})
+            if not proxy.get('tls') or 'https://' + proxy.get('hostname', '') not in public['origins']:
+                raise ValueError('El ingreso DEV debe coincidir con una origin HTTPS aprobada en Auth0')
+            planned['auth'] = {key: public[key] for key in ('issuer', 'audience')}
+            planned['auth']['mode'] = 'auth0'
+            planned['ui'] = {'auth': {key: public[key] for key in ('domain', 'client_id', 'audience')}}
         validate_manifest(planned)
         print(json.dumps(planned, indent=2))
         return

@@ -19,7 +19,8 @@ BUNDLE_SCRIPTS = ('deploy_service.py', 'github_cd.py', 'stack_release.py', 'wait
 BUNDLE_FILES = ('swarm/stack.yaml', 'swarm/stack.ingress.yaml', 'swarm/stack.tls.yaml', 'swarm/stack.asset.yaml',
                 'swarm/stack.ui.yaml', 'swarm/stack.apm.yaml', 'swarm/stack.background.yaml', 'nginx/nginx.conf', 'nginx/templates/redirect.conf.template',
                 'nginx/templates/tls.conf.template', 'nginx/templates/routes.conf.template', 'nginx/validate-env.sh',
-                'swarm/stack.redis.yaml', 'redis/redis.conf', 'redis/entrypoint.sh', 'redis/healthcheck.sh')
+                'swarm/stack.redis.yaml', 'redis/redis.conf', 'redis/entrypoint.sh', 'redis/healthcheck.sh',
+                'auth0/development.public.json')
 
 
 def create_bundle(destination):
