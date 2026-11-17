@@ -12,6 +12,8 @@ proxy_set_header X-Forwarded-Server "${PROXY_HOSTNAME}";
 proxy_set_header X-Forwarded-Ssl "";
 proxy_set_header X-Forwarded-Prefix $external_prefix;
 proxy_set_header X-Request-ID $request_id;
+proxy_hide_header X-Request-ID;
+add_header X-Request-ID $request_id always;
 
 location = /healthz {
     access_log off;
@@ -39,6 +41,7 @@ location /api/executions/ {
     gzip off;
     proxy_hide_header Cache-Control;
     add_header Cache-Control "no-store" always;
+    add_header X-Request-ID $request_id always;
     proxy_pass http://snippets_backend/executions/;
 }
 

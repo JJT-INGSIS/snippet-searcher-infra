@@ -41,6 +41,15 @@ class RuntimeContract(unittest.TestCase):
             },
         )
 
+    def test_swarm_sample_compares_with_the_release_confirmed_by_cd(self):
+        swarm = observability_runtime.integrations(self.config)["integrations"][-1]
+        command = swarm["config"]["apis"][0]["commands"][0]["run"]
+        self.assertEqual(
+            command,
+            "python3 /opt/runtime/swarm_sample.py --environment dev --release "
+            "/host/home/azureuser/.local/state/snippet-searcher/dev/release.json",
+        )
+
     def test_prod_cannot_be_rendered_by_dev_specific_dispatcher(self):
         config = copy.deepcopy(self.config)
         config["environment"] = "prod"

@@ -1,0 +1,27 @@
+services:
+  journal:
+    platform: linux/amd64
+    build:
+      context: .
+    tmpfs: [/run]
+    volumes:
+      - journal:/var/log/journal
+      - ${FIXTURE_DIRECTORY:?}/machine-id:/etc/machine-id:ro
+
+  forwarder:
+    extends:
+      file: ../../observability/logs/forwarder.compose.yaml
+      service: forwarder
+    platform: linux/amd64
+    container_name: ${FIXTURE_FORWARDER:?}
+    restart: "no"
+    volumes:
+      - journal:/var/log/journal:ro
+      - ${FIXTURE_DIRECTORY}/machine-id:/etc/machine-id:ro
+      - ${FIXTURE_DIRECTORY}/license.conf:/fluent-bit/etc/license.conf:ro
+      - ${FIXTURE_DIRECTORY}/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - fixture_state:/fluent-bit/state
+
+volumes:
+  journal:
+  fixture_state:

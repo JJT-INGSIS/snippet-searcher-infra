@@ -266,7 +266,11 @@ def main():
     parser.add_argument('--ui-image', help='Sólo plan: incorporar UI por su digest real; no actualiza una UI instalada')
     parser.add_argument('--ui-dev-actor', help='Sólo plan: actor público explícito de dev; vacío deshabilita identidad')
     parser.add_argument('--dev-record', type=Path, help='Registro confirmado de dev para promocionar los mismos digests')
+    parser.add_argument('--proxy-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar configs de NGINX y desplegar únicamente ese servicio')
     args = parser.parse_args()
+    if args.proxy_only and not (args.mode == 'deploy' and args.infrastructure):
+        parser.error('--proxy-only sólo acompaña a deploy --infrastructure')
     manifest = json.loads(args.manifest.read_text())
     selected = validate_manifest(manifest)
     if args.mode == 'plan':
@@ -322,6 +326,9 @@ def main():
             if args.infrastructure:
                 if previous is None or args.service:
                     raise ValueError('Infra requiere bootstrap confirmado y no combina --service')
+                if args.proxy_only:
+                    from proxy_update import ProxySwarm
+                    swarm = ProxySwarm(manifest['environment'], previous)
                 deploy_infrastructure(state, manifest, swarm,
                     lambda target: require_updated_callers(target, include_ui='ui' in manifest['images'],
                                                           redis='redis' in infrastructure(manifest)))

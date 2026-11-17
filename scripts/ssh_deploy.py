@@ -15,7 +15,7 @@ BUNDLE_SCRIPTS = ('deploy_service.py', 'github_cd.py', 'stack_release.py', 'wait
                   'verify_stack.py', 'internal_http.py', 'smoke_tests.py', 'bootstrap_swarm.py',
                   'stack_runtime.py', 'rollout_checks.py', 'validate_asset_config.py', 'asset_probe.py',
                   'validate_nginx_config.py', 'redis_runtime.py', 'redis_cd.py', 'redis_preflight.py',
-                  'observability_deployment.py')
+                  'observability_deployment.py', 'proxy_update.py')
 BUNDLE_FILES = ('swarm/stack.yaml', 'swarm/stack.ingress.yaml', 'swarm/stack.tls.yaml', 'swarm/stack.asset.yaml',
                 'swarm/stack.ui.yaml', 'nginx/nginx.conf', 'nginx/templates/redirect.conf.template',
                 'nginx/templates/tls.conf.template', 'nginx/templates/routes.conf.template', 'nginx/validate-env.sh',
