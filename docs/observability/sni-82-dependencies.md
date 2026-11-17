@@ -6,8 +6,24 @@ El inventario siguiente describe las fuentes del 09/11, no el estado actual de l
 verificadas después de los cuatro despliegues `v0.6.5`. SNI-86 ya puede consumir
 estas señales sin esperar la aceptación de fallas/avisos de SNI-87. Ver la
 [entrega operativa](../../observability/runtime/README.md#entrega-para-sni-86-tras-el-piloto-v065)
-y su evidencia. JDBC/pool sigue siendo una señal de aplicación de SNI-81;
-no se deduce de sesiones SQL ni se declara disponible.
+y su evidencia. Las secciones fechadas del relevamiento conservan su contexto histórico.
+
+## Aceptación consolidada — 17/11/2026
+
+SNI-81 ya está integrado y su [evidencia DEV](sni-81-apm-traces.md#dev)
+entrega JDBC y el pool HikariCP: spans `Datastore/statement/Postgres/...` con duración
+y métricas `Database Connection/HikariCP/HikariPool-1/...` por `appName`.
+La fuente es la instrumentación de JVM; las conexiones del servidor SQL siguen
+siendo otra señal. Las consultas entregadas se incorporan al
+[archivo de diagnóstico](../../observability/runtime/dependencies-dev.nrql).
+Son observaciones de SNI-81, no una nueva consulta a New Relic realizada por SNI-82.
+
+La [aceptación consolidada](../evidence/sni82-acceptance-2026-11-17.json) reúne los
+tres criterios del ticket: recepción real distinguible, fallas/restauración aisladas
+y configuración/permisos separados. No se vuelve a cortar DEV para repetir las
+fallas aisladas ya acreditadas. Alertas, aviso al teléfono y fallas del entorno
+compartido corresponden a SNI-86/87 y mantienen su aceptación pendiente; no son
+resultados de SNI-82 ni una condición nueva para entregar sus señales.
 
 ## Componentes que debe distinguir la cobertura
 
