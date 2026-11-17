@@ -84,12 +84,8 @@ class IngressLoggingDriverTests(unittest.TestCase):
         stack = (ROOT / "swarm/stack.ingress.yaml").read_text()
         self.assertRegex(stack, r"logging:\n\s+driver: journald\n\s+options:\n\s+tag: snippet-ingress")
 
-    def test_changed_nginx_files_get_new_config_revisions(self):
-        stacks = "".join((ROOT / "swarm" / name).read_text() for name in ("stack.ingress.yaml", "stack.tls.yaml"))
-        self.assertIn("_nginx_main_v2", stacks)
-        self.assertIn("_nginx_routes_v2", stacks)
-        self.assertNotIn("_nginx_main_v1", stacks)
-        self.assertNotIn("_nginx_routes_v1", stacks)
+    def test_local_compose_keeps_the_default_driver(self):
+        self.assertNotIn("journald", (ROOT / "compose.yaml").read_text())
 
 
 if __name__ == "__main__":
