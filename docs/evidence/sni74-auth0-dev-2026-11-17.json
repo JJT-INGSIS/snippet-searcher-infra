@@ -1,0 +1,145 @@
+{
+  "ticket": "SNI-74",
+  "date": "2026-11-17",
+  "status": "DEV_LOGIN_VERIFIED",
+  "environment": "dev",
+  "deployment": {
+    "at": "2026-11-17T23:21:57.400111+00:00",
+    "exitCode": 0,
+    "pendingJournalPresent": false,
+    "apiMode": "auth0",
+    "uiMode": "auth0",
+    "imagesUnchangedDuringCut": true,
+    "apmUnchanged": true,
+    "otherServiceSpecsUnchanged": true,
+    "monitorContainersUnchanged": true,
+    "checks": {
+      "convergence": "passed",
+      "sql_and_internal_http": "passed"
+    },
+    "authenticatedSnippetGets": [
+      {
+        "time": "2026-11-17T23:21:18+00:00",
+        "request_id": "0da6a0e7feac6523896d4d76d0cf0bdd",
+        "method": "GET",
+        "path": "/api/snippets",
+        "status": 200
+      },
+      {
+        "time": "2026-11-17T23:21:28+00:00",
+        "request_id": "ffc9237dbaa6e54008d120b4e7d6c577",
+        "method": "GET",
+        "path": "/api/snippets",
+        "status": 200
+      }
+    ],
+    "confirmedImages": {
+      "snippets-service": "ghcr.io/jjt-ingsis/snippets-service@sha256:4c77251c1067bf4b20eff92f0b2b542d4d39711e8202e9fad126f7190a26e493",
+      "permissions-service": "ghcr.io/jjt-ingsis/permissions-service@sha256:f143ed50ea72523bef4f097dc5c225da47d42e66de35eed7a65cc46c6d2ba7d0",
+      "printscript-service": "ghcr.io/jjt-ingsis/printscript-service@sha256:5c2cd6863dd66b45b5ce13df3272f4ebfa0b33b0b92b7cd03abe7eff34845687",
+      "ui": "ghcr.io/jjt-ingsis/snippet-searcher-ui@sha256:d2fb6005085f2fef7d8b919368821b7b7a11cb7beca4af922671f6fa64b00727"
+    },
+    "services": [
+      "snippet-observability-dev_collector 1/1",
+      "snippet-searcher-dev_nginx 1/1",
+      "snippet-searcher-dev_permissions-db 1/1",
+      "snippet-searcher-dev_permissions-service 1/1",
+      "snippet-searcher-dev_printscript-service 1/1",
+      "snippet-searcher-dev_redis 1/1",
+      "snippet-searcher-dev_snippets-db 1/1",
+      "snippet-searcher-dev_snippets-service 1/1",
+      "snippet-searcher-dev_ui 1/1"
+    ],
+    "capturedCredentials": false
+  },
+  "publicBoundary": {
+    "at": "2026-11-17T23:19:56.809052+00:00",
+    "target": "https://jjt-snippets-dev.duckdns.org",
+    "runtime": {
+      "environment": "dev",
+      "identity": {
+        "mode": "auth0",
+        "domain": "jjt-snippet-searcher.us.auth0.com",
+        "clientId": "BDuvRyQ6ryyye08Bs9ZEfRzw7AsskFs6",
+        "audience": "https://jjt-snippets-dev.duckdns.org/api"
+      }
+    },
+    "languagesStatus": 200,
+    "unsignedStatus": 401,
+    "forgedDevHeaderStatus": 401,
+    "bearerChallengePresent": true,
+    "tlsVerification": "enabled",
+    "actualBrowserLogin": "PASS",
+    "authenticatedSnippetGets": [
+      {
+        "time": "2026-11-17T23:21:18+00:00",
+        "request_id": "0da6a0e7feac6523896d4d76d0cf0bdd",
+        "method": "GET",
+        "path": "/api/snippets",
+        "status": 200
+      },
+      {
+        "time": "2026-11-17T23:21:28+00:00",
+        "request_id": "ffc9237dbaa6e54008d120b4e7d6c577",
+        "method": "GET",
+        "path": "/api/snippets",
+        "status": 200
+      }
+    ]
+  },
+  "infraRevision": "4ecb9ebec028bd42531dfdf208667b14b78e3922",
+  "centralCdVersion": "v0.6.6",
+  "deploymentsBeforeCut": [
+    {
+      "repo": "snippets-service",
+      "id": 44195626174,
+      "sha": "7d1292bc946ce632fb06bb3051729ee3dbf0e880",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/JJT-INGSIS/snippets-service/actions/runs/44195626174"
+    },
+    {
+      "repo": "permissions-service",
+      "id": 44195313440,
+      "sha": "787fd1995451084b9169aaa1e598f6ebe60d663f",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/JJT-INGSIS/permissions-service/actions/runs/44195313440"
+    },
+    {
+      "repo": "printscript-service",
+      "id": 44195325659,
+      "sha": "3858c9f7b03bbe5168e687453e430157bbb1aae1",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/JJT-INGSIS/printscript-service/actions/runs/44195325659"
+    },
+    {
+      "repo": "snippet-searcher-ui",
+      "id": 44195727957,
+      "sha": "723986c359d0acd3d219d60ac078987de123e030",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/JJT-INGSIS/snippet-searcher-ui/actions/runs/44195727957"
+    }
+  ],
+  "browser": {
+    "realAuth0GoogleLogin": true,
+    "callbackReturnedToPublicDev": true,
+    "authenticatedListingLoaded": true,
+    "readonlySearchCompleted": true,
+    "credentialsRecorded": false
+  },
+  "network": {
+    "existingTeamAddressesPreserved": true,
+    "onlyCurrentClientIpv4AddedAs32": true,
+    "newRelicSyntheticsRulePreserved": true,
+    "publicAddressValuesRecorded": false
+  },
+  "limits": [
+    "No PROD activation",
+    "No identity or data migration",
+    "Directory Management credentials and background workers not activated by this rollout",
+    "Local owner/reader/third acceptance recorded separately in snippets-service"
+  ]
+}

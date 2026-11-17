@@ -2,6 +2,22 @@
 -- Consultas verificadas en DEV el 16/11/2026; no son políticas de alerta.
 -- Con DEV desasignada no se esperan muestras nuevas.
 
+-- JDBC/pool: nombres y consultas entregados por SNI-81 el 17/11/2026.
+-- Aplicaciones instrumentadas: snippets-service (dev), permissions-service (dev).
+-- No confundir ocupación de HikariCP con conexiones del servidor PostgreSQL.
+SELECT latest(newrelic.timeslice.value)
+FROM Metric
+WHERE appName IN ('snippets-service (dev)', 'permissions-service (dev)')
+  AND metricTimesliceName LIKE 'Database Connection/HikariCP/%'
+FACET appName, metricTimesliceName SINCE 30 minutes ago LIMIT MAX
+
+-- Duración de spans JDBC, no tiempo de espera del pool ni una métrica SQL derivada.
+SELECT count(*), average(duration * 1000), percentile(duration * 1000, 95)
+FROM Span
+WHERE appName IN ('snippets-service (dev)', 'permissions-service (dev)')
+  AND name LIKE 'Datastore/statement/Postgres/%'
+FACET appName, name SINCE 30 minutes ago LIMIT MAX
+
 -- Integraciones nativas: identidad, ambiente, versión y frescura.
 SELECT count(*), latest(label.environment), latest(label.service),
   latest(label.version), latest(blocked_sessions), latest(timestamp)

@@ -1,9 +1,21 @@
 # SNI-74 — Activación Auth0 de DEV
 
-Preparación local del 17/11/2026. Este documento y los tests no acreditan todavía
-login en la VM. La ventana fue autorizada por Thiago después de confirmar que
-Juanchi terminó sus pruebas. El cambio preparado por Juanfran no estaba disponible
-localmente ni publicado; Thiago autorizó preparar la activación desde la base actual.
+**DEV activado y login público verificado — 17/11/2026.**
+La [evidencia](evidence/sni74-auth0-dev-2026-11-17.json) registra el corte confirmado
+a las 23:21:57 UTC, ingreso real por Auth0/Google, callback a la URL pública y dos
+GET autenticados de `/api/snippets` con 200. API sin token o con header dev forjado:
+401 Bearer. Los nueve servicios permanecieron 1/1; APM, secretos montados, agentes
+y especificaciones ajenas a Snippets/UI se conservaron. No hubo journal pendiente.
+
+Thiago autorizó la ventana después de las pruebas de Juanchi y preparar el cambio
+propio al no estar disponible la rama comunicada. También autorizó agregar sólo la
+IP actual /32 a `AllowTeamWeb`, conservando las IPs previas y Synthetics. Los valores
+de esas direcciones no se publican en la evidencia.
+
+Se usaron las imágenes confirmadas y CD v0.6.6, sin migrar identidades/datos, activar
+PROD, provisionar la M2M del directorio o encender workers. La aceptación local de
+owner/lector/tercero se conserva separada en Snippets. DEV queda encendido para
+continuar las pruebas del equipo; la aceptación PROD pertenece a SNI-88.
 
 ## Cambio y límites
 
@@ -73,7 +85,7 @@ Suite: `uv run --no-project --python 3.12 python -B -m unittest discover -s scri
 Incluye rechazo de parámetros incompletos/mezclados, conservación de APM en el render,
 alcance a dos servicios, 401 vacío válido y recuperación de UI/API mezcladas tras una
 interrupción. La evidencia real de propietario/lector/tercero está en Snippets;
-es aceptación local, separada del login público todavía pendiente.
+es aceptación local, separada de la aceptación pública DEV registrada arriba.
 
 Ante corte incierto, inspeccionar y reconciliar la operación registrada. No ejecutar
 un deploy genérico ni borrar `pending.json`. La recuperación usa el mismo alcance y
