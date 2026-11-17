@@ -120,6 +120,76 @@ válida, por lo tanto **el agente no se inició y la ingesta no está acreditada
 La cuenta necesita que su administrador cree/entregue la clave por un canal privado.
 Auth0 queda pospuesto por indicación del usuario; no se cambian sus recursos/permisos.
 
+## Recepción comprobada el 16/11/2026
+
+La falta de ingesta documentada arriba es histórica: el agente se inició con una
+licencia entregada por Thiago y la cuenta **8718557** recibió muestras reales de
+ambos PostgreSQL, Redis, los cuatro probes de storage/volumen y Swarm. El storage
+activo observado es **local**; esta ejecución no acredita Asset/Azurite en DEV.
+La evidencia y las consultas reproducibles están en
+[`docs/evidence/sni82-ingestion-2026-11-16.json`](../../docs/evidence/sni82-ingestion-2026-11-16.json).
+
+Las integraciones nativas usan `label.environment`, `label.service` y
+`label.version`; los probes Flex usan `environment`, `service` y `version`.
+Para consultar salud de storage filtrar `WHERE up IS NOT NULL`: una muestra de
+metadatos del agente sin `up` no significa salud ni caída de un proveedor.
+No sustituir la ausencia de muestras por cero. Los probes filesystem no verifican
+contenido: sólo `storage-local` aporta `contentOk`, además de lectura/escritura/borrado.
+
+SSH rechazó las claves locales, por lo que se utilizó Run Command de Azure. La
+licencia viajó cifrada para una clave temporal root-only de la VM; se descifró
+exclusivamente allí y entró por stdin al script revisado. Se comprobó modo 0600
+de `agent.json` y eliminación del material temporal. No se puso la licencia en
+el script de Azure, environment, argumentos, repo ni evidencia. Como el usuario
+la compartió en el chat, corresponde coordinar su rotación con el administrador;
+no se revocó ni reemplazó automáticamente la licencia operativa.
+
+La aceptación local volvió a pasar, con ocho servicios de aplicación 1/1.
+La muestra puntual del agente fue 136 MiB y 0,03% CPU; no representa un pico ni
+una medición sostenida. El helper local conserva `newRelicIngestionVerified: false`
+por diseño: la prueba externa de recepción se registra por separado, sin cambiar
+retroactivamente su resultado.
+
+Esto no completa JDBC/pool/APM de SNI-81 ni los logs/alertas de SNI-80. No se
+provocaron caídas en las dependencias compartidas de DEV: las fallas aisladas
+anteriores conservan su alcance de QA; observar fallo/recuperación en DEV y
+coordinar la conservación de alias/configuración con CD siguen pendientes.
+SNI-82 permanece In Progress hasta resolver esos puntos. PROD no fue modificado.
+DEV ya estaba encendida al iniciar esta sesión y se verificó al finalizar como
+**Detenido (desasignado)**. Al volver a iniciarla, el agente conserva su configuración
+y política `unless-stopped`; comprobar muestras nuevas, no sólo las de esta evidencia.
+
+### Entrega de consultas y ensayos aislados
+
+[`dependencies-dev.nrql`](dependencies-dev.nrql) contiene las consultas ejecutadas
+en la cuenta 8718557: identidad/frescura de las integraciones, salud del storage e
+inventario de recepción. Ejecutar cada SELECT por separado. Son resultados para
+diagnóstico y preparación de SNI-86, no condiciones ni umbrales de alerta elegidos.
+
+Se repitió `verify_observability.py --architecture amd64` con los colectores reales
+en un proyecto Docker local exclusivo. Resultado **PASS**: bloqueo PostgreSQL
+1→0, caída/recuperación de base y Redis, volumen readonly, caída/recuperación del
+backend Azurite, AOF sin espacio en tmpfs exclusivo y credencial de monitor inválida
+sin perder disponibilidad de aplicación. Contenedores propios detenidos, sin
+eliminar volúmenes ni interrumpir DEV. Registro:
+[`sni82-faults-2026-11-16.json`](../../docs/evidence/sni82-faults-2026-11-16.json).
+
+La prueba aislada acredita detección/restauración por los colectores; la evidencia
+de ingesta acredita recepción sana en DEV. No se combinan para afirmar que New
+Relic observó esos fallos, abrió incidentes o envió avisos al teléfono.
+
+| Pendiente de integración | Evidencia que falta / coordinación |
+| --- | --- |
+| JDBC/pool (SNI-81) | Señales efectivas de la aplicación y consulta de diagnóstico; sesiones SQL no equivalen a conexiones ocupadas del pool |
+| Siguientes despliegues | Conservar alias privados y configuración ACL/secret de Redis de observabilidad en el CD vigente |
+| Falla/recuperación en DEV | Ventana y restauración revisadas; observar pérdida/recuperación de muestras por dependencia |
+| Alertas y aviso (SNI-86/87) | Condiciones/canal entregados por SNI-86 antes de ejecutar la aceptación de SNI-87 |
+
+La aceptación de ensayos **aislados** del ticket tiene evidencia actual; la
+integración operativa pendiente mantiene SNI-82 In Progress. SNI-86 ya dispone
+de las consultas y muestras de dependencias para preparar sus dashboards, sin
+atribuirle métricas JDBC todavía no entregadas ni cerrar tickets de compañeros.
+
 ## Compatibilidad con despliegues de aplicaciones
 
 El provisionamiento inicial reemplaza el entrypoint Redis y agrega un secreto de
