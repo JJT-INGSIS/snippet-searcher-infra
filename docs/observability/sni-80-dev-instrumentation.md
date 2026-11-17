@@ -185,6 +185,12 @@ sudo -n python3 -B scripts/bootstrap_swarm.py deploy candidate-dev.json --infras
 Es la misma técnica que el corte de Redis (despliegue parcial sin `--prune`). Reconciliar
 el manifiesto con el monitoreo sigue siendo un pendiente de SNI-82.
 
+El 17/11 el primer intento se frenó en el control de callers, sin aplicar nada: los
+cuatro servicios ya llaman al workflow central `v0.6.5` (SNI-82, que fija la infra
+`9cd0e2d` con la compatibilidad del monitoreo), pero `redis_cd.VERSION` seguía en
+`v0.6.4`. Se actualizó a `v0.6.5` después de comprobar contra GitHub que esa release
+fija una infra con el contrato Redis completo; `v0.6.4` ahora se rechaza como caller viejo.
+
 ## Consultas de pérdida de señal y diagnóstico
 
 Son consultas, no alertas: las alertas son de SNI-86. La ventana sigue a SNI-79
