@@ -1,9 +1,16 @@
 # SNI-87 — Ensayos de fallas y evidencia de recuperación
 
-Preparación al 09/11/2026. **NOT_EXECUTED**: no se interrumpieron VMs/servicios,
-no se crearon incidentes ni se envió una notificación. SNI-86 sigue Todo en Linear;
-no se puede acreditar detección/aviso antes de disponer de sus alertas y workflow.
+Actualización al 18/11/2026. **ACEPTACIÓN DE ALERTAS PENDIENTE**: SNI-83 ya verificó
+en DEV la pausa/reanudación y sus señales; esa prueba no acredita el aviso de SNI-87.
+El [registro de entrada](../evidence/sni87-readiness-2026-11-18.json) distingue esa
+entrega de las condiciones y notificaciones todavía pendientes de SNI-85/86.
 Esta guía conserva el alcance del ticket; no elige umbrales, SLO ni canal móvil.
+
+La revisión de New Relic de hoy encontró sólo tres condiciones: disponibilidad de
+API, disponibilidad de UI y certificado. No había una condición de atraso del
+consumidor ni del listado 200 sin fixture. SNI-85 y SNI-86 siguen Todo en Linear;
+DEV se observó detenido/desasignado. No se encendió ni se provocó un corte para
+repetir la prueba técnica sin su detector. Esto no es un ensayo de caída de VM.
 
 ## Condiciones de entrada
 
@@ -53,15 +60,86 @@ un healthcheck no reemplaza la verificación funcional tras restaurar.
 
 No decidir aquí cómo inyectar el 200 incorrecto: usar el mecanismo controlado que
 entregue SNI-85, manteniendo monitor/condición equivalentes a DEV. Si no existe,
-registrar la preparación faltante. Para separar consumidor y publicador, verificar
-el mecanismo real de operación de SNI-83 y el despliegue: si comparten proceso,
-no parar Snippets completo y afirmar que sólo cayó el consumidor. Acordar un
-control específico o un entorno aislado que conserve el resto activo.
+registrar la preparación faltante. Para separar consumidor y publicador usar el
+mecanismo de SNI-83 documentado abajo: ambos comparten Snippets y detener todo el
+servicio también eliminaría el muestreador. La pausa lógica conserva publicador,
+Redis y señales, aunque el cambio de flags reinicie Snippets y PrintScript.
 
 En el alta fallida, una respuesta incierta de red no autoriza repetir una mutación
 con una clave nueva: seguir el contrato de idempotencia existente. El alta sana de
 recuperación es una intención nueva identificada; no reemplaza la conciliación de
 una operación cuyo resultado sea incierto.
+
+## Consumidor detenido: procedimiento entregado por SNI-83
+
+La [verificación DEV de SNI-83](sni-83-background-signals.md#dev-18112026-utc)
+documenta el corte del 18/11 entre 01:54 y 02:44 UTC: con el consumidor apagado,
+`lag = 1`, el outbox permaneció en 0 y la edad elegible creció cada minuto. Al
+reanudar, el trabajo terminó y lag, PEL, outbox y edad elegible volvieron a 0.
+Se reutiliza como evidencia de la señal; **no es evidencia de incidente ni aviso**.
+
+Usar CD **v0.6.8**, cuyo `INFRA_REVISION` es
+`cbd30f98224f82919fc5b12211aed49c36aef308`. `v0.6.7` no sirve para estos cortes:
+su revisión exigía callers v0.6.6 y el gate fallaba antes de aplicar. Conservar los
+tags inmutables; no resolverlo omitiendo la comprobación ni reaplicando un stack.
+
+El operador debe confirmar primero que `background.publisher` y
+`background.consumer` están en `true`, no hay operación pendiente, los cuatro
+callers usan v0.6.8 y no hay despliegues activos. Registrar el release sano y la
+condición/canal de SNI-86 antes de preparar el corte. No ejecutar estos comandos
+contra el manifiesto de bootstrap ni mientras falten esas condiciones.
+
+Como `azureuser`, con directorio de ensayo nuevo y privado ya preparado:
+
+```sh
+sni87_bundle=/home/azureuser/.local/share/snippet-searcher/cd/cbd30f98224f82919fc5b12211aed49c36aef308
+sni87_release=/home/azureuser/.local/state/snippet-searcher/dev/release.json
+sni87_run=/home/azureuser/sni87-ENSAYO-UNICO
+
+cp "$sni87_release" "$sni87_run/before.json"
+python3 -B "$sni87_bundle/scripts/bootstrap_swarm.py" plan \
+  "$sni87_release" --consumer off > "$sni87_run/consumer-off.json"
+sudo -n python3 -B "$sni87_bundle/scripts/bootstrap_swarm.py" deploy \
+  "$sni87_run/consumer-off.json" --infrastructure --background-only
+```
+
+El alcance sólo admite cambiar `background` y despliega Snippets/PrintScript;
+conserva imágenes, Auth0, APM, UI, bases y Redis. Revisar el candidato antes de
+aplicarlo. Después de confirmar la pausa, producir un cambio de reglas exclusivo
+con la identidad autenticada de prueba y conservar sus request/event/job IDs.
+
+Para restaurar el estado inicial activo, usar el release **confirmado vigente**:
+
+```sh
+python3 -B "$sni87_bundle/scripts/bootstrap_swarm.py" plan \
+  "$sni87_release" --consumer on > "$sni87_run/consumer-on.json"
+sudo -n python3 -B "$sni87_bundle/scripts/bootstrap_swarm.py" deploy \
+  "$sni87_run/consumer-on.json" --infrastructure --background-only
+```
+
+Confirmar finalización del job, recuperación de la UI, ACK/PEL y lag/outbox sin
+atraso, además de cierre del incidente. El reinicio deja aproximadamente un minuto
+sin muestra: no tratarlo como prueba de ausencia sostenida ni usar `consumers`
+como contador de workers vivos, porque Redis conserva nombres de reinicios.
+
+### Cuota necesaria para pausar y restaurar
+
+Cada corte manual hace unas 30 consultas anónimas a GitHub desde la IP de la VM,
+con cupo de 60 por hora. **Como máximo dos cortes por hora**, sumando pausa,
+restauración y operaciones de otros integrantes. La cantidad real puede variar;
+no suponer que dos cortes siempre entran ni gastar el cupo en reintentos.
+
+Antes de pausar, revisar el cupo/reset y reservar la restauración. Si no alcanza,
+posponer o acordar una pausa cerca del reset y una reanudación después. En SNI-83
+la espera prolongó la pausa unos 45 minutos: no prometer recuperación inmediata
+sin cupo disponible. Un 403 del gate requiere revisar journal/estado y esperar la
+renovación; no pasar una credencial a la VM ni saltarse la validación.
+
+La consulta de seguimiento está en SNI-83: `stream.lag` y edad de jobs `PENDING`
+crecientes con outbox=0 distinguen el consumidor detenido de publicación atrasada.
+PEL con idle creciente es otro caso. El umbral de cinco muestras es una propuesta
+de SNI-83 para SNI-86; SNI-87 debe registrar la condición y ventana efectivamente
+aplicadas, no declarar un aviso por observar cinco valores en una gráfica.
 
 ## Matriz adicional
 
