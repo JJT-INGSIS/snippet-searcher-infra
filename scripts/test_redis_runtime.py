@@ -57,11 +57,12 @@ class RedisRuntimeTests(unittest.TestCase):
             require_updated_callers('dev', factory('v0.6.3'), redis=True)
         with self.assertRaisesRegex(ValueError, 'antiguo'):
             require_updated_callers('dev', factory('v0.6.4'), redis=True)
-        with self.assertRaises(ValueError):
-            require_updated_callers('dev', factory('v0.6.5'), redis=True)
-        require_updated_callers('dev', factory('v0.6.6'), redis=True)
+        for previous in ('v0.6.5', 'v0.6.6', 'v0.6.7'):
+            with self.subTest(previous=previous), self.assertRaises(ValueError):
+                require_updated_callers('dev', factory(previous), redis=True)
+        require_updated_callers('dev', factory('v0.6.8'), redis=True)
         with self.assertRaisesRegex(ValueError, 'activas'):
-            require_updated_callers('dev', factory('v0.6.6', active=True), redis=True)
+            require_updated_callers('dev', factory('v0.6.8', active=True), redis=True)
 
     def test_central_tag_must_pin_redis_aware_tools_not_the_legacy_sha(self):
         from redis_cd import require_redis_cd, LEGACY_REVISION
