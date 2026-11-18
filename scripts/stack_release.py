@@ -161,7 +161,7 @@ def validate_manifest(manifest):
     database = manifest['database']['image'] if version == 2 else manifest.get('database_image')
     if not isinstance(database, str) or not re.fullmatch(rf'postgres:18\.6-bookworm@{DIGEST}', database):
         raise ValueError('PostgreSQL 18.6-bookworm requiere digest exacto')
-    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui', 'auth', 'apm')):
+    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui', 'auth', 'apm', 'background')):
         raise ValueError('Ampliar el inventario requiere schema_version=2')
     if version == 2:
         if 'database_image' in manifest:
@@ -173,6 +173,7 @@ def validate_manifest(manifest):
     settings.update(auth_environment(manifest))
     settings.update(cors_environment(manifest))
     apm_enabled(manifest)
+    settings.update(background_environment(manifest))
     return settings
 
 
@@ -181,6 +182,27 @@ def apm_enabled(manifest):
     if not isinstance(apm, dict) or set(apm) != {'enabled'} or type(apm['enabled']) is not bool:
         raise ValueError('Configuración APM desconocida')
     return apm['enabled']
+
+
+BACKGROUND_FLAGS = ('publisher', 'consumer')
+
+
+def background_flags(manifest):
+    background = manifest.get('background', {flag: False for flag in BACKGROUND_FLAGS})
+    if not isinstance(background, dict) or set(background) != set(BACKGROUND_FLAGS) \
+            or any(type(value) is not bool for value in background.values()):
+        raise ValueError('Configuración de procesamiento de fondo desconocida')
+    if any(background.values()) and 'redis' not in infrastructure(manifest):
+        raise ValueError('El procesamiento de fondo requiere Redis instalado')
+    return background
+
+
+def background_environment(manifest):
+    background = background_flags(manifest)
+    text = {True: 'true', False: 'false'}
+    return {'SNIPPETS_OUTBOX_ENABLED': text[background['publisher']],
+            'SNIPPETS_WORKER_ENABLED': text[background['consumer']],
+            'PRINTSCRIPT_OPERATIONS_ENABLED': text[any(background.values())]}
 
 
 def validate_components(manifest):
@@ -285,6 +307,8 @@ def select_release(requested, previous, change_infrastructure=False):
         selected['auth'] = deepcopy(requested['auth'])
     if 'apm' in requested:
         selected['apm'] = deepcopy(requested['apm'])
+    if 'background' in requested:
+        selected['background'] = deepcopy(requested['background'])
     validate_manifest(selected)
     return selected
 

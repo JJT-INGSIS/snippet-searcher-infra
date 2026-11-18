@@ -14,9 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from stack_release import (APPLICATIONS, CERTIFICATES, DATABASE_SERVICES, database_image, expected_images, infrastructure,
-                           nginx_files, upgrade_release, write_record, validate_manifest, select_release, update_service,
-                           validate_promotion)
+from stack_release import (APPLICATIONS, BACKGROUND_FLAGS, CERTIFICATES, DATABASE_SERVICES, background_flags,
+                           database_image, expected_images, infrastructure, nginx_files, upgrade_release, write_record,
+                           validate_manifest, select_release, update_service, validate_promotion)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -264,6 +264,11 @@ def execute(manifest, environment, state):
     print(f"Release confirmado: {state / 'release.json'}")
 
 
+def switched_background(release, **choices):
+    current = background_flags(release)
+    return {name: current[name] if choices[name] is None else choices[name] == 'on' for name in BACKGROUND_FLAGS}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("plan", "check", "preflight", "deploy"))
@@ -283,17 +288,23 @@ def main():
     parser.add_argument('--apm-only', action='store_true',
                         help='Con --infrastructure: sólo cambiar apm y desplegar únicamente los servicios Java')
     parser.add_argument('--apm', choices=('on', 'off'), help='Sólo plan: activar o desactivar APM en los servicios Java')
+    parser.add_argument('--background-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar background y desplegar únicamente Snippets y PrintScript')
+    parser.add_argument('--publisher', choices=('on', 'off'), help='Sólo plan: publicador del outbox')
+    parser.add_argument('--consumer', choices=('on', 'off'), help='Sólo plan: consumidor de eventos')
     parser.add_argument('--auth-only', action='store_true',
                         help='Con --infrastructure: cambiar sólo identidad de Snippets y UI en DEV')
     parser.add_argument('--auth0-dev', action='store_true', help='Sólo plan: parámetros públicos Auth0 DEV verificados')
     args = parser.parse_args()
-    scope = 'auth' if args.auth_only else 'proxy' if args.proxy_only else 'apm' if args.apm_only else None
-    if sum((args.proxy_only, args.apm_only, args.auth_only)) > 1:
-        parser.error('Los alcances proxy-only, apm-only y auth-only no se combinan')
+    scopes = [name for name, chosen in (('proxy', args.proxy_only), ('apm', args.apm_only),
+                                         ('background', args.background_only), ('auth', args.auth_only)) if chosen]
+    if len(scopes) > 1:
+        parser.error('Los alcances proxy-only, apm-only, background-only y auth-only no se combinan')
+    scope = scopes[0] if scopes else None
     if scope and not (args.mode == 'deploy' and args.infrastructure):
         parser.error('Los alcances parciales sólo acompañan a deploy --infrastructure')
-    if args.apm and args.mode != 'plan':
-        parser.error('--apm sólo acompaña a plan')
+    if (args.apm or args.publisher or args.consumer) and args.mode != 'plan':
+        parser.error('--apm, --publisher y --consumer sólo acompañan a plan')
     if args.auth0_dev and (args.mode != 'plan' or args.apm or args.ui_dev_actor is not None):
         parser.error('--auth0-dev sólo acompaña a plan sin otros cambios de identidad/APM')
     manifest = json.loads(args.manifest.read_text())
@@ -305,7 +316,8 @@ def main():
                                args.ui_image, args.ui_dev_actor, args.tls, args.install_redis)
         if args.apm:
             planned['apm'] = {'enabled': args.apm == 'on'}
-            validate_manifest(planned)
+        if args.publisher or args.consumer:
+            planned['background'] = switched_background(planned, publisher=args.publisher, consumer=args.consumer)
         if args.auth0_dev:
             if manifest['environment'] != 'dev' or 'ui' not in manifest['images']:
                 raise ValueError('--auth0-dev requiere DEV con UI instalada')
@@ -316,7 +328,7 @@ def main():
             planned['auth'] = {key: public[key] for key in ('issuer', 'audience')}
             planned['auth']['mode'] = 'auth0'
             planned['ui'] = {'auth': {key: public[key] for key in ('domain', 'client_id', 'audience')}}
-            validate_manifest(planned)
+        validate_manifest(planned)
         print(json.dumps(planned, indent=2))
         return
     if args.mode == "check":
