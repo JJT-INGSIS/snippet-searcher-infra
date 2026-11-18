@@ -1,7 +1,7 @@
 # SNI-83 — Outbox, Redis Streams y progreso durable de los jobs
 
 Revisión de fuentes: 17/11/2026. Snippets `ed6a249`, infra `fef79e1`, gradle-conventions `8395716`.
-Estado: **en desarrollo. Diseño aprobado; nada aplicado todavía.**
+Estado: **verificado localmente el 17/11/2026; pendiente la activación en DEV.**
 
 Un cambio de reglas puede guardarse, publicar su evento y quedar sin procesar mientras la
 API y Redis siguen disponibles. Este ticket separa tres cosas que hoy no se distinguen:
@@ -47,8 +47,8 @@ Aprobadas por Juan el 17/11/2026.
 | `aspect` | Campos | Qué distingue |
 | --- | --- | --- |
 | `outbox` | `pending`, `oldestPendingSeconds`, `retrying`, `failingReasons` | Publicación atrasada |
-| `stream` | `lagKnown`, `lag`, `entriesRead`, `pending`, `oldestPendingIdleSeconds`, `consumers` | Entrega sin ACK (PEL) y atraso del grupo, por separado |
-| `jobs` | `reaction`, `state`, `count`, `oldestEligibleSeconds`, `lastProgressSeconds`, `backoff` | Trabajo que dejó de avanzar, reintentos y `UNKNOWN` sostenido |
+| `stream` | `streamExists`, `groupExists`, `lagKnown`, `lag`, `entriesRead`, `pending`, `oldestPendingIdleSeconds`, `consumers` | Entrega sin ACK (PEL) y atraso del grupo, por separado |
+| `jobs` | `reaction`, `state`, `count`, `oldestEligibleSeconds`, `stalestProgressSeconds`, `backoff` | Trabajo que dejó de avanzar, reintentos y `UNKNOWN` sostenido |
 | `jobs-finished` | `reaction`, `state`, `count` (últimos 15 min) | `PARTIAL` y `FAILED` recientes |
 | `capacity` | `heldBackground`, `unknownPermits`, `oldestHeldSeconds` | Reservas que siguen reteniendo capacidad |
 
@@ -61,7 +61,7 @@ medir no se reemplaza por cero.
 | Publicación atrasada | `outbox.pending > 0` con edad creciente; el stream no recibe |
 | Entrega sin ACK | `stream.pending > 0` con idle creciente |
 | Consumidor detenido | `stream.lag` crece y el trabajo `PENDING` envejece; el outbox sigue en 0 |
-| Trabajo trabado | Trabajo con lease y `lastProgressSeconds` creciendo |
+| Trabajo trabado | Trabajo `RUNNING` con `stalestProgressSeconds` creciendo |
 | Lag desconocido | `lagKnown = false` y sin `lag` |
 | Muestreador caído | Ausencia de muestras |
 
@@ -75,6 +75,21 @@ medir no se reemplaza por cero.
 | Turno del consumidor | Transacción de fondo con los mismos atributos y el intento del trabajo |
 | Logs | MDC con esas claves, reenviadas por el agente |
 
+## Publicación del CD
+
+B6 tuvo un costo que el plan no contó: el CD central fija una revisión de infra, así que
+activar `background` exige un tag nuevo de `github-workflows` y los cuatro callers
+actualizados. Sin eso, un deploy de Snippets o PrintScript con el CD anterior reconstruye
+esos servicios sin el overlay y apaga publicador y consumidor en silencio.
+
+| Paso | Resultado |
+| --- | --- |
+| `v0.6.7` fija infra `e294c17` (#59) | Callers actualizados y CD de los cuatro servicios en verde. El corte `--background-only` se frenó antes de tocar el stack: `redis_cd.VERSION` seguía en `v0.6.6` y rechazó los callers `v0.6.7` |
+| `v0.6.8` fija la revisión que sube `VERSION` a `v0.6.8` | Misma regla que usó SNI-74: el commit fijado nombra el tag que lo va a fijar. El chequeo del SHA fijado suma `background_runtime.py`, `require_background_only` y el overlay |
+
+`v0.6.7` queda publicada pero inconsistente para cortes de infraestructura; no se mueve
+(los tags son inmutables) y no se usa.
+
 ## Fronteras
 
 - SNI-57/58: no se cambia el comportamiento del outbox ni del consumidor; solo se observa.
@@ -85,4 +100,32 @@ medir no se reemplaza por cero.
 
 ## Verificación
 
-Pendiente.
+### Local (17/11/2026)
+
+Snippets de la rama con el agente 9.5.0 y el `newrelic.yml` de `gradle-conventions` 0.3.1,
+Permissions y PrintScript de `dev`, PostgreSQL 18.6, Redis 7.4.7 y el colector falso de
+SNI-81. Publicador, consumidor y operaciones de PrintScript prendidos; muestreo cada 10 s
+en lugar de 60 s para acortar la prueba.
+
+| Caso | Resultado |
+| --- | --- |
+| Correlación | `X-Request-ID: 0123456789abcdef0123456789abcdef` en el `PUT` de reglas → `correlationId` `01234567-89ab-cdef-0123-456789abcdef` en el evento. El `PUT` lleva `request.id`, `event.id`, `job.id` y `correlation.id`; la publicación y cada turno del consumidor, los mismos IDs más `attempt`. Los logs llegan con `context.correlation.id`, `context.event.id`, `context.job.id`, `context.attempt` y su `trace.id` |
+| Cola sana | Un trabajo de 3 snippets pasa por PrintScript y termina `COMPLETED` en 4 s; después `pending = 0`, `lag = 0` y sin trabajos elegibles |
+| Trabajo de varios turnos | La entrega queda en la PEL hasta el reclamo del consumidor (idle hasta ~30 s) y se vacía sola. Es el diseño de SNI-58; el umbral de 60 s de B7 queda por encima |
+| Consumidor detenido | Con `SNIPPETS_WORKER_ENABLED=false`: outbox en 0, `stream.lag = 2`, `jobs.count = 2` y `oldestEligibleSeconds` creciendo (59 → 69 s). Al reanudarlo, `lag = 0`, el cambio viejo queda `SUPERSEDED` y el nuevo `COMPLETED` |
+| Publicación atrasada | Con Redis detenido: `outbox.pending = 1`, `retrying = 1`, `failingReasons = REDIS_WRITE_UNAVAILABLE` y edad creciendo (24 → 72 s); la fila `stream` llega con `samplerError = true` y sin valores. Con Redis de vuelta publica tras el backoff y el trabajo termina |
+
+La prueba encontró que el `PUT` no llevaba `event.id` ni `job.id`; se corrigió antes del PR.
+
+Notas para SNI-86:
+
+- «Con lease y sin progreso» se mide en las filas `jobs` de estado `RUNNING`. En un
+  trabajo `PENDING` sin elementos, `stalestProgressSeconds` coincide con su edad.
+- `consumers` suma un nombre por cada reinicio de Snippets (Redis conserva los
+  consumidores del grupo); no sirve para alertar.
+- `attempt` empieza en 1 en la publicación y en 0 en el primer turno del consumidor
+  (intentos previos del trabajo).
+
+### DEV
+
+Pendiente: después del corte Auth0 de SNI-74 y sin deploys en paralelo.
