@@ -1,7 +1,7 @@
 # SNI-83 — Outbox, Redis Streams y progreso durable de los jobs
 
 Revisión de fuentes: 17/11/2026. Snippets `ed6a249`, infra `fef79e1`, gradle-conventions `8395716`.
-Estado: **verificado localmente el 17/11/2026; pendiente la activación en DEV.**
+Estado: **verificado localmente y en DEV (18/11/2026); publicador y consumidor activos en DEV.**
 
 Un cambio de reglas puede guardarse, publicar su evento y quedar sin procesar mientras la
 API y Redis siguen disponibles. Este ticket separa tres cosas que hoy no se distinguen:
@@ -126,6 +126,46 @@ Notas para SNI-86:
 - `attempt` empieza en 1 en la publicación y en 0 en el primer turno del consumidor
   (intentos previos del trabajo).
 
-### DEV
+### DEV (18/11/2026, UTC)
 
-Pendiente: después del corte Auth0 de SNI-74 y sin deploys en paralelo.
+CD `v0.6.8` (infra `cbd30f9`) en los cuatro callers. Cortes con
+`deploy --infrastructure --background-only` desde el bundle del CD en la VM; cada uno
+reemplazó sólo Snippets y PrintScript, con verificación SQL, HTTP, Auth0, UI y proxy en PASS
+y los 9 servicios `1/1`. Auth0 y APM sin cambios.
+
+| Paso | Resultado |
+| --- | --- |
+| Sin procesamiento | `SnippetBackgroundSample` llega una vez por minuto por aspecto (`outbox`, `stream`, `jobs`, `capacity`; `jobs-finished` sólo con terminados recientes); outbox en 0 y `lagKnown = false` sin grupo |
+| Activación | `background: {publisher: true, consumer: true}`; Env efectivo `SNIPPETS_OUTBOX_ENABLED`, `SNIPPETS_WORKER_ENABLED` y `PRINTSCRIPT_OPERATIONS_ENABLED` en `true` |
+| Cambio de reglas real | Login Auth0 en la URL pública, `indent-inside-if` a 4: «Reformateados: 1 snippet». Tres transacciones con `correlation.id` `ba1fab3a-00c1-f198-7627-2c7619082d2a`: el `PUT` (`request.id` `ba1fab3a00c1f19876272c7619082d2a`), la publicación y el turno del consumidor, con un único `job.id` y `event.id` |
+| Consumidor detenido | `consumer: false` y otro cambio de reglas: la UI queda «todavía buscando snippets». Desde 01:54 `lag = 1`, `publicacion_s = 0`, PEL en 0 y `elegible_s` 23 → 83 → … → 323 (01:59) → 383, exactamente 60 s por muestra |
+| Reanudación | `consumer: true` tras ~45 min de pausa (espera del cupo de GitHub, ver abajo): el trabajo pendiente se procesó, la UI pasó sola a «Listo — Reformateados: 1 snippet» y de 02:44 a 02:52 `lag`, `elegible_s`, PEL y outbox quedaron en 0 con una muestra por minuto. DEV queda con publicador y consumidor activos |
+
+Consulta usada (una sola consulta, `TIMESERIES 1 minute`):
+
+```sql
+SELECT
+  filter(max(oldestPendingSeconds), WHERE aspect = 'outbox') AS 'publicacion_s',
+  filter(max(oldestPendingIdleSeconds), WHERE aspect = 'stream' AND samplerError = false) AS 'pel_idle_s',
+  filter(max(lag), WHERE aspect = 'stream' AND lagKnown = true) AS 'lag',
+  filter(max(oldestEligibleSeconds), WHERE aspect = 'jobs' AND reaction = 'all') AS 'elegible_s',
+  filter(max(stalestProgressSeconds), WHERE aspect = 'jobs' AND state = 'RUNNING') AS 'sin_progreso_s',
+  filter(count(*), WHERE aspect = 'outbox') AS 'muestras'
+FROM SnippetBackgroundSample
+WHERE environment = 'dev'
+TIMESERIES 1 minute SINCE 30 minutes ago
+```
+
+Notas para SNI-86:
+
+- Con «sostenido = 5 muestras», el consumidor detenido dispara a los ~5 min de `lag > 0`
+  con `elegible_s` creciendo y el outbox en 0; no se confunde con publicación atrasada.
+- Cada corte de Snippets deja un minuto sin muestra (reinicio): la regla de ausencia no
+  debe disparar por un solo minuto.
+- `count` es palabra reservada de NRQL: los campos se citan con comillas invertidas
+  (`` `count` ``) o se usa `filter(...)` como arriba.
+
+Limitación de los cortes manuales: el control previo consulta GitHub sin token bajo `sudo`
+(unas 30 consultas por corte, cupo anónimo de 60 por hora e IP). Dos cortes seguidos
+agotan el cupo y el siguiente falla con 403 antes de tocar el stack; se espera la
+renovación en lugar de pasar un token a la VM.
