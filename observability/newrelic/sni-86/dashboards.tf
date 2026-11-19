@@ -13,15 +13,15 @@ locals {
       description = "Disponibilidad pública, listado real, SLI, latencia, errores y trazas de los servicios."
       widgets = [
         {
-          title         = "Disponibilidad HTTP · objetivo 99% y mínimo 100 solicitudes"
+          title         = "API (7 d) · <${local.slos.api.volume} solicitudes: muestra insuficiente"
           visualization = "viz.billboard"
-          query         = "FROM Log SELECT percentage(count(*), WHERE ${local.http_success}) AS 'SLI (%)', count(*) AS 'Solicitudes válidas', count(*) * 0.01 - filter(count(*), WHERE ${local.http_failure}) AS 'Presupuesto restante (solicitudes)' WHERE ${local.dashboard_scoped} AND ${local.api_valid} SINCE 7 days ago"
+          query         = "FROM Log SELECT percentage(count(*), WHERE ${local.http_success}) AS 'SLI (%) · objetivo ${local.slos.api.target}%', count(*) AS 'Solicitudes válidas', count(*) * ${(100 - local.slos.api.target) / 100} - filter(count(*), WHERE ${local.http_failure}) AS 'Presupuesto restante (solicitudes)' WHERE ${local.dashboard_scoped} AND ${local.api_valid} SINCE 7 days ago"
           fixed_window  = true
         },
         {
-          title         = "Listado real · objetivo 96% y mínimo 25 resultados"
+          title         = "Listado (7 d) · <${local.slos.functional.volume} resultados: muestra insuficiente"
           visualization = "viz.billboard"
-          query         = "FROM SnippetFunctionalCheck SELECT percentage(count(*), WHERE result = 'SUCCESS') AS 'SLI (%)', count(*) AS 'Resultados', count(*) * 0.04 - filter(count(*), WHERE result = 'FAILURE') AS 'Presupuesto restante (resultados)' WHERE ${local.dashboard_scoped} AND ${local.dashboard_functional} AND ${local.functional_valid} SINCE 7 days ago"
+          query         = "FROM SnippetFunctionalCheck SELECT percentage(count(*), WHERE result = 'SUCCESS') AS 'SLI (%) · objetivo ${local.slos.functional.target}%', count(*) AS 'Resultados', count(*) * ${(100 - local.slos.functional.target) / 100} - filter(count(*), WHERE result = 'FAILURE') AS 'Presupuesto restante (resultados)' WHERE ${local.dashboard_scoped} AND ${local.dashboard_functional} AND ${local.functional_valid} SINCE 7 days ago"
           fixed_window  = true
         },
         {
@@ -43,10 +43,16 @@ locals {
           fixed_window  = false
         },
         {
-          title         = "Listado de Cypress: último resultado y fallas"
+          title         = "Listado de Cypress · último resultado en 7 días"
           visualization = "viz.table"
-          query         = "FROM SnippetFunctionalCheck SELECT latest(result), latest(timestamp), latest(durationMs), filter(count(*), WHERE result = 'FAILURE') WHERE ${local.dashboard_scoped} AND ${local.dashboard_functional} FACET failureCategory"
-          fixed_window  = false
+          query         = "FROM SnippetFunctionalCheck SELECT latest(result) AS 'Resultado', latest(timestamp) AS 'Hora del chequeo', latest(durationMs) AS 'Duración (ms)' WHERE ${local.dashboard_scoped} AND ${local.dashboard_functional} AND ${local.functional_valid} SINCE 7 days ago"
+          fixed_window  = true
+        },
+        {
+          title         = "Listado de Cypress · fallos por categoría en 7 días"
+          visualization = "viz.table"
+          query         = "FROM SnippetFunctionalCheck SELECT count(*) AS 'Fallos', latest(timestamp) AS 'Último fallo' WHERE ${local.dashboard_scoped} AND ${local.dashboard_functional} AND result = 'FAILURE' FACET failureCategory SINCE 7 days ago"
+          fixed_window  = true
         },
         {
           title         = "Tráfico y errores APM por servicio"
@@ -145,9 +151,9 @@ locals {
           fixed_window  = false
         },
         {
-          title         = "Trabajos · edad del elegible y progreso RUNNING (s)"
+          title         = "Trabajos · edad del elegible, progreso y PEL (s)"
           visualization = "viz.line"
-          query         = "FROM SnippetBackgroundSample SELECT ${local.eligible_age} AS 'Elegible más antiguo', filter(max(stalestProgressSeconds), WHERE state = 'RUNNING') AS 'Mayor tiempo sin progreso', ${local.consumer_delay} AS 'Señal de consumidor' WHERE ${local.dashboard_scoped} AND (aspect = 'stream' OR aspect = 'jobs') TIMESERIES"
+          query         = "FROM SnippetBackgroundSample SELECT ${local.eligible_age} AS 'Elegible más antiguo', filter(max(stalestProgressSeconds), WHERE state = 'RUNNING') AS 'Mayor tiempo sin progreso', filter(max(oldestPendingIdleSeconds), WHERE aspect = 'stream' AND groupExists = true AND samplerError = false) AS 'Mayor idle PEL', ${local.consumer_delay} AS 'Señal de consumidor' WHERE ${local.dashboard_scoped} AND (aspect = 'stream' OR aspect = 'jobs') TIMESERIES"
           fixed_window  = false
         },
         {

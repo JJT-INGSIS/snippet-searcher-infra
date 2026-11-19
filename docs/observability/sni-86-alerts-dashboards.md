@@ -59,11 +59,14 @@ Para diagnosticar una imagen atrasada, abrir el último CD del servicio:
 ## SLI y objetivos
 
 Ventana móvil de **7 días** y objetivos iniciales de DEV. El tablero muestra
-el denominador y el presupuesto disponible, calculado como
+el denominador, el mínimo y el presupuesto disponible, calculado como
 `válidos × (1 - objetivo/100) - fallas`. Los resultados de los ensayos quedan
 en la historia de DEV. Las ventanas de mantenimiento silencian avisos
 y conservan datos y antecedentes. Cero muestras significa que no se puede
-calcular disponibilidad.
+calcular disponibilidad. Con menos de 100 solicitudes de API o 25 resultados
+de Cypress, el porcentaje y el presupuesto son orientativos. El último
+resultado de Cypress se muestra con su fecha y duración. Las fallas por
+categoría se cuentan aparte como historial de siete días.
 
 | SLI | Definición | Objetivo | Interpretación |
 | --- | --- | --- | --- |
@@ -106,6 +109,7 @@ haberlos recibido al menos una vez.
 | Storage de contenidos falla dos ventanas de 1 min | Crítica · correo y push | Thiago | Dependencias y procesamiento. Revisar probe, volumen y permisos. Recuperar lectura, escritura y comprobación del contenido. |
 | VM sin SystemSample 5 min | Crítica · correo y push | Thiago | Infraestructura y entrega. Contrastar Azure y monitores públicos para distinguir caída de VM de agente caído. Recuperación con nueva muestra y endpoints sanos. |
 | Consumidor atrasado: lag conocido >0 y edad elegible >300 s durante cinco ventanas de 1 min | Crítica · correo y push | Juanchi | Dependencias y procesamiento. Comprobar outbox, Redis y último worker. Recuperación al consumir y ver lag/edad a nivel normal. |
+| Redis con entregas en PEL más de 60 s sin nueva entrega durante cinco ventanas de 1 min | Warning · correo | Juanchi | Dependencias y procesamiento. Revisar PEL, reclamos, ACK y progreso del job. Recuperación: la PEL se vacía o baja el idle. Confirmar ACK o avance; el reclamo reinicia el idle. |
 | Colector Swarm ausente 10 min / muestreador sin outbox 5 min | Warning · correo | Thiago / Juanchi | Infraestructura y entrega / Dependencias y procesamiento. Distinguir deploy transitorio de colector detenido. Recuperación con muestras nuevas. |
 | Outbox >60 s / RUNNING sin progreso >60 s / error del muestreador, cada uno sostenido 5 min | Warning · correo | Juanchi | Dependencias y procesamiento. Revisar escritura a Redis y reintentos, lease y trazas del job o el aspecto del muestreador. Recuperación con edad dentro del límite, avance o muestras sanas. |
 | Poco espacio (<15% por 5 min), CPU ≥85% o memoria ≥90% por 10 min | Warning · correo | Thiago | Dependencias y procesamiento / Infraestructura y entrega. Identificar volumen o recurso, crecimiento, tareas y OOM. Recuperación al volver a la banda segura. |
@@ -121,6 +125,14 @@ entrega. Un despliegue puede interrumpir un minuto. El cálculo combina lag
 con edad en la misma ventana; una medición desconocida queda sin valor. Para
 la prueba de SNI-87 hay que esperar ambas etapas y reservar la ventana y la
 cuota para restaurar.
+
+La condición de PEL cubre mensajes que Redis ya entregó y sigue esperando
+confirmar, incluso con lag cero o desconocido. SNI-83 observó reclamos
+normales cerca de 30 s. Exigir más de 60 s de inactividad durante cinco
+ventanas consecutivas evita avisos por reclamos transitorios. El muestreador
+inspecciona un subconjunto acotado de la PEL y Redis reinicia el idle tras
+cada reclamo. Para pendientes que se reclaman repetidamente, contrastar
+con el progreso del job y los logs del consumidor.
 
 Los umbrales de recursos anticipan agotamiento y toleran picos breves.
 El umbral inicial de latencia de 2 s es casi tres veces el p95 de 695 ms medido.

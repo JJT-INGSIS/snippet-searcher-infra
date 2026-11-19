@@ -40,6 +40,14 @@ locals {
       threshold   = 60
       duration    = 300
     }
+    redis_pending_ack = {
+      title       = "DEV - Entregas de Redis pendientes de ACK"
+      description = "Juanchi. En Dependencias y procesamiento revisar PEL, reclamos del consumidor y progreso del job. Recuperación: la PEL se vacía o vuelve a haber entregas recientes. Confirmar el ACK o el avance del trabajo."
+      critical    = false
+      query       = "SELECT filter(count(*), WHERE pending > 0 AND oldestPendingIdleSeconds > 60) FROM SnippetBackgroundSample WHERE environment = 'dev' AND aspect = 'stream' AND groupExists = true AND samplerError = false"
+      threshold   = 0
+      duration    = 300
+    }
     job_stalled = {
       title       = "DEV - Trabajo RUNNING sin progreso"
       description = "Juanchi. En Dependencias y procesamiento revisar lease, progreso y trazas de background. Recuperación: el trabajo vuelve a progresar o sale de RUNNING."
