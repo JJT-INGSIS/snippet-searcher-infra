@@ -1,0 +1,658 @@
+{
+  "schema": "sni-87-evidence-v1",
+  "status": "TECHNICAL_EVIDENCE_COMPLETE_DEVICE_CONFIRMATION_PENDING",
+  "environment": "dev",
+  "date": "2026-11-19",
+  "authorizedBy": "Thiago: terminar SNI-87 y SNI-88; verificar envios y confirmar telefono posteriormente",
+  "sourceRevision": "dca7a00",
+  "cdVersion": "v0.6.8",
+  "cdInfraRevision": "cbd30f98224f82919fc5b12211aed49c36aef308",
+  "initialState": {
+    "at": "2026-11-19T21:43:28.851748Z",
+    "releaseSha256": "f2d1c1add7ee9204b500a80b8dd4a7ae4f2606205248dc369cbc81e73c6da683",
+    "auth": "auth0",
+    "apm": true,
+    "storage": "local",
+    "background": {
+      "publisher": true,
+      "consumer": true
+    },
+    "applicationServicesRunning": 8,
+    "pendingJournal": false,
+    "collectorServicesRunning": 1
+  },
+  "scenarios": [
+    {
+      "id": "listing-200-missing-fixture",
+      "status": "TECHNICAL_PASS_DEVICE_CONFIRMATION_PENDING",
+      "conditionId": "69952989",
+      "baseline": {
+        "result": "SUCCESS",
+        "at": "2026-11-19T21:44:49Z"
+      },
+      "faultAction": "SNI-85 --fixture hide: renombrar exclusivamente el fixture conocido y verificado",
+      "restoreAction": "SNI-85 --fixture restore y chequeo real; respaldo systemd de ocho minutos",
+      "timestamps": {
+        "faultAt": "2026-11-19T21:46:36.068152Z",
+        "signalAt": "2026-11-19T21:47:14.368878Z",
+        "incidentAt": "2026-11-19T21:49:03Z",
+        "deviceReceivedAt": null,
+        "restoreStartedAt": "2026-11-19T21:50:19.916696Z",
+        "functionalRecoveryAt": "2026-11-19T21:50:59.886685Z",
+        "incidentClosedAt": "2026-11-19T21:52:53Z"
+      },
+      "incidentId": "ba851d67-9a8d-4c41-a28e-653e2769007f",
+      "incidentUrl": "https://aiops.service.newrelic.com/accounts/8718557/incidents/ba851d67-9a8d-4c41-a28e-653e2769007f/redirect",
+      "issueId": "b3cf57dd-a985-4245-91e8-f8afc024730d",
+      "notification": {
+        "displayTimeUtc": "2026-11-19T21:49Z",
+        "timePrecision": "minute",
+        "email": "Sent",
+        "mobilePush": "Sent to 1 devices",
+        "humanReceiptConfirmed": false,
+        "verifiedEventSource": "NrAiNotification",
+        "pushEvents": [
+          {
+            "at": "2026-11-19T21:53:00.476000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-19T21:49:10.832000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      },
+      "actualResult": "HTTP 200 con ausencia del fixture produjo FAILURE/SNIPPET_MISSING; luego SUCCESS y cierre real",
+      "gap": "Confirmacion de recepcion humana en el telefono pendiente por indicacion del usuario"
+    },
+    {
+      "id": "printscript-during-create",
+      "status": "TECHNICAL_PASS_DEVICE_CONFIRMATION_PENDING",
+      "conditionId": "69984637",
+      "baseline": {
+        "status": 201,
+        "requestId": "666ce5b79bdeaa35ea4203d410210ec5",
+        "snippetId": "be4a5f4c-39c0-4b05-bcbc-db5cda5d79b7"
+      },
+      "faultAction": "Sesion real abierta antes de detener unicamente PrintScript a cero replicas; restauracion systemd de ocho minutos",
+      "restoreAction": "Restauracion automatica/manual a una replica; esperar health y crear otra intencion nueva",
+      "timestamps": {
+        "faultAt": "2026-11-19T21:56:46Z",
+        "signalAt": "2026-11-19T21:56:48.152Z",
+        "incidentAt": "2026-11-19T22:02:02Z",
+        "deviceReceivedAt": null,
+        "restoreStartedAt": "2026-11-19T22:04:03.757565Z",
+        "functionalRecoveryAt": "2026-11-19T22:04:39.148Z",
+        "incidentClosedAt": "2026-11-19T22:09:57Z"
+      },
+      "correlation": {
+        "requestId": "cb7c08aa83d0ffb058bc8562e5286108",
+        "traceId": "e445dc4168aa0769cd0f24ef55bdd62a",
+        "transactionOutcome": "technical",
+        "transactionDurationSeconds": 2.018,
+        "spansVerified": [
+          "Snippets/creation/prepare",
+          "Custom/JavaHttpClient.send"
+        ],
+        "dependencySpanDurationSeconds": 2.0034387
+      },
+      "response": {
+        "status": 502,
+        "type": "urn:snippets:problem:dependency-failure",
+        "snippetId": null
+      },
+      "incidentId": "96c380f0-4593-41f9-9a8e-a63680103fe3",
+      "incidentUrl": "https://aiops.service.newrelic.com/accounts/8718557/incidents/96c380f0-4593-41f9-9a8e-a63680103fe3/redirect",
+      "issueId": "2afee66c-a7a5-47df-812f-e7e59dd1c7ba",
+      "notification": {
+        "displayTimeUtc": "2026-11-19T22:02Z",
+        "timePrecision": "minute",
+        "email": "Sent",
+        "mobilePush": "Sent to 1 devices",
+        "humanReceiptConfirmed": false,
+        "verifiedEventSource": "NrAiNotification",
+        "pushEvents": [
+          {
+            "at": "2026-11-19T22:10:10.156000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-19T22:02:11.681000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      },
+      "recovery": {
+        "status": 201,
+        "requestId": "2159b1016e18fba8feb24363a8ac402d",
+        "snippetId": "89099c27-aa73-4ae3-9345-c8ed1e1f3420"
+      },
+      "attempts": [
+        {
+          "result": "FAILED_AND_RESTORED",
+          "reason": "Navegador fallo antes de comprobar alta al detener PrintScript antes del login"
+        },
+        {
+          "result": "502_AND_INCIDENT_VERIFIED",
+          "arrangement": "Autenticar primero y coordinar corte host/navegador"
+        }
+      ],
+      "cleanup": "El timer ya habia ejecutado y la unidad transitoria desaparecio; stop devolvio 5 despues del 201 de recuperacion",
+      "gap": "Confirmacion humana en telefono pendiente"
+    },
+    {
+      "id": "consumer-stopped",
+      "status": "TECHNICAL_PASS_DEVICE_CONFIRMATION_PENDING",
+      "conditionId": "69984639",
+      "pauseOperation": "infra-8688f1b569f34d06a3cf6cb6a2462743",
+      "pauseStartedAt": "2026-11-19T22:10:17.091321Z",
+      "pauseConfirmedAt": "2026-11-19T22:12:52.077115Z",
+      "jobId": "898b0014-8a0a-4862-834a-369bd48de612",
+      "eventId": "f975497f-eee6-4daa-be6a-a4cdd5ba30e0",
+      "correlationId": "fb23e25e-45be-2758-5c8c-fe55a77c7bcd",
+      "jobCreatedAt": "2026-11-19T22:13:08.937742Z",
+      "publishedAt": "2026-11-19T22:13:09.133861Z",
+      "redisRecordId": "1795126389129-0",
+      "incidentId": "702c3a3f-29b6-4e94-8e7d-5744bbf5f11f",
+      "incidentAt": "2026-11-19T22:26:38Z",
+      "incidentUrl": "https://aiops.service.newrelic.com/accounts/8718557/incidents/702c3a3f-29b6-4e94-8e7d-5744bbf5f11f/redirect",
+      "issueId": "4f9104a3-ce1d-4992-9eb7-1a3e6afaa23c",
+      "notification": {
+        "email": "Sent",
+        "mobilePush": "Sent to 1 devices",
+        "humanReceiptConfirmed": false,
+        "verifiedEventSource": "NrAiNotification",
+        "pushEvents": [
+          {
+            "at": "2026-11-19T22:40:06.094000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-19T22:26:48.979000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      },
+      "restoreStartedAt": "2026-11-19T22:29:09.234572Z",
+      "restoreVerifiedAt": "2026-11-19T22:33:14.475644Z",
+      "jobCompletedAt": "2026-11-19T22:31:08.165990Z",
+      "proof": {
+        "logicalJobsForEvent": 1,
+        "items": 3,
+        "distinctItemKeys": 3,
+        "completedItems": 3
+      },
+      "rulesRestorationJobId": "f40635c4-0425-44d3-9528-6138b27d967d",
+      "functionalRecoveryAt": "2026-11-19T22:38:59.257549Z",
+      "configurationPreserved": [
+        "images",
+        "infrastructure",
+        "auth",
+        "apm",
+        "ui",
+        "storage_provider",
+        "database"
+      ],
+      "pendingJournal": false,
+      "githubRequestsUsed": 50,
+      "deviceReceivedAt": null,
+      "incidentClosedAt": "2026-11-19T22:39:58Z",
+      "recoveredBackground": {
+        "from": "2026-11-19T22:43:00Z",
+        "until": "2026-11-19T22:48:00Z",
+        "maxOutboxAgeSeconds": 0,
+        "maxLag": 0,
+        "maxPendingAck": 0,
+        "maxEligibleAgeSeconds": 0
+      }
+    }
+  ],
+  "additionalMatrix": {
+    "status": "TECHNICAL_EVIDENCE_COMPLETE_DEVICE_CONFIRMATION_PENDING",
+    "upstreamIsolatedEvidence": "sni82-faults-2026-11-16.json",
+    "upstreamScope": "QA de colectores y recursos aislados; no certifica cortes ni notificaciones actuales de DEV",
+    "businessResponses": {
+      "verifiedAt": "2026-11-19T22:20:45Z",
+      "statuses": [
+        400,
+        422,
+        404
+      ],
+      "requestIds": [
+        "7fed94c9e33b947dfa664ed67b75dfdb",
+        "ff39f353725aac43c86d4370407c2b6b",
+        "071c3615c59d9fc0e4a13a0821cc3b30"
+      ],
+      "ingressLogRequests": 3,
+      "technicalFailures": 0
+    },
+    "preflightAttempt": {
+      "status": "ABORTED_BEFORE_FAULT",
+      "reason": "El control contaba el colector como servicio de aplicacion; corregido a ocho servicios de aplicacion",
+      "allApplicationReplicasAfterAbort": "1/1"
+    },
+    "isolatedEvidence": "sni87-isolated-faults-2026-11-19.json",
+    "isolatedScope": "Capacity/AOF-full filesystem, local readonly write failure and external Asset transport failure with recovery; actual Docker fixtures, not live DEV incidents",
+    "quietTraffic": {
+      "status": "PASS",
+      "from": "2026-11-20T00:15:00Z",
+      "until": "2026-11-20T00:30:00Z",
+      "hostSamples": 15,
+      "eligibleApiRequests": 0,
+      "incidentsOpened": 0,
+      "scope": "Observed quiet interval, not a forced host outage"
+    },
+    "replicaFaults": [
+      {
+        "component": "nginx",
+        "status": "DETECTED_AND_RESTORED_DEVICE_CONFIRMATION_PENDING",
+        "faultAt": "2026-11-20T01:03:49.455877+00:00",
+        "restoreStartedAt": "2026-11-20T01:10:49.456263+00:00",
+        "functionalRecoveryAt": "2026-11-20T01:11:13.472005+00:00",
+        "originalTemplatePreserved": true,
+        "incidentId": "1f9dd56b-ff3f-4fb2-87fd-2fde02f6b677",
+        "conditionId": 69984631,
+        "incidentOpenedAt": "2026-11-20T01:09:19.455000+00:00",
+        "incidentClosedAt": "2026-11-20T01:16:13.055000+00:00",
+        "deviceReceivedAt": null,
+        "issueIds": [
+          "ffe47e3f-21b0-4d06-b53a-ef3457ed2cf7"
+        ],
+        "pushes": [
+          {
+            "at": "2026-11-20T01:16:21.594000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-20T01:09:24.561000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      },
+      {
+        "component": "ui",
+        "status": "DETECTED_AND_RESTORED_DEVICE_CONFIRMATION_PENDING",
+        "faultAt": "2026-11-20T01:11:30.657460+00:00",
+        "restoreStartedAt": "2026-11-20T01:18:30.657850+00:00",
+        "functionalRecoveryAt": "2026-11-20T01:18:54.942071+00:00",
+        "originalTemplatePreserved": true,
+        "incidentId": "9a096428-fd82-42f8-abf8-cb6e6bbe36b2",
+        "conditionId": 69984631,
+        "incidentOpenedAt": "2026-11-20T01:17:07.581000+00:00",
+        "incidentClosedAt": "2026-11-20T01:24:12.722000+00:00",
+        "deviceReceivedAt": null,
+        "issueIds": [
+          "86368ce4-4fc4-45c5-86d2-ade96304783d"
+        ],
+        "pushes": [
+          {
+            "at": "2026-11-20T01:32:23.751000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-20T01:17:22.788000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      },
+      {
+        "component": "snippets-service",
+        "status": "DETECTED_AND_RESTORED_DEVICE_CONFIRMATION_PENDING",
+        "faultAt": "2026-11-20T01:19:12.067316+00:00",
+        "restoreStartedAt": "2026-11-20T01:26:12.067870+00:00",
+        "functionalRecoveryAt": "2026-11-20T01:26:48.948372+00:00",
+        "originalTemplatePreserved": true,
+        "incidentId": "a0d223fc-aeca-4ac9-8c1a-d353eb3cb378",
+        "conditionId": 69984631,
+        "incidentOpenedAt": "2026-11-20T01:24:04.930000+00:00",
+        "incidentClosedAt": "2026-11-20T01:32:16.720000+00:00",
+        "deviceReceivedAt": null,
+        "issueIds": [
+          "86368ce4-4fc4-45c5-86d2-ade96304783d"
+        ],
+        "pushes": [
+          {
+            "at": "2026-11-20T01:32:23.751000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-20T01:17:22.788000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ],
+        "notificationGrouping": "NR grouped this incident into the already active UI issue; opening push preceded this component fault; no fresh activation push claimed"
+      },
+      {
+        "component": "permissions-service",
+        "status": "DETECTED_AND_RESTORED_DEVICE_CONFIRMATION_PENDING",
+        "faultAt": "2026-11-20T01:27:06.087264+00:00",
+        "restoreStartedAt": "2026-11-20T01:34:06.087604+00:00",
+        "functionalRecoveryAt": "2026-11-20T01:34:40.771431+00:00",
+        "originalTemplatePreserved": true,
+        "incidentId": "c8221ed9-905b-4925-975c-5d915019929d",
+        "conditionId": 69984631,
+        "incidentOpenedAt": "2026-11-20T01:32:21.861000+00:00",
+        "incidentClosedAt": "2026-11-20T01:40:01.931000+00:00",
+        "deviceReceivedAt": null,
+        "issueIds": [
+          "83d76930-31be-4731-acaf-46880cbd9093"
+        ],
+        "pushes": [
+          {
+            "at": "2026-11-20T01:40:11.439000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-20T01:32:26.594000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      },
+      {
+        "component": "snippets-db",
+        "status": "DETECTED_AND_RESTORED_DEVICE_CONFIRMATION_PENDING",
+        "faultAt": "2026-11-20T01:34:58.159713+00:00",
+        "restoreStartedAt": "2026-11-20T01:41:58.160106+00:00",
+        "functionalRecoveryAt": "2026-11-20T01:42:22.651752+00:00",
+        "originalTemplatePreserved": true,
+        "incidentId": "a4f0406a-0513-48c4-bca6-56b79ae99009",
+        "conditionId": 69984631,
+        "incidentOpenedAt": "2026-11-20T01:40:07.064000+00:00",
+        "incidentClosedAt": "2026-11-20T01:46:58.670000+00:00",
+        "deviceReceivedAt": null,
+        "issueIds": [
+          "c93644b8-b6f4-45a4-91e8-1c53e9568ac7"
+        ],
+        "pushes": [
+          {
+            "at": "2026-11-20T01:47:07.976000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-20T01:40:15.754000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      },
+      {
+        "component": "redis",
+        "status": "DETECTED_AND_RESTORED_DEVICE_CONFIRMATION_PENDING",
+        "faultAt": "2026-11-20T01:42:39.834504+00:00",
+        "restoreStartedAt": "2026-11-20T01:49:39.834859+00:00",
+        "functionalRecoveryAt": "2026-11-20T01:50:03.872590+00:00",
+        "originalTemplatePreserved": true,
+        "incidentId": "66906fe2-a9a7-4ef3-afbf-bf2e9bda3a68",
+        "conditionId": 69984631,
+        "incidentOpenedAt": "2026-11-20T01:48:05.960000+00:00",
+        "incidentClosedAt": "2026-11-20T01:55:06.800000+00:00",
+        "deviceReceivedAt": null,
+        "issueIds": [
+          "c1d9241e-db20-4fb2-9f0a-217bba67a7f3"
+        ],
+        "pushes": [
+          {
+            "at": "2026-11-20T01:55:16.088000+00:00",
+            "trigger": "INCIDENT_CLOSED",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          },
+          {
+            "at": "2026-11-20T01:48:13.415000+00:00",
+            "trigger": "STATE_CHANGE",
+            "status": "SUCCESS",
+            "result": "Sent to 1 devices"
+          }
+        ]
+      }
+    ],
+    "storageView": {
+      "environment": "dev",
+      "scope": "Active volume, collector readonly view only; application mount unchanged",
+      "preparedAt": "2026-11-20T01:58:38.319340+00:00",
+      "status": "PROBE_DETECTED_RESTORED_WITH_AUDITED_DEFAULT_NORMALIZATION_DEVICE_PENDING",
+      "baseline": {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-runtime-v1",
+        "kind": "local",
+        "availableBytes": 13092876288,
+        "totalBytes": 30084825088,
+        "availableInodes": 3501836,
+        "writeOk": 1,
+        "readOk": 1,
+        "contentOk": 1,
+        "deleteOk": 1,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 83.912
+      },
+      "deviceReceivedAt": null,
+      "faultAt": "2026-11-20T01:58:53.704330+00:00",
+      "failed": {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-runtime-v1",
+        "kind": "local",
+        "availableBytes": 13092704256,
+        "totalBytes": 30084825088,
+        "availableInodes": 3501792,
+        "up": 0,
+        "reason": "io-failed",
+        "durationMs": 0.088
+      },
+      "restoreStartedAt": "2026-11-20T02:05:53.704710+00:00",
+      "originalTemplatePreserved": false,
+      "recovered": {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-runtime-v1",
+        "kind": "local",
+        "availableBytes": 13092401152,
+        "totalBytes": 30084825088,
+        "availableInodes": 3501737,
+        "writeOk": 1,
+        "readOk": 1,
+        "contentOk": 1,
+        "deleteOk": 1,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 6.072
+      },
+      "functionalRecoveryAt": "2026-11-20T02:06:27.746911+00:00",
+      "incidentId": "6338cb4f-4adc-4fd7-89da-0413dc0c597a",
+      "conditionId": 69984632,
+      "incidentOpenedAt": "2026-11-20T02:04:19.466000+00:00",
+      "incidentClosedAt": "2026-11-20T02:11:17.388000+00:00",
+      "applicationDuringFault": {
+        "at": "2026-11-20T02:01:13.595Z",
+        "status": 201,
+        "requestId": "47709723355b355cb47fbbc5518bd303",
+        "snippetId": "29139f57-d1ad-45e7-977b-331a11c2bf0a"
+      },
+      "restoreAudit": {
+        "rawTemplateEqual": false,
+        "changedDefaults": {
+          "DNSConfig": {},
+          "StopGracePeriodNanoseconds": 10000000000
+        },
+        "restoreDiffPaths": [
+          "ContainerSpec.DNSConfig presence",
+          "ContainerSpec.StopGracePeriod presence",
+          "ContainerSpec.Mounts[6].ReadOnly presence"
+        ],
+        "comment": "CLI reordered mounts and normalized empty fields/default 10s shutdown. Original raw flag is retained; subsequent delivered verifier normalizes only audited defaults, not real configuration changes."
+      },
+      "pushes": [
+        {
+          "at": "2026-11-20T02:11:22.880000+00:00",
+          "trigger": "INCIDENT_CLOSED",
+          "status": "SUCCESS",
+          "result": "Sent to 1 devices",
+          "issueLink": "https://radar-api.service.newrelic.com/accounts/8718557/issues/11b3ac7c-e1d9-42b1-a864-5a97bd5c12f9?notifier=MOBILE_PUSH"
+        },
+        {
+          "at": "2026-11-20T02:04:27.728000+00:00",
+          "trigger": "STATE_CHANGE",
+          "status": "SUCCESS",
+          "result": "Sent to 1 devices",
+          "issueLink": "https://radar-api.service.newrelic.com/accounts/8718557/issues/11b3ac7c-e1d9-42b1-a864-5a97bd5c12f9?notifier=MOBILE_PUSH"
+        }
+      ]
+    },
+    "vm": {
+      "status": "DETECTED_AND_MANUALLY_RECOVERED_DEVICE_CONFIRMATION_PENDING",
+      "stopRequestedAt": "2026-11-20T02:19:00.245Z",
+      "stoppedObservedAt": "2026-11-20T02:20:26.669Z",
+      "before": {
+        "at": "2026-11-20T02:17:50.051847Z",
+        "services": "9 at 1/1",
+        "releaseSha256": "056966b4e538c63975918852e40eb387c4089a360a21fbd8cc0b322d90e3dc68",
+        "pendingJournal": false,
+        "unfinishedJobsOutboxPermits": 0,
+        "restoreTimers": 0
+      },
+      "activeApplicationCdRuns": 0,
+      "recoveryControl": "Azure portal outside the DEV VM; normal Stop/Start, no forced deallocation",
+      "deviceReceivedAt": null,
+      "startRequestedAt": "2026-11-20T02:25:38.398Z",
+      "incidentId": "caafae2d-5ac8-42ad-b0ce-56588081441c",
+      "conditionId": 69984649,
+      "incidentOpenedAt": "2026-11-20T02:24:01.289000+00:00",
+      "incidentClosedAt": "2026-11-20T02:31:02.275000+00:00",
+      "functionalRecoveryObservedAt": "2026-11-20T02:47:48.647420+00:00",
+      "recovery": {
+        "createAt": "2026-11-20T02:46:14.671Z",
+        "status": 201,
+        "requestId": "129ba20f211175d70780cae357fa0697",
+        "snippetId": "dffce0fc-8bdd-4b2a-8fe4-c093ba1a9dc9",
+        "listingAndExactFixtureContent": "SUCCESS NONE; New Relic Event API acknowledged",
+        "functionalCheckDurationMs": 18166,
+        "servicesAtOneReplica": 9
+      },
+      "automaticBusinessRecovery": false,
+      "manualRecovery": {
+        "obsoleteDatabaseTask": {
+          "taskId": "iafm9kunz4k450g9w3f5ycx7l",
+          "desiredState": "shutdown",
+          "state": "failed",
+          "health": "unhealthy",
+          "action": "Stopped only obsolete container after verifying a distinct active running/healthy task; no container/volume deletion"
+        },
+        "initialReadinessCheck": "Failed before a business mutation; obsolete task caused ambiguous container selection",
+        "postBootBusinessCheck": "Failed at LISTING_HTTP; ingress observed GET /api/snippets 499 at client timeout",
+        "diagnosis": "TCP to both databases and Permissions succeeded; Snippets PostgreSQL sessions were idle. Exact cause of listing wait was not isolated.",
+        "mitigation": "Rolling restart of Snippets only, --force --no-resolve-image; then new 201 and real listing/content SUCCESS",
+        "restartPreserved": [
+          "Image",
+          "Env",
+          "Secrets",
+          "Mounts",
+          "Configs",
+          "User",
+          "Networks"
+        ],
+        "taskTemplateByteIdentityAfterRestart": false,
+        "reason": "ForceUpdate and Docker CLI default normalization are intentional restart metadata; no exact full-template preservation claimed after this manual mitigation"
+      },
+      "pushes": [
+        {
+          "at": "2026-11-20T02:24:10.859000+00:00",
+          "trigger": "STATE_CHANGE",
+          "status": "SUCCESS",
+          "result": "Sent to 1 devices",
+          "issueLink": "https://radar-api.service.newrelic.com/accounts/8718557/issues/3d7d86b2-fe30-4d4c-a6ce-699f50f96cfb?notifier=MOBILE_PUSH"
+        }
+      ],
+      "secondaryIncidents": [
+        {
+          "id": "42e9e3a3-88f3-49bd-810b-bdd0b95f920b",
+          "conditionId": 69667170,
+          "closedAt": "2026-11-20T02:41:02.351000+00:00"
+        },
+        {
+          "id": "23c781d6-dbbd-4ab0-8864-b58e1975a387",
+          "conditionId": 69670105,
+          "closedAt": "2026-11-20T02:37:53.306000+00:00"
+        },
+        {
+          "id": "74ab406d-9eaa-45d1-b541-e39b2084de0a",
+          "conditionId": 69984631,
+          "closedAt": "2026-11-20T02:33:10.128000+00:00"
+        },
+        {
+          "id": "953445aa-26fe-4c33-8b50-fa3a18cc72ae",
+          "conditionId": 69984650,
+          "closedAt": "2026-11-20T02:32:07.842000+00:00"
+        }
+      ]
+    }
+  },
+  "verification": {
+    "python": "3.12.12",
+    "unitTests": 324,
+    "unitResult": "PASS",
+    "cypressConfigurationSyntax": "PASS",
+    "integration": "Operaciones reales en DEV; la salida de Cypress se descarta",
+    "isolatedDockerFaults": "PASS"
+  },
+  "productionChanged": false,
+  "credentialsOrJwtRecorded": false,
+  "queries": "observability/drills/evidence.nrql",
+  "drillSourceSha256": {
+    "scripts/run_dev_drill.py": "bb847ecafa1faecae3d5264656b0f3880afab74f76fc11b7095db1131de032da",
+    "scripts/run_dev_replica_matrix.py": "f92c4de4fd8b6983ec3df8b2bbacd02387f2d6938086d852715d3c0800dc88cb",
+    "scripts/run_dev_storage_drill.py": "650e57fd595a078d6dfd890715a3d4c0d124923e26cf29f302d253f1fdf23a1c",
+    "scripts/dev_drill_state.py": "dd58073612f5dcf9a33313842384c5dd7975f452d2856e30e9efacf465e43d56",
+    "observability/drills/cypress.config.cjs": "601f6e70b0cfb0922804c3f38bf2c3f9d74d7325d00bad2ea23a9eb3a1da1fc3",
+    "observability/drills/dev.cy.js": "6e56a8e03b3316c779d9bd8682caad2990553fcc8fe6e32582347373e002f0f2"
+  },
+  "deliveredDrillSourceSha256": {
+    "scripts/run_dev_drill.py": "bb847ecafa1faecae3d5264656b0f3880afab74f76fc11b7095db1131de032da",
+    "scripts/run_dev_replica_matrix.py": "f92c4de4fd8b6983ec3df8b2bbacd02387f2d6938086d852715d3c0800dc88cb",
+    "scripts/run_dev_storage_drill.py": "084344120008ed16aea745f4e2626c08ecc1761376076767bb7af6a60fa0865a",
+    "scripts/dev_drill_state.py": "dd58073612f5dcf9a33313842384c5dd7975f452d2856e30e9efacf465e43d56",
+    "observability/drills/cypress.config.cjs": "601f6e70b0cfb0922804c3f38bf2c3f9d74d7325d00bad2ea23a9eb3a1da1fc3",
+    "observability/drills/dev.cy.js": "6e56a8e03b3316c779d9bd8682caad2990553fcc8fe6e32582347373e002f0f2"
+  },
+  "sourceChangeAfterStorageDrill": "Delivered storage verifier recognizes audited Docker default normalization and stops on other drift; executed old source hash and its raw false flag remain in evidence.",
+  "sourceRevisionScope": "Deployed infra baseline; executed one-off drill sources are identified by hashes, not claimed present in that base commit.",
+  "deliveredDrillRevision": "0789e3a",
+  "finalState": {
+    "dev": "Running, nine services at 1/1, creation and authenticated listing/content verified",
+    "prod": "Stopped (deallocated), no monitoring rollout applied",
+    "restorationTimers": 0,
+    "applicationSourceChanges": false
+  }
+}

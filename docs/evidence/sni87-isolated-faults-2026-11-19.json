@@ -1,0 +1,125 @@
+{
+  "result": "PASS",
+  "at": "2026-11-20T01:28:13.323078+00:00",
+  "project": "sni82-qa-84829746",
+  "architecture": "arm64",
+  "packages": {
+    "nri-postgresql": {
+      "version": "2.32.1",
+      "assets": {
+        "amd64": {
+          "url": "https://github.com/newrelic/nri-postgresql/releases/download/v2.32.1/nri-postgresql_linux_2.32.1_amd64.tar.gz",
+          "sha256": "87b2fe5842d535d9e4df9e5aa78f697e51466f15e94a293db2751841cfc66886"
+        },
+        "arm64": {
+          "url": "https://github.com/newrelic/nri-postgresql/releases/download/v2.32.1/nri-postgresql_linux_2.32.1_arm64.tar.gz",
+          "sha256": "cd1a145c93783bb9ab43f70e0ea88a7765cb0e777bf2e703585a760b9c363d65"
+        }
+      }
+    },
+    "nri-redis": {
+      "version": "1.16.2",
+      "assets": {
+        "amd64": {
+          "url": "https://github.com/newrelic/nri-redis/releases/download/v1.16.2/nri-redis_linux_1.16.2_amd64.tar.gz",
+          "sha256": "d15f73de209d14cbb780e45c390c706131b6a2675094523a61c8f98ecf8d8c1b"
+        },
+        "arm64": {
+          "url": "https://github.com/newrelic/nri-redis/releases/download/v1.16.2/nri-redis_linux_1.16.2_arm64.tar.gz",
+          "sha256": "4d89d501b54fcc2065caa4c9ab6500f114f26b142e29eccd4cd2f52579085aac"
+        }
+      }
+    }
+  },
+  "flex": {
+    "version": "1.18.18",
+    "assets": {
+      "amd64": {
+        "url": "https://github.com/newrelic/nri-flex/releases/download/v1.18.18/nri-flex_linux_1.18.18_amd64.tar.gz",
+        "sha256": "ad2928c077e340cbfb353006ce09d9e186533c57e58f2491dda63f1d5a60fd2f"
+      },
+      "arm64": {
+        "url": "https://github.com/newrelic/nri-flex/releases/download/v1.18.18/nri-flex_linux_1.18.18_arm64.tar.gz",
+        "sha256": "02dd773217f15d2e3e12260e807184823470ef79eb4c986798215d1075e4e5fb"
+      }
+    }
+  },
+  "cases": {
+    "nativeHealthy": {
+      "snippets-db": [
+        "PgCustomQuerySample",
+        "PostgresqlDatabaseSample",
+        "PostgresqlInstanceSample"
+      ],
+      "permissions-db": [
+        "PgCustomQuerySample",
+        "PostgresqlDatabaseSample",
+        "PostgresqlInstanceSample"
+      ],
+      "redis": [
+        "RedisSample"
+      ]
+    },
+    "noApplicationTableAccess": true,
+    "redisNoKeyWriteOrConfigAccess": true,
+    "realBlockedSessionAndRecovery": {
+      "blocked": 1,
+      "recovered": 0
+    },
+    "flexAcceptsActualSamples": [
+      "storage-local",
+      "asset-service"
+    ],
+    "localReadOnlyFailureAndRecovery": {
+      "before": {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-v1",
+        "kind": "local",
+        "availableBytes": 435744854016,
+        "totalBytes": 485473984512,
+        "availableInodes": 29702298,
+        "writeOk": 1,
+        "readOk": 1,
+        "contentOk": 1,
+        "deleteOk": 1,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 1.571
+      },
+      "failed": {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-v1",
+        "kind": "local",
+        "availableBytes": 435744940032,
+        "totalBytes": 485473984512,
+        "availableInodes": 29702306,
+        "up": 0,
+        "reason": "io-failed",
+        "durationMs": 0.865
+      },
+      "recovered": true
+    },
+    "assetBackendFailureAndRecovery": {
+      "environment": "dev",
+      "service": "asset-service",
+      "version": "sni82-v1",
+      "kind": "asset",
+      "up": 0,
+      "reason": "transport-failed",
+      "durationMs": 5152.026
+    },
+    "db1UnavailableAndRecovered": true,
+    "redisUnavailableAndRecovered": true,
+    "aofFullFilesystemErrorAndRecovery": true,
+    "badMonitoringCredentialKeepsApplicationAvailable": true
+  },
+  "limits": [
+    "Standalone collectors/Flex; no New Relic ingestion or live VM",
+    "Pool/JDBC latency belongs to application instrumentation",
+    "Isolated Redis tmpfs is a fault fixture, not a durability certification"
+  ],
+  "stoppedOwnProject": true,
+  "executionScope": "Isolated local Docker QA, repeated for SNI-87. No DEV interruption, no New Relic ingestion or alert-delivery claim."
+}
