@@ -1,11 +1,11 @@
 {
   "environment": "prod",
-  "version": "sni88-candidate-v1",
+  "version": "sni88-inventory-20261119",
   "intervalSeconds": 60,
   "postgres": [
     {
       "service": "snippets-db",
-      "host": "prod-snippets-db",
+      "host": "snippets-db",
       "port": 5432,
       "database": "snippets",
       "username": "nri_monitor",
@@ -13,7 +13,7 @@
     },
     {
       "service": "permissions-db",
-      "host": "prod-permissions-db",
+      "host": "permissions-db",
       "port": 5432,
       "database": "permissions",
       "username": "nri_monitor",
