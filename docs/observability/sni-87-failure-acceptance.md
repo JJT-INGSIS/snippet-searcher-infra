@@ -1,16 +1,18 @@
 # SNI-87 — Ensayos de fallas y evidencia de recuperación
 
-Actualización al 18/11/2026. **ACEPTACIÓN DE ALERTAS PENDIENTE**: SNI-83 ya verificó
-en DEV la pausa/reanudación y sus señales; esa prueba no acredita el aviso de SNI-87.
-El [registro de entrada](../evidence/sni87-readiness-2026-11-18.json) distingue esa
-entrega de las condiciones y notificaciones todavía pendientes de SNI-85/86.
-Esta guía conserva el alcance del ticket; no elige umbrales, SLO ni canal móvil.
+Actualización al 19/11/2026. **EVIDENCIA TÉCNICA COMPLETA; RECEPCIÓN HUMANA PENDIENTE**. SNI-85 y SNI-86
+están Done: hay chequeo autenticado, condiciones y workflows desplegados.
+Los tres casos principales produjeron fallo, incidente, envío de correo/push
+y recuperación. PrintScript devolvió `502` y luego una nueva alta `201`. El job
+del consumidor terminó con tres items y tres claves distintas, sin duplicación lógica;
+se restauraron las reglas de la identidad de prueba. La [evidencia fechada](../evidence/sni87-dev-2026-11-19.json)
+separa los hechos comprobados de lo pendiente. La recepción humana en el teléfono
+queda pendiente por indicación de Thiago; `Sent to 1 devices` no la reemplaza.
 
-La revisión de New Relic de hoy encontró sólo tres condiciones: disponibilidad de
-API, disponibilidad de UI y certificado. No había una condición de atraso del
-consumidor ni del listado 200 sin fixture. SNI-85 y SNI-86 siguen Todo en Linear;
-DEV se observó detenido/desasignado. No se encendió ni se provocó un corte para
-repetir la prueba técnica sin su detector. Esto no es un ensayo de caída de VM.
+El [registro del 18/11](../evidence/sni87-readiness-2026-11-18.json) es histórico:
+entonces faltaban SNI-85/86 y no se ejecutaron cortes. No usarlo como inventario actual.
+Las condiciones, ventanas y responsables efectivos están en
+[SNI-86](sni-86-alerts-dashboards.md). No se cambian sus umbrales para aprobar el ensayo.
 
 ## Condiciones de entrada
 
@@ -137,9 +139,64 @@ renovación; no pasar una credencial a la VM ni saltarse la validación.
 
 La consulta de seguimiento está en SNI-83: `stream.lag` y edad de jobs `PENDING`
 crecientes con outbox=0 distinguen el consumidor detenido de publicación atrasada.
-PEL con idle creciente es otro caso. El umbral de cinco muestras es una propuesta
-de SNI-83 para SNI-86; SNI-87 debe registrar la condición y ventana efectivamente
-aplicadas, no declarar un aviso por observar cinco valores en una gráfica.
+PEL con idle creciente es otro caso. SNI-86 desplegó la condición `69984639`:
+lag conocido positivo y edad elegible mayor que 300 s durante cinco ventanas
+consecutivas de un minuto, con dos minutos de demora de agregación. Reservar unos
+doce minutos desde el trabajo pendiente, más entrega y restauración; observar cinco
+valores en una gráfica no acredita el incidente. PrintScript usa `69984637`, con
+dos ventanas de un minuto y la misma demora de agregación.
+
+## Operaciones autenticadas repetibles
+
+[El runner DEV](../../scripts/run_dev_drill.py) reutiliza el login de SNI-85 y su
+imagen Cypress fijada. Ejecutar como root en `vm-snippet-dev`, con el árbol
+`scripts/` y `observability/` de esta revisión en una carpeta propia del ensayo.
+No reemplazar el runner de SNI-85 ni copiar sus credenciales. El archivo existente
+`/etc/snippet-observability/dev/functional-auth0.json` se monta sólo en lectura;
+la licencia de New Relic no entra en el contenedor. JWT y credenciales permanecen
+en memoria del navegador; no hay capturas, videos ni logs de Cypress persistidos.
+La salida admite sólo estados HTTP, UUID, request ID y tipos estables.
+
+```sh
+python3 -B scripts/run_dev_drill.py healthy-create
+python3 -B scripts/run_dev_drill.py enqueue-format
+python3 -B scripts/run_dev_drill.py job-status --job-id UUID_DEL_TRABAJO
+python3 -B scripts/run_dev_drill.py restore-format
+```
+
+`healthy-create` deja un snippet de prueba `SNI-87 ...` con descripción dedicada.
+`enqueue-format` afecta exclusivamente las reglas de esa identidad de prueba,
+conserva el original en `/var/tmp/sni87-20261119-rules-before.json` y rechaza
+sobrescribirlo. Restaurar las reglas después de acreditar el trabajo original;
+esa restauración puede generar otro trabajo legítimo. No borrar el snapshot
+para forzar un reintento ni ejecutar la operación con una cuenta personal.
+
+Para el alta con PrintScript caído, primero comprobar estado sano y preparar
+el temporizador de restauración, con el nombre que exige esta revisión:
+
+```sh
+systemd-run --unit=sni87-printscript-restore-20261119b --on-active=8min \
+  /usr/bin/docker service scale --detach=true snippet-searcher-dev_printscript-service=1
+python3 -B scripts/run_dev_drill.py printscript-unavailable --inject-printscript
+```
+
+El navegador inicia sesión y confirma el listado antes de solicitar el corte;
+el host espera ese aviso, comprueba la réplica original y detiene sólo PrintScript.
+El contenedor de Cypress no recibe socket Docker ni privilegios. Tras comprobar
+incidente/envío, restaurar a una réplica y repetir `healthy-create`; el timer es
+la recuperación de respaldo. Si falla la prueba, restaurar inmediatamente.
+El 19/11 el timer alcanzó a ejecutar la restauración; intentar detener después
+una unidad transitoria ya eliminada devolvió `5`, aunque la nueva alta fue `201`.
+Comprobar servicio y operación real antes de clasificar un error de limpieza.
+
+El primer intento detuvo PrintScript antes de iniciar sesión y el navegador
+falló antes de comprobar el alta. Se restauró y se repitió con sesión previa;
+el intento fallido no se cuenta como PASS. Se eligió este orden para aislar la
+creación de los pasos de entrada de la UI. Su costo es un pequeño protocolo de
+coordinación navegador/host; operar manualmente sería más simple, pero menos
+repetible y sin los mismos controles. Es análisis propio del proyecto con el marco
+de decisiones y trade-offs de capítulos 2/21 del
+[índice de Fundamentals of Software Architecture, 2e](https://www.oreilly.com/library/view/fundamentals-of-software/9781098175504/).
 
 ## Matriz adicional
 
@@ -162,6 +219,124 @@ Los nombres identifican escenarios, no el número de alertas esperadas: una caí
 puede tener síntomas correlacionados. Capturar agrupación/causa que entregue SNI-86,
 no crear otra ruta de ingesta ni políticas duplicadas para hacer pasar este ensayo.
 
+### Cortes secuenciales de réplicas
+
+[`run_dev_replica_matrix.py`](../../scripts/run_dev_replica_matrix.py) exige DEV,
+réplicas originales 1/1, publicador/consumidor activos, sin deploy pendiente ni
+jobs/outbox/permisos de ejecución pendientes. Toma el lock del despliegue por cada
+caso. El primer preflight del 19/11 abortó sin cortar nada porque contaba el colector
+como aplicación; son ocho servicios de aplicación y un colector. Quedó registrado
+como intento abortado, no PASS.
+
+```sh
+python3 -B scripts/run_dev_replica_matrix.py \
+  --components nginx ui snippets-service permissions-service snippets-db redis \
+  --hold-seconds 420 --execute
+```
+
+Cada caso tiene un timer independiente de restauración a la réplica original,
+`finally` y recibo privado en `/var/tmp/sni87-matrix-<UTC>/`. Después espera salud
+de las aplicaciones, compara la plantilla original y ejecuta una nueva alta real.
+No borra volúmenes ni modifica las imágenes. Su estado final es
+`RESTORED_AWAITING_ALERT_EVIDENCE`: debe correlacionarse con la señal, incidente,
+envío y cierre de New Relic. Un proceso `Type=oneshot` largo figura `activating`
+mientras trabaja; consultar el journal/recibos y no reiniciarlo por ese estado.
+Al lanzarlo con `systemd-run`, usar `--no-block` para no confundir el timeout del
+comando de Azure con la finalización del ensayo.
+
+Las réplicas se restauran sin gastar la cuota de los cortes de infraestructura CD.
+Se acepta una ventana sin servicio a cambio de una falla reversible que conserva
+la plantilla; matar procesos en un loop produciría reinicios menos deterministas.
+Las alertas de disponibilidad pública pueden permanecer abiertas entre cortes
+contiguos de componentes distintos. Los incidentes facetados de Swarm y los tiempos
+de los recibos identifican la causa; no contar cada síntoma como una falla distinta.
+
+### Storage activo y fixtures aislados
+
+[`run_dev_storage_drill.py`](../../scripts/run_dev_storage_drill.py) prepara un
+corte de siete minutos de la **vista del colector** sobre el volumen local activo,
+haciéndola sólo lectura. Verifica `up=0` real, prepara la inversa con timer y
+restaura escritura/lectura/contenido; finalmente ejecuta otra alta real. No cambia
+el montaje de Snippets ni los bytes de usuarios. Rechaza PROD, otro volumen y una
+vista que ya fuese sólo lectura.
+
+```sh
+python3 -B scripts/run_dev_storage_drill.py --execute
+```
+
+Esto ensaya el probe y su alerta sobre el proveedor activo; **no demuestra una
+interrupción de escritura de la aplicación ni daño del backend**. Una mala
+configuración del observador puede alertar aunque la aplicación siga escribiendo:
+es una limitación de separar el probe de su proceso consumidor, no una licencia
+para presentar un falso outage de la aplicación. El recibo distingue ese alcance. En el ensayo actual, Snippets confirmó otra alta
+`201` a las 02:01:13 UTC mientras el probe reportaba `up=0`; no se infiere una
+caída de la aplicación a partir del estado del observador.
+No ejecutar en paralelo con otro corte; usa el mismo lock de despliegue.
+
+La comparación cruda del ensayo devolvió `originalTemplatePreserved: false` y se
+conserva ese resultado. La auditoría observó reordenamiento de montajes, campos
+vacíos y dos defaults explicitados por CLI: DNS `{}` y apagado de diez segundos
+([default documentado por Docker](https://docs.docker.com/reference/cli/docker/service/create/)).
+La restauración restituyó la vista escribible y la aplicación volvió a confirmar
+un alta. La versión entregada compara esos defaults de forma equivalente y conserva
+sus hashes; un DNS no vacío, otro timeout, volumen o imagen siguen siendo drift.
+El hash de la versión realmente ejecutada se registra separado de la corregida;
+no se cambió retrospectivamente el recibo del ensayo.
+
+La [aceptación Docker aislada repetida](../evidence/sni87-isolated-faults-2026-11-19.json)
+comprobó falta de espacio AOF en tmpfs, escritura local sólo lectura y falla de
+transporte de Asset, con recuperación. Sus recursos y credenciales son exclusivos
+del proyecto QA; los contenedores propios se detuvieron al finalizar. No ingresa
+muestras a New Relic ni demuestra recepción de avisos DEV por esos casos.
+
+### Corte de VM con recuperación desde Azure
+
+Antes de detener DEV, esperar que los ensayos anteriores hayan restaurado sus
+componentes, no queden timers de restauración ni despliegues activos y los jobs
+estén ociosos. [`dev_drill_state.py`](../../scripts/dev_drill_state.py) rechaza PROD,
+Docker remoto, journal pendiente y réplicas incompletas; conserva sólo hashes,
+imágenes y nombres públicos, sin environment ni secretos.
+
+```sh
+python3 -B scripts/dev_drill_state.py before
+```
+
+Usar **Detener** sobre `vm-snippet-dev` en el portal Azure y conservar el estado
+observado y los tiempos UTC. El operador debe mantener abierto el control Azure
+fuera de la VM: un timer alojado dentro no puede recuperar una máquina apagada.
+Tras una pausa acotada para observar pérdida de SystemSample y aviso, usar **Iniciar**.
+No cambiar IP, NSG, discos, credenciales ni reaplicar el stack. Esperar la convergencia
+antes de ejecutar la comparación:
+
+```sh
+python3 -B scripts/dev_drill_state.py after
+python3 -B scripts/run_dev_drill.py healthy-create
+python3 -B /opt/snippet-observability/dev/functional/run.py
+```
+
+La comparación acredita conservación del release/plantillas y réplicas; imprime
+`functionalRecoveryVerified: false` deliberadamente. Las operaciones reales
+posteriores y las muestras/cierre en New Relic completan la recuperación. Una
+recepción `SUCCESS` del proveedor de push todavía requiere confirmación humana.
+El snapshot fechado no se sobrescribe para forzar otro intento; preparar otro
+recibo revisado si se repite la ventana.
+
+En el arranque del 20/11 apareció un contenedor PostgreSQL de una tarea vieja,
+además del vigente sano. El primer control de estado abortó antes de las operaciones
+funcionales. Se inspeccionaron los task IDs: el viejo estaba `shutdown/failed` y
+`unhealthy`, y el vigente `running/healthy`. Se detuvo sólo el contenedor obsoleto,
+sin eliminarlo ni tocar volúmenes, y se repitió la verificación. No seleccionar un
+contenedor arbitrario ni detener una réplica vigente para resolver ese síntoma.
+
+### Controles sin falla
+
+El 20/11 UTC, entre 00:15 y 00:30, hubo quince muestras del host y cero solicitudes
+API elegibles; no se abrieron incidentes. Se verificó con consultas de eventos,
+no haciendo fallar un cociente con denominador cero. Las tres respuestas esperadas
+400/422/404 del 19/11 aparecen en logs de ingreso y aportan cero fallas técnicas
+al predicado `status >= 500 AND status < 600` de SNI-86. No equivale a garantizar
+que nunca habrá un aviso de otra causa durante una respuesta de negocio.
+
 ## Diagnóstico y restauración
 
 Desde New Relic: ubicar ambiente/servicio/versión, revisar el incidente y luego
@@ -183,3 +358,29 @@ recuperación siguen en [SNI-24](../sni-24-bootstrap.md),
 [Redis SNI-56](../sni-56-redis.md) y [Asset SNI-33](../sni-33-asset.md).
 No reaplicar un stack viejo para restaurar una sola tarea ni cambiar CD durante el
 ensayo. PROD se trata separadamente en SNI-88.
+
+
+## Resultado del cierre técnico — 19/11 Argentina, 20/11 UTC
+
+Los tres casos principales y los seis cortes de réplicas tienen detección,
+recuperación y evidencia fechada. Storage produjo el incidente `6338cb4f-4adc-4fd7-89da-0413dc0c597a`
+y recuperó el probe; su alcance fue la vista del observador. La VM se detuvo a las
+02:19 UTC y se solicitó iniciar a las 02:25:38; el incidente de host abrió a las
+02:24:01 y cerró a las 02:31:02. Los incidentes públicos de API/UI también cerraron.
+
+El host sano no acreditó por sí mismo la recuperación de negocio: después del
+arranque, el listado quedó esperando y el navegador abortó (499 en ingreso).
+Las conexiones TCP a las bases/Permissions funcionaban; no se aisló la causa exacta
+de la espera. Se renovó sólo Snippets con `docker service update --force --no-resolve-image`,
+conservando imagen, variables, secretos, montajes, configs, usuario y redes.
+Después, el alta devolvió 201 a las 02:46:14 y el chequeo autenticado del fixture y
+su contenido terminó SUCCESS, con reconocimiento de New Relic. Es una mitigación
+manual verificada, no una afirmación de recuperación automática ni de causa raíz.
+La plantilla completa cambia por ForceUpdate/defaults; no se la presenta como idéntica
+byte a byte tras esa mitigación. No se modificó código de los servicios ni de compañeros.
+
+DEV quedó encendido y con nueve servicios en 1/1; PROD quedó desasignado sin rollout.
+Pasaron 324 tests locales y la QA Docker aislada. La recepción humana de los pushes
+sigue pendiente por decisión del usuario: el ticket no se declara Done sólo con
+`Sent to 1 devices`. El registro JSON conserva los intentos fallidos y las
+normalizaciones auditadas, además de las operaciones que sí se verificaron.
