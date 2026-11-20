@@ -10,10 +10,9 @@ RELEASE_FILE = "/host/home/azureuser/.local/state/snippet-searcher/{environment}
 SWARM_TIMEOUT = "20s"
 
 
-def integrations(config):
+def split_integrations(config):
+    """Pure host-dispatch rendering; callers must validate their deployment topology."""
     observability_config.validate(config)
-    if config["environment"] != "dev":
-        raise ValueError("This reviewed deployment is DEV only")
     targets = [*config["postgres"], *([config["redis"]] if config["redis"] else [])]
     native = [
         {
@@ -22,7 +21,7 @@ def integrations(config):
             "interval": str(config["intervalSeconds"]) + "s",
             "timeout": "25s",
             "labels": {
-                "environment": "dev",
+                "environment": config["environment"],
                 "version": config["version"],
                 "service": target["service"],
             },
@@ -35,7 +34,7 @@ def integrations(config):
             "interval": str(config["intervalSeconds"]) + "s",
             "timeout": "35s",
             "labels": {
-                "environment": "dev",
+                "environment": config["environment"],
                 "version": config["version"],
                 "service": target["service"],
             },
@@ -77,12 +76,19 @@ def integrations(config):
             ],
         },
         "labels": {
-            "environment": "dev",
+            "environment": config["environment"],
             "version": config["version"],
             "service": "swarm",
         },
     }
     return {"integrations": [*native, *storage, swarm]}
+
+
+def integrations(config):
+    observability_config.validate(config)
+    if config["environment"] != "dev":
+        raise ValueError("This reviewed deployment is DEV only")
+    return split_integrations(config)
 
 
 if __name__ == "__main__":

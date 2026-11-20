@@ -1,0 +1,27 @@
+{
+  "environment": "prod",
+  "status": "REQUIRES_ADMIN_CONFIGURATION",
+  "domain": "jjt-snippet-searcher.us.auth0.com",
+  "issuer": "https://jjt-snippet-searcher.us.auth0.com/",
+  "applicationName": "snippet-searcher-prod-ui",
+  "applicationType": "spa",
+  "clientId": null,
+  "apiName": "snippet-searcher-prod-api",
+  "audience": "https://jjt-snippets-prod.duckdns.org/api",
+  "callbacks": [
+    "https://jjt-snippets-prod.duckdns.org/auth/callback"
+  ],
+  "logoutUrls": [
+    "https://jjt-snippets-prod.duckdns.org/"
+  ],
+  "origins": [
+    "https://jjt-snippets-prod.duckdns.org"
+  ],
+  "grantTypes": [
+    "authorization_code"
+  ],
+  "offlineAccess": false,
+  "signingAlgorithm": "RS256",
+  "connection": "Seleccionar la misma conexion de usuario/contrasena verificada en DEV; confirmar su ID con el administrador",
+  "accessTokenLifetimeSeconds": null
+}

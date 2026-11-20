@@ -1,21 +1,41 @@
 # SNI-88 — Preparación de cobertura PROD
 
-Estado al 17/11/2026: **PREPARACIÓN, NO DESPLEGADO**. SNI-87 aún no acredita
-alerta/aviso/recuperación y SNI-86 sigue Todo. Este documento no habilita el corte
-ni presenta el piloto DEV como recepción PROD.
-Resultados y brechas: [registro de preparación](../evidence/sni88-preparation-2026-11-17.json).
+Estado al 19/11/2026: **INVENTARIO ACTUAL VERIFICADO; COBERTURA PROD SIN APLICAR**.
+SNI-85/86 están Done. Los tres ensayos principales DEV de SNI-87 produjeron
+incidentes y envíos; su recepción humana y la matriz restante siguen pendientes.
+
+PROD se encendió para inspección autorizada, conservando sus imágenes y datos:
+siete servicios saludables, dos bases y storage local; sin Redis, Asset ni Azurite.
+Auth0/APM y workers están deshabilitados. Las tres imágenes JVM existentes carecen
+del launcher New Relic: activar solamente una variable no las instrumenta.
+Registro: [inventario actual](../evidence/sni88-inventory-2026-11-19.json).
+
+La sesión Auth0 recuperada corresponde al tenant correcto, pero su rol es
+`Editor - Specific Apps` y sólo muestra las dos aplicaciones DEV. El
+[contrato público PROD](../../auth0/production.public.json) deja preparados nombre,
+issuer, audience, callback y orígenes; client ID, conexión y TTL requieren
+confirmación/configuración de un administrador. No contiene secretos ni habilita
+OAuth por sí mismo. También debe revisarse la promoción de imágenes instrumentadas,
+con sus migraciones, mediante CD y evidencia DEV; no reemplazar las imágenes a mano.
+
+El renderer candidato usa los aliases de servicio que ya ofrece Swarm para ambas bases.
+Esto evita agregar alias y reiniciar bases durante la instalación de colectores;
+a cambio depende de esos aliases y de la red aislada de PROD. No se agregan Redis ni workers
+para justificar una señal. La instalación operativa, credenciales/permisos,
+Browser/check, políticas y recepción siguen pendientes; este documento no los
+presenta como aplicados.
 
 ## Candidato y topología
 
-La última inspección de PROD registrada es del 09/11, en la
+La inspección histórica previa era del 09/11, en la
 [base común](../architecture/observability-baseline.md#consulta-de-prod--09112026):
 NGINX, UI, tres JVM, dos PostgreSQL y storage local; no aparecían Redis, Asset ni
-Azurite. No se encendió PROD para esta revisión. El bootstrap `swarm/prod-release.json`
+Azurite. La inspección actual del 19/11 confirma esa topología. El bootstrap `swarm/prod-release.json`
 es una selección histórica, no el inventario efectivo ni un candidato de aplicación
 listo para promover.
 
 [`config.prod-local.example.json`](../../observability/config.prod-local.example.json)
-prepara sólo esas dependencias: dos bases con alias privados `prod-*`, storage
+prepara sólo esas dependencias: dos bases con aliases existentes `snippets-db`/`permissions-db`, storage
 local y capacidad de sus tres volúmenes. Redis es `null`; no se agrega infraestructura
 de aplicación para justificar un monitor. Si el inventario efectivo cambió, revisar
 el candidato antes de instalarlo. Asset reemplaza el probe local cuando sea el
@@ -47,17 +67,51 @@ son deliberadamente específicos:
 | `observability/runtime/agent.compose.yaml` | VM, etiquetas, nombre/estado del agente y rutas `/dev/` |
 | `collector.stack.yaml` | UID/GID del volumen real, nodo, redes, volúmenes, secretos y montajes; actualmente exige Redis |
 | `dispatch.sh` y `swarm.sh` | Stack/colector DEV y alcance permitido; no seleccionar tareas de otro ambiente |
-| `scripts/observability_runtime.py` | Rechaza PROD expresamente; sus labels no son parametrizables por el ejemplo |
+| `scripts/observability_runtime.py` | La entrada DEV conserva su rechazo de PROD; el renderer compartido se usa sólo desde el candidato PROD que comprueba su topología |
 | `prepare/provision/start/verify_observability_dev.py` | Host, paths y operaciones DEV; no ejecutar en PROD ni reemplazar nombres con `sed` |
 | `scripts/observability_deployment.py` | Compatibilidad de CD verificada sólo con el marcador DEV; PROD necesita reconciliación equivalente antes de instalar aliases/ACL |
 
 Se reutiliza el renderer genérico y los binarios fijados, conservando el rechazo de
-un despliegue no revisado. La alternativa de convertir todo en flags ahora reduciría
-duplicación, pero permitiría generar una instalación para una topología que todavía
-no comprobamos. Se acepta terminar la adaptación operativa después del inventario.
+un despliegue no revisado. La alternativa de convertir todos los instaladores DEV en flags reduciría
+duplicación, pero ampliaría el alcance de operaciones que hoy sólo están verificadas
+en DEV. Se comparte el renderer puro y se agrega una entrada PROD restringida al
+inventario comprobado; los instaladores operativos DEV conservan sus barreras.
 Es análisis del proyecto con el marco de trade-offs/decisiones de los capítulos
 2/21 del [índice de Fundamentals of Software Architecture, 2e](https://www.oreilly.com/library/view/fundamentals-of-software/9781098175504/),
 no una prescripción de tecnología atribuida al libro.
+
+## Bundle público para revisión
+
+[`production_observability_candidate.py`](../../scripts/production_observability_candidate.py)
+produce un candidato offline, sin ejecutar Docker, conceder permisos ni leer una
+licencia. Genera configuración del agente, stack del colector, dispatcher privado
+PROD y seis integraciones (dos bases, tres probes de storage/disco y Swarm).
+Rechaza DEV, Redis, Asset y destinos que no coincidan con el inventario. No copia
+el runtime ni modifica el release de aplicación.
+
+```sh
+python3 scripts/production_observability_candidate.py > /tmp/sni88-prod-candidate.json
+```
+
+El colector tiene UID/GID 10001, filesystem raíz de lectura, capacidades eliminadas,
+sin socket Docker, licencia ni puertos publicados. Sólo monta los dos secretos de
+monitoreo PostgreSQL; las bases se observan en lectura. El volumen de contenido es
+escribible únicamente para comprobar el fixture acotado del probe existente.
+El agente de host requiere privilegios y socket Docker, con acceso efectivo alto
+al host: `/:ro` no elimina ese riesgo. La separación deja las credenciales de base
+fuera del agente, pero no lo vuelve una frontera frente a un administrador del host.
+Debe revisarse y autorizarse esa instalación antes de aplicarla.
+
+Los topes 384/256 MiB y 0.5 CPU por contenedor provienen del piloto; no son consumo
+PROD medido. Tampoco hay roles, secretos, binarios, recepción o licencia instalados
+por emitir este JSON. Su estado explícito es `REVIEW_ONLY_NOT_APPLIED`.
+Validaciones locales: **309 tests**, `docker compose config --quiet` del agente y
+`docker stack config` del colector correctos. Son validaciones de configuración,
+no recepción de telemetría ni pruebas contra las bases de PROD.
+
+Los cuatro callers de `main` consultados el 20/11 UTC usan **v0.6.2**, compatible
+con el gate actual de PROD sin Redis. No hay un bloqueo de versión comprobado allí;
+revalidar al promover. La VM se dejó **Detenida (desasignada)** después del inventario.
 
 ## Secuencia de promoción y aceptación
 
