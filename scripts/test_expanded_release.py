@@ -460,7 +460,7 @@ class UIEvidenceTests(unittest.TestCase):
 
 
 class RolloutGateTests(unittest.TestCase):
-    def api(self, reference='v0.6.2', active=False):
+    def api(self, reference='v0.6.8', active=False):
         class API:
             def __init__(self, repository, token): self.repository = repository
             def request(self, path):

@@ -55,8 +55,11 @@ def without_auth(release):
 
 
 def require_auth_only(previous, release):
-    if release['environment'] != 'dev' or 'ui' not in release['images']:
-        raise ValueError('El corte Auth0 requiere DEV con UI ya instalada')
+    if 'ui' not in release['images']:
+        raise ValueError('El corte Auth0 requiere UI ya instalada')
+    if release['environment'] == 'prod':
+        from auth_rollout import require_production_identity
+        require_production_identity(release)
     if without_auth(previous) != without_auth(release):
         raise ValueError('El corte Auth0 sólo admite cambiar identidad de UI y API')
     # The confirmed legacy state remains a valid rollback target.
@@ -106,9 +109,9 @@ class ScopedSwarm(Swarm):
         if self.scope != 'auth':
             return
         from deploy_service import docker_json
-        spec = docker_json('service', 'inspect', 'snippet-searcher-dev_snippets-service')[0]
+        spec = docker_json('service', 'inspect', f'snippet-searcher-{self.environment}_snippets-service')[0]
         values = dict(entry.split('=', 1) for entry in spec['Spec']['TaskTemplate']['ContainerSpec'].get('Env', []))
-        current = {key: values.get(key, 'dev' if key == 'AUTH_MODE' else '') for key in
+        current = {key: values.get(key, ('dev' if previous['environment'] == 'dev' else 'disabled') if key == 'AUTH_MODE' else '') for key in
                    ('AUTH_MODE', 'AUTH_ISSUER', 'AUTH_AUDIENCE', 'SNIPPETS_CORS_ALLOWED_ORIGINS')}
         if not any(current == {**auth_environment(release), **cors_environment(release)}
                    for release in (previous, candidate)):
