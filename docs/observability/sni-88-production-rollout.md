@@ -1,3 +1,66 @@
+## Activación retomada — 20/11/2026
+
+El administrador confirmó la SPA `snippet-searcher-prod-ui`, Client ID público
+`3WzM34S00lsCGU0p4hYImgs2xCuPgejW`, y la API con audience
+`https://jjt-snippets-prod.duckdns.org/api`, URLs PROD y acceso delegado.
+La sesión del dashboard venció; esta confirmación del administrador todavía no
+es una prueba de login. SNI-87 fue cerrado por aceptación técnica de Thiago.
+
+El inventario se volvió a verificar: siete servicios 1/1, release sin cambios,
+sin journal pendiente, Auth0/APM apagados y JVM sin launcher de APM. Se generaron
+respaldos root-only de ambas bases, contenido y release en la VM antes de promover.
+Se verificó que se pueden listar los archivos; no se afirma un restore probado.
+
+La promoción usa las imágenes verificadas de DEV mediante PRs dev → main; no se
+reconstruye para PROD ni se editan implementaciones de compañeros. Incluye el
+contenido acumulado de DEV, no sólo el agente. Snippets agrega migraciones de
+funcionalidades ya verificadas; rollback de imagen no revierte su esquema.
+No se habilitan Redis, Asset, publicador ni consumidor como efecto del corte.
+
+### Aplicación acotada y recuperación
+
+`bootstrap_swarm.py plan <release-confirmado> --auth0-prod` arma un candidato con
+los parámetros públicos confirmados. `deploy <candidato> --infrastructure --auth-only`
+cambia sólo Snippets/UI bajo el mismo lock/journal, conservando APM, imágenes,
+bases y volúmenes. Rechaza client/audience DEV, hostname distinto, HTTP sin TLS y
+cambios ajenos a identidad. El estado deshabilitado anterior sigue siendo destino
+de recuperación. La regla usa el ambiente real al inspeccionar Snippets, también
+al reanudar un corte interrumpido. La actualización de imágenes sigue pasando por CD.
+
+El gate manual exige los cuatro callers v0.6.8, incluido PROD sin Redis. Mantener
+v0.6.2 bloqueaba un corte después de promover los callers actuales; esto no
+publica ni mueve tags centrales. La nueva dependencia `auth_rollout.py` y el
+contrato público PROD viajan en el bundle para recuperación independiente de SSH.
+
+`production_observability_runtime.py` separa `stage`, `provision`, `verify` y
+`start`. Está restringido a root en el manager PROD x86-64, siete servicios sanos,
+la topología local sin Redis, UID de contenido 10001 y ausencia de pending. Usa
+el lock del CD; provisión exige además SHA-256 del release revisado. Rechaza
+colisiones de runtime, roles, secretos y licencia: un fallo parcial se inspecciona,
+no se reintenta para rotar credenciales. No reinicia bases ni agrega aliases.
+
+Antes de `provision`/`start` se requiere autorización de la instalación concreta:
+agente oficial privilegiado con socket Docker; dos roles `nri_monitor` limitados
+a `CONNECT`/`pg_read_all_stats`, sin SELECT a tablas; dos secretos nuevos sólo
+para el colector; ingesta en la cuenta 8718557 con configuración PROD. No copiar
+credenciales DEV. La licencia entra por stdin y se guarda root-only. `verify`
+exige métricas nativas presentes y probe de contenido/capacidad exitoso; no confunde
+salida 0 sin métricas con salud ni acredita ingesta por un render local.
+
+Se conserva el split aprobado en DEV: simplifica operar el mismo empaquetado y
+separa las contraseñas de bases del agente, a costo del acceso amplio del agente al
+host y de mantener un instalador PROD restringido. La alternativa de abrir las
+barreras DEV mediante sustitución de nombres se descarta porque permitiría ejecutar
+operaciones sobre una topología no revisada. Marco de análisis: capítulos 2/21 del
+[índice de Fundamentals of Software Architecture, 2e](https://www.oreilly.com/library/view/fundamentals-of-software/9781098175504/);
+la elección concreta es del proyecto.
+
+**Lo anterior describe preparación y controles; aún no acredita corte Auth0,
+recepción de telemetría, Browser, checks, alertas ni SLO PROD.** El estado histórico
+de abajo se conserva como antecedente, no como bloqueo Auth0 actual.
+
+---
+
 # SNI-88 — Preparación de cobertura PROD
 
 Estado al 19/11/2026: **INVENTARIO ACTUAL VERIFICADO; COBERTURA PROD SIN APLICAR**.

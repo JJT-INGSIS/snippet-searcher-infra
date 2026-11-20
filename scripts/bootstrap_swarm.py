@@ -293,8 +293,9 @@ def main():
     parser.add_argument('--publisher', choices=('on', 'off'), help='Sólo plan: publicador del outbox')
     parser.add_argument('--consumer', choices=('on', 'off'), help='Sólo plan: consumidor de eventos')
     parser.add_argument('--auth-only', action='store_true',
-                        help='Con --infrastructure: cambiar sólo identidad de Snippets y UI en DEV')
+                        help='Con --infrastructure: cambiar sólo identidad de Snippets y UI del ambiente registrado')
     parser.add_argument('--auth0-dev', action='store_true', help='Sólo plan: parámetros públicos Auth0 DEV verificados')
+    parser.add_argument('--auth0-prod', action='store_true', help='Sólo plan: parámetros públicos Auth0 PROD confirmados')
     args = parser.parse_args()
     scopes = [name for name, chosen in (('proxy', args.proxy_only), ('apm', args.apm_only),
                                          ('background', args.background_only), ('auth', args.auth_only)) if chosen]
@@ -305,8 +306,10 @@ def main():
         parser.error('Los alcances parciales sólo acompañan a deploy --infrastructure')
     if (args.apm or args.publisher or args.consumer) and args.mode != 'plan':
         parser.error('--apm, --publisher y --consumer sólo acompañan a plan')
-    if args.auth0_dev and (args.mode != 'plan' or args.apm or args.ui_dev_actor is not None):
-        parser.error('--auth0-dev sólo acompaña a plan sin otros cambios de identidad/APM')
+    if args.auth0_dev and args.auth0_prod:
+        parser.error('Seleccionar un único ambiente Auth0')
+    if (args.auth0_dev or args.auth0_prod) and (args.mode != 'plan' or args.apm or args.ui_dev_actor is not None):
+        parser.error('Auth0 sólo acompaña a plan sin otros cambios de identidad/APM')
     manifest = json.loads(args.manifest.read_text())
     selected = validate_manifest(manifest)
     if args.mode == 'plan':
@@ -318,16 +321,9 @@ def main():
             planned['apm'] = {'enabled': args.apm == 'on'}
         if args.publisher or args.consumer:
             planned['background'] = switched_background(planned, publisher=args.publisher, consumer=args.consumer)
-        if args.auth0_dev:
-            if manifest['environment'] != 'dev' or 'ui' not in manifest['images']:
-                raise ValueError('--auth0-dev requiere DEV con UI instalada')
-            public = json.loads((ROOT / 'auth0/development.public.json').read_text())
-            proxy = infrastructure(manifest).get('nginx', {})
-            if not proxy.get('tls') or 'https://' + proxy.get('hostname', '') not in public['origins']:
-                raise ValueError('El ingreso DEV debe coincidir con una origin HTTPS aprobada en Auth0')
-            planned['auth'] = {key: public[key] for key in ('issuer', 'audience')}
-            planned['auth']['mode'] = 'auth0'
-            planned['ui'] = {'auth': {key: public[key] for key in ('domain', 'client_id', 'audience')}}
+        if args.auth0_dev or args.auth0_prod:
+            from auth_rollout import plan_identity
+            planned = plan_identity(planned, 'prod' if args.auth0_prod else 'dev')
         validate_manifest(planned)
         print(json.dumps(planned, indent=2))
         return
