@@ -38,8 +38,17 @@ class ProductionAuthTests(unittest.TestCase):
         for service in before['services']:
             if service not in ('ui', 'snippets-service'):
                 self.assertEqual(before['services'][service], after['services'][service])
-        self.assertEqual(before['services']['snippets-service']['secrets'],
-                         after['services']['snippets-service']['secrets'])
+        key = 'auth0_directory_prod'
+        before_snippets = before['services']['snippets-service']
+        after_snippets = after['services']['snippets-service']
+        self.assertEqual(after_snippets['secrets'], before_snippets['secrets'] + [
+            {'source': key, 'target': 'snippets.directory.auth0.client-secret'},
+        ])
+        self.assertNotIn('AUTH0_DIRECTORY_CLIENT_ID', before_snippets['environment'])
+        self.assertEqual(after_snippets['environment']['AUTH0_DIRECTORY_CLIENT_ID'],
+                         'wa4O5PHWRFY7ekVtsoF3lzHlegDAZ3Tb')
+        self.assertEqual(after['secrets'][key],
+                         {'external': True, 'name': 'snippet-searcher-prod-auth0-directory-v1'})
         with patch('scoped_deploy.validate_rendered', side_effect=json.dumps):
             scoped = json.loads(scoped_document(candidate, {'ui', 'snippets-service'}))
         self.assertEqual(set(scoped['services']), {'ui', 'snippets-service'})
