@@ -62,6 +62,26 @@ class AuthConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'autenticación'):
             verify_service_configuration(release, docker, 'snippets-service')
 
+    def test_directory_mount_is_preserved_only_for_prod_with_auth0(self):
+        prod_auth = {**AUTH, 'audience': 'https://jjt-snippets-prod.duckdns.org/api'}
+        prod = {**expanded('prod', assets=False), 'auth': prod_auth}
+        key = 'auth0_directory_prod'
+        rendered = render_release(prod)
+        snippets = rendered['services']['snippets-service']
+        self.assertEqual(snippets['environment']['AUTH0_DIRECTORY_CLIENT_ID'],
+                         'wa4O5PHWRFY7ekVtsoF3lzHlegDAZ3Tb')
+        self.assertIn({'source': key, 'target': 'snippets.directory.auth0.client-secret'}, snippets['secrets'])
+        self.assertTrue(rendered['secrets'][key]['external'])
+        self.assertEqual(rendered['secrets'][key]['name'], 'snippet-searcher-prod-auth0-directory-v1')
+        for name, service in rendered['services'].items():
+            if name != 'snippets-service':
+                self.assertNotIn(key, {secret['source'] for secret in service.get('secrets', [])})
+        for release in ({**expanded(assets=False), 'auth': AUTH}, expanded('prod', assets=False)):
+            with self.subTest(environment=release['environment']):
+                rendered = render_release(release)
+                self.assertNotIn(key, rendered['secrets'])
+                self.assertNotIn('AUTH0_DIRECTORY_CLIENT_ID', rendered['services']['snippets-service']['environment'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -32,6 +32,8 @@ def render_release(release):
         settings.update(ui_environment(release))
     if apm_enabled(release):
         files.append('swarm/stack.apm.yaml')
+    if release['environment'] == 'prod' and settings['AUTH_MODE'] == 'auth0':
+        files.append('swarm/stack.auth0-directory-prod.yaml')
     if any(background_flags(release).values()):
         files.append('swarm/stack.background.yaml')
     settings['STORAGE_PROVIDER'] = storage_provider(release)
@@ -179,6 +181,10 @@ def apply_release(release, docker_json, redis_transition=False):
         allowed = {'redis', 'snippets-service', 'printscript-service'}
         rendered['services'] = {name: spec for name, spec in rendered['services'].items() if name in allowed}
     document = validate_rendered(rendered)
+    directory_secret = rendered.get('secrets', {}).get('auth0_directory_prod')
+    if directory_secret:
+        subprocess.run(['docker', 'secret', 'inspect', '--format', '{{.Spec.Name}}', directory_secret['name']],
+                       check=True, stdout=subprocess.DEVNULL, timeout=30)
     require_configs(release, docker_json, create=True)
     subprocess.run(['docker', 'stack', 'deploy', '--resolve-image', 'always', '-c', '-',
                     f'snippet-searcher-{release["environment"]}'], input=document, text=True, check=True, timeout=180)
