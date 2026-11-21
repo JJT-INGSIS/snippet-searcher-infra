@@ -45,17 +45,6 @@ datos. La verificación efectiva detecta una configuración de autenticación
 distinta de la registrada; para registros antiguos admite tareas todavía sin
 variables AUTH_*.
 
-El directorio de usuarios para compartir snippets en PROD usa la aplicación M2M
-`snippet-searcher-prod-directory` con el permiso `read:users` de Auth0 Management
-API. Si el release de PROD usa Auth0, el render de Swarm agrega sólo a Snippets
-el Client ID público y monta el secreto externo
-`snippet-searcher-prod-auth0-directory-v1` como
-`/run/secrets/snippets.directory.auth0.client-secret`. Spring lo lee mediante
-`configtree:/run/secrets/`. El valor del secreto se provisiona en el manager de
-PROD antes de aplicar el stack y permanece en Swarm. El despliegue comprueba que
-el secreto exista antes de modificar el stack. DEV y los releases de PROD con
-Auth0 deshabilitado no incluyen este montaje.
-
 ## Activación posterior
 
 La activación integrada de UI/API en DEV y el alcance que preserva el monitor

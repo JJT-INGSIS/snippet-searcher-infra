@@ -32,8 +32,6 @@ def render_release(release):
         settings.update(ui_environment(release))
     if apm_enabled(release):
         files.append('swarm/stack.apm.yaml')
-    if release['environment'] == 'prod' and settings['AUTH_MODE'] == 'auth0':
-        files.append('swarm/stack.auth0-directory-prod.yaml')
     if any(background_flags(release).values()):
         files.append('swarm/stack.background.yaml')
     settings['STORAGE_PROVIDER'] = storage_provider(release)
@@ -42,6 +40,12 @@ def render_release(release):
                           ('max_content_bytes', 1048576)):
         settings['STORAGE_ASSET_' + name.upper()] = str(asset.get(name, default))
     data = render(files, settings)
+    if release['environment'] == 'prod' and settings['AUTH_MODE'] == 'auth0':
+        key = 'auth0_directory_prod'
+        snippets = data['services']['snippets-service']
+        snippets['environment']['AUTH0_DIRECTORY_CLIENT_ID'] = 'wa4O5PHWRFY7ekVtsoF3lzHlegDAZ3Tb'
+        snippets['secrets'].append({'source': key, 'target': 'snippets.directory.auth0.client-secret'})
+        data['secrets'][key] = {'external': True, 'name': 'snippet-searcher-prod-auth0-directory-v1'}
     data.pop('name', None)
     data['version'] = '3.8'
     # Compose supplies project names. Swarm must own these resources per environment.
@@ -181,10 +185,6 @@ def apply_release(release, docker_json, redis_transition=False):
         allowed = {'redis', 'snippets-service', 'printscript-service'}
         rendered['services'] = {name: spec for name, spec in rendered['services'].items() if name in allowed}
     document = validate_rendered(rendered)
-    directory_secret = rendered.get('secrets', {}).get('auth0_directory_prod')
-    if directory_secret:
-        subprocess.run(['docker', 'secret', 'inspect', '--format', '{{.Spec.Name}}', directory_secret['name']],
-                       check=True, stdout=subprocess.DEVNULL, timeout=30)
     require_configs(release, docker_json, create=True)
     subprocess.run(['docker', 'stack', 'deploy', '--resolve-image', 'always', '-c', '-',
                     f'snippet-searcher-{release["environment"]}'], input=document, text=True, check=True, timeout=180)
