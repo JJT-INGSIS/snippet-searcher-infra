@@ -1,0 +1,29 @@
+-- Read-only. Account 8718557 (US). Adjust UTC window for the demonstration.
+-- Recent ingestion does not prove an alert or human reception.
+SELECT count(*), latest(timestamp)
+FROM SystemSample, SnippetSwarmSample, SnippetStorageSample,
+  PostgresqlInstanceSample, PostgresqlDatabaseSample, PgCustomQuerySample,
+  Transaction, Span, Log
+WHERE environment = 'prod' OR label.environment = 'prod' OR appName LIKE '%(prod)%'
+FACET eventType() SINCE 20 minutes ago LIMIT MAX
+
+SELECT latest(running), latest(desired), latest(imageState), latest(timestamp)
+FROM SnippetSwarmSample WHERE environment = 'prod'
+FACET service SINCE 20 minutes ago LIMIT MAX
+
+SELECT latest(up), latest(contentOk), latest(reason), latest(timestamp)
+FROM SnippetStorageSample WHERE environment = 'prod' AND up IS NOT NULL
+FACET service SINCE 20 minutes ago
+
+SELECT count(*), latest(timestamp)
+FROM PageView, PageViewTiming, BrowserInteraction, JavaScriptError
+WHERE appName = 'snippet-searcher-prod-ui'
+FACET eventType() SINCE 30 minutes ago
+
+SELECT latest(result), latest(timestamp)
+FROM SyntheticCheck WHERE monitorName LIKE 'snippet-searcher-prod-%'
+FACET monitorName, location SINCE 1 hour ago
+
+SELECT latest(result), latest(failureCategory), latest(timestamp)
+FROM SnippetFunctionalCheck WHERE environment = 'prod'
+FACET checkName SINCE 1 day ago
