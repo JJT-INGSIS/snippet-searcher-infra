@@ -22,7 +22,5 @@
   ],
   "offlineAccess": false,
   "signingAlgorithm": "RS256",
-  "connection": "Seleccionar la misma conexion de usuario/contrasena verificada en DEV; confirmar su ID con el administrador",
-  "accessTokenLifetimeSeconds": null,
   "confirmedBy": "Thiago, 2026-11-20; SPA URLs and delegated API access confirmed"
 }
