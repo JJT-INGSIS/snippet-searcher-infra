@@ -60,7 +60,6 @@ class GitHub:
             with urllib.request.urlopen(req, timeout=30) as response:
                 return json.load(response)
         except HTTPError as error:
-            # Do not expose the response or authorization headers in diagnostics.
             raise RuntimeError(f'GitHub {error.code} en {path.split("?")[0]}') from None
 
     def pages(self, path, key=None):
@@ -135,8 +134,6 @@ def valid_evidence(api, deployment, service, tree):
             or run.get('path') != '.github/workflows/pipeline.yml'
             or run.get('repository', {}).get('full_name') != payload['repository']):
         return None
-    # The caller must actually have executed the central pipeline and CD from
-    # one immutable revision. A similarly named local workflow is not proof.
     workflows = run.get('referenced_workflows', [])
     revisions = {}
     required_workflows = ('frontend-ci.yml', 'cd.yml') if service == 'ui' else ('kotlin-service-pipeline.yml', 'cd.yml')
@@ -159,8 +156,6 @@ def valid_evidence(api, deployment, service, tree):
     commit = api.request(f'/git/commits/{payload["source-sha"]}')
     if commit['tree']['sha'] != tree:
         return None
-    # A later inactive status does not erase the explicit successful receipt.
-    # Retention of older statuses/logs is deliberately not part of selection.
     return payload
 
 
@@ -180,7 +175,6 @@ def record_evidence(api, receipt):
             or receipt.get('actual-image') != receipt['image-ref']:
         raise ValueError('El recibo no confirma checks e imagen efectiva')
     payload = {**receipt, 'schema': 1}
-    # Idempotent retry after a successful create followed by a lost response.
     for existing in api.pages(f'/deployments?environment=dev&task={TASK}'):
         if existing.get('payload') == payload and existing.get('creator', {}).get('login') == 'github-actions[bot]':
             deployment = existing

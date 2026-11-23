@@ -59,7 +59,6 @@ def backup(container, destination):
         with partial.open('r+b') as saved:
             os.fsync(saved.fileno())
         digest = hashlib.sha256(partial.read_bytes()).hexdigest()
-        # Hard-link creates the final name exclusively, never replacing another backup.
         os.link(partial, destination)
         metadata = {'format': 'redis-rdb-v1', 'sha256': digest, 'image': REDIS_IMAGE}
         with destination.with_suffix('.json').open('x') as output:
@@ -90,7 +89,6 @@ def restore(snapshot, volume, secret):
     if actual.get('Labels', {}).get('com.jjt.sni56.restore') != identity:
         raise ValueError('El volumen no pertenece a esta restauración')
     folder = ROOT / '.sni56' / identity
-    # These files contain only public configuration, never credentials. Redis drops to uid 999.
     folder.mkdir(parents=True, mode=0o755)
     config = folder / 'redis.conf'
     config.write_text((ROOT / 'redis/redis.conf').read_text().replace('appendonly yes', 'appendonly no'))
@@ -115,11 +113,10 @@ def restore(snapshot, volume, secret):
                 if redis(container, 'PING') == 'PONG':
                     break
             except RuntimeError:
-                pass  # Only bounded startup polling; no restore is declared healthy from an error.
+                pass
             time.sleep(.2)
         else:
             raise RuntimeError('Redis restaurado no respondió')
-        # Load RDB without AOF first; otherwise an AOF may mask/ignore the restored snapshot.
         if redis(container, 'CONFIG', 'SET', 'appendonly', 'yes') != 'OK':
             raise RuntimeError('No se habilitó AOF después de cargar el RDB')
         wait_for(container, lambda state: state['aof_enabled'] == '1' and
@@ -133,7 +130,6 @@ def restore(snapshot, volume, secret):
         config.unlink(missing_ok=True)
         for name in ('entrypoint.sh', 'healthcheck.sh', 'cli.sh'):
             (folder / name).unlink(missing_ok=True)
-        # Deliberately retain the new volume on success AND failure; no destructive auto-repair.
 
 
 if __name__ == '__main__':

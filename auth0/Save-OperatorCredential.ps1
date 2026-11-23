@@ -1,4 +1,3 @@
-# Windows-only bootstrap. No network requests, plan or apply.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
@@ -22,8 +21,6 @@ try {
     [IO.Directory]::CreateDirectory($taskFolder) | Out-Null
     $taskPath = Join-Path $taskFolder 'auth0-operator.credential.xml'
     $taskCredential = New-Object System.Management.Automation.PSCredential($ClientId, $taskSecret)
-    # On Windows Export-Clixml protects the SecureString with current-user DPAPI.
-    # Client ID is public; the secret is encrypted and tied to this user/machine.
     $taskCredential | Export-Clixml -LiteralPath $taskPath -Force
     Write-Output 'Credencial guardada cifrada para este usuario de Windows. No se consultó ni modificó Auth0.'
 } finally {

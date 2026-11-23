@@ -124,7 +124,6 @@ def provision(expected_release):
             raise ValueError('Monitoring role collision; review existing grants')
     PRIVATE.mkdir(parents=True, mode=0o700)
     write_private(PRIVATE / 'provisioning', VERSION + '\n')
-    # No aliases, application service edits, table grants or database restarts.
     for db, name in zip(DATABASES, names):
         password = secrets.token_hex(32)
         write_private(PRIVATE / name, password)
@@ -190,7 +189,6 @@ def main():
     args = parser.parse_args()
     if args.phase == 'provision' and (not args.expected_release or len(args.expected_release) != 64):
         parser.error('Provision requires --expected-release SHA-256')
-    # Same application lock; fail promptly instead of racing a CD deployment.
     require_host()
     with (STATE / 'deploy.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

@@ -43,7 +43,6 @@ def verify_effective(release, docker_json, application=None):
     from observability_deployment import installed, redis_configs, require_aliases
     stack = f'snippet-searcher-{release["environment"]}'
     monitored = installed(release['environment'])
-    # Independent deploys preserve the installed Redis component, even for UI/Permissions.
     current = docker_json('service', 'inspect', f'{stack}_redis')[0]
     spec = current['Spec']
     container = spec['TaskTemplate']['ContainerSpec']

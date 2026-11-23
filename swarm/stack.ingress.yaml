@@ -1,4 +1,3 @@
-# SNI-43: rendered by stack_runtime; application ports are removed explicitly in JSON.
 version: "3.8"
 services:
   nginx:

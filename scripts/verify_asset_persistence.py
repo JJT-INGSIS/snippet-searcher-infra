@@ -15,7 +15,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def local_engine():
-    # Docker gives an explicitly selected context priority over DOCKER_HOST.
     if os.environ.get("DOCKER_CONTEXT"):
         endpoint = subprocess.check_output(
             ["docker", "context", "inspect", os.environ["DOCKER_CONTEXT"], "--format", "{{.Endpoints.docker.Host}}"],
@@ -37,8 +36,6 @@ def local_engine():
 def verify():
     local_engine()
     project = "sni33-check-" + uuid4().hex[:12]
-    # --env-file disables the project's real .env. These values only satisfy
-    # interpolation; none is passed to Asset, Azurite or the probe.
     environment = {**os.environ, "SNIPPETS_DB_PASSWORD": "unused-isolated-validation",
                    "PERMISSIONS_DB_PASSWORD": "unused-isolated-validation",
                    "GITHUB_ACTOR": "unused-isolated-validation", "GITHUB_TOKEN": "unused-isolated-validation"}
@@ -63,7 +60,6 @@ def verify():
         if len(before) != 2:
             raise RuntimeError("Expected exactly two running runtime containers")
         manifest = probe("prepare")
-        # Read it now too: do not recreate if a failed probe emitted bad evidence.
         json.loads(manifest)
         compose("up", "-d", "--force-recreate", "--no-deps", "--wait", "--wait-timeout", "180",
                 "asset-service", "azurite")
@@ -78,7 +74,6 @@ def verify():
         probe("cleanup", manifest)
         print("PASS Asset/Azurite: new containers, identical content, outage/recovery, idempotent deletion; internal network only", flush=True)
     finally:
-        # No -v, no prune, no existing project. Preserve blobs for investigation.
         compose("down", "--timeout", "20")
 
 

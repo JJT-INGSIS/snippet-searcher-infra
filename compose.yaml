@@ -146,7 +146,6 @@ services:
       printscript-service:
         condition: service_started
 
-  # Opt-in runtime. Merely starting these services does not switch existing data.
   asset-service:
     profiles: [assets]
     image: ghcr.io/austral-ingsis/snippet-asset-service@sha256:eacad54bf95717c5483619ad1fe45a9b4a0012a37b451c37baf13e6f43200656

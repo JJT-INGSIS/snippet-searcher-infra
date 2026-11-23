@@ -34,7 +34,6 @@ resource "auth0_resource_server" "snippets" {
   allow_offline_access = false
   enforce_policies     = false
 
-  # User login is allowed. M2M callers require separate, explicit client grants.
   subject_type_authorization {
     user {
       policy = "allow_all"
@@ -49,14 +48,11 @@ resource "auth0_resource_server" "snippets" {
   }
 }
 
-# Add one association, rather than replacing all clients on a shared connection.
 resource "auth0_connection_client" "ui" {
   connection_id = var.database_connection_id
   client_id     = auth0_client.ui.id
 }
 
-# The existing M2M application and its Management API grant must be imported,
-# not recreated: its current secret is already in use by the team.
 resource "auth0_client" "dev_directory" {
   name        = "snippet-searcher-dev-directory"
   app_type    = "non_interactive"

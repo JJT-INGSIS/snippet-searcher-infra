@@ -40,7 +40,6 @@ def plan_identity(release, environment):
 
 
 def require_production_identity(release):
-    # The previous disabled state remains a valid recovery target. Never introduce a dev actor.
     if auth_environment(release)['AUTH_MODE'] == 'disabled':
         if ui_configuration(release)['identity']['mode'] != 'disabled':
             raise ValueError('Recuperación PROD requiere UI y API deshabilitadas')

@@ -65,8 +65,6 @@ def verify():
         if not rows or any(row["up"] != 1 for row in rows):
             raise ValueError("Storage probe did not succeed")
         evidence["storage"].extend(rows)
-    # Test the actual Docker CLI and shell dispatch inside the pinned agent image,
-    # without passing an ingest key or starting a second agent.
     image = json.loads((ROOT / "images.lock.json").read_text())["agent"]
     native = json.loads(
         execute(

@@ -1,5 +1,3 @@
-// Opt-in SNI-52 transport checks. NGINX/fixture API + a real local Spring backend.
-// No cy.intercept, interpreter or application execution endpoints are provided here.
 describe('SNI-52 / real browser transport', () => {
   it('reads NDJSON and sends input before the controlled upstream finishes', () => {
     cy.visit('/');
@@ -59,7 +57,6 @@ describe('SNI-52 / real browser transport', () => {
         const response = await win.fetch(backend + path, {method,
           headers: {'Content-Type': 'application/json', 'X-Dev-Actor-Id': 'dev-thiago'},
           ...(method === 'POST' ? {body: '{}'} : {})});
-        // Missing endpoints/sessions remain errors: CORS never implements the operation.
         expect(response.status).to.be.oneOf([400, 401, 404]);
       }
       for (const options of [{method: 'DELETE'}, {headers: {Authorization: 'Bearer fixture'}}]) {

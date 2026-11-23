@@ -1,5 +1,3 @@
-// Opt-in against the actual HTTPS deployment, not the fixture API. No cy.intercept.
-// Copy into the UI Cypress directory and select this spec explicitly (see SNI-44).
 describe('SNI-44 / deployed ingress', () => {
   const environment = Cypress.env('environment');
   const host = `https://jjt-snippets-${environment}.duckdns.org`;
@@ -16,7 +14,6 @@ describe('SNI-44 / deployed ingress', () => {
       expect(languages.status).to.eq(200);
       const catalog = await languages.json();
       expect(catalog).to.be.an('array');
-      // Missing identity is an application error, never an HTML fallback or CORS failure.
       const denied = await win.fetch('/api/snippets?page=0&page_size=10');
       expect(denied.status).to.eq(401);
       expect((await denied.json()).type).to.be.a('string');
@@ -57,7 +54,6 @@ describe('SNI-44 / deployed ingress', () => {
   });
 
   it('blocks an unlisted browser origin while the same public API is reachable', () => {
-    // This control distinguishes browser CORS enforcement from a firewall/DNS outage.
     cy.request(host + '/api/languages').its('status').should('eq', 200);
     cy.visit('http://127.0.0.1:5184/');
     cy.window().then(async win => {
