@@ -10,13 +10,21 @@ x-app-deploy: &app-deploy
   restart_policy:
     condition: any
     delay: 10s
-  update_config:
+  update_config: &app-update
     parallelism: 1
     order: start-first
     monitor: 60s
     failure_action: rollback
   rollback_config:
     parallelism: 1
+    order: stop-first
+
+x-execution-deploy: &execution-deploy
+  <<: *app-deploy
+  # Execution sessions are process-local: never overlap old/new coordinators,
+  # including releases without the optional Redis overlay.
+  update_config:
+    <<: *app-update
     order: stop-first
 
 services:
@@ -48,7 +56,7 @@ services:
       timeout: 8s
       retries: 5
       start_period: 90s
-    deploy: *app-deploy
+    deploy: *execution-deploy
 
   permissions-service:
     image: ${PERMISSIONS_IMAGE:?Definir PERMISSIONS_IMAGE}
@@ -84,7 +92,7 @@ services:
       timeout: 8s
       retries: 5
       start_period: 90s
-    deploy: *app-deploy
+    deploy: *execution-deploy
 
   snippets-db:
     image: ${POSTGRES_IMAGE:?Definir POSTGRES_IMAGE}
