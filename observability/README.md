@@ -175,7 +175,8 @@ integraciones para motor/AOF; probe para integridad/volumen; SNI-80 para host; S
 para pool/JDBC. Cuantificar CPU/memoria/ingesta del piloto antes de promover PROD.
 SNI-87 prueba aviso/diagnóstico; SNI-88 conserva la promoción y autorización propias.
 Para la defensa en PROD, [SNI-89](../docs/observability/sni-89-prod-defense.md)
-separa cobertura verificada, límites de acceso, recepción pendiente y revalidación
+registra el ensayo UI con restauración y cierre verificados, los Ping públicos,
+recepción humana pendiente y revalidación
 posterior a la promoción final; no usar el cierre de DEV como evidencia PROD.
 
 Fuentes: [estadísticas y permisos PostgreSQL 18](https://www.postgresql.org/docs/18/runtime-config-statistics.html),

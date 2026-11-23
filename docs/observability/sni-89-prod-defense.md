@@ -1,6 +1,6 @@
 # SNI-89 — Guía corta de monitoreo para la defensa
 
-Estado del 23/11/2026: **preparación parcial verificada; ensayo y recepción humana pendientes**.
+Estado del 23/11/2026: **ensayo ejecutado y cierre verificado; recepción humana y cobertura restante pendientes**.
 Cuenta New Relic US `8718557`. Usar UTC para correlacionar evidencias.
 
 ## Qué está comprobado
@@ -31,7 +31,7 @@ no cambia el push compartido de DEV ni acredita un dispositivo registrado.
 | Falta una réplica de UI/API/PrintScript/Permissions/DB/NGINX | `PROD - Servicio del stack sin replicas disponibles`, ID `70091549`; incumplimiento sostenido 2 min, ventana 60 s, retraso 120 s: estimar 4–6 min más notificación | Abrir Infraestructura y entrega, elegir PROD, identificar servicio y tareas. Recuperar la réplica/configuración mediante el procedimiento revisado, conservando volúmenes; comprobar HTTP y muestras normales. |
 | Host/agente deja de enviar datos | `PROD - VM sin senal de infraestructura`, ID `70091779`; pérdida de señal 5 min, más entrega | Revisar Azure, agente, red e ingesta. No asumir que sólo puede ser VM apagada. Recuperar el componente afectado y comprobar nuevas muestras del host correcto. |
 | Storage local falla | `PROD - Prueba de storage local fallo`, ID `70091854`; probe con `up=0` o `contentOk=0` sostenido 2 min, ventana 60 s y retraso 120 s: estimar 4–6 min más entrega. Configurada, no ensayada | Abrir Dependencias y procesamiento en PROD; revisar permisos, mount y espacio. No borrar datos ni llenar el disco real para demostrarlo. |
-| UI/API pública inaccesible con réplicas sanas | **Sin checks públicos PROD acreditados**: panel Sintéticos exige Full con advertencia de cargos | Administrador debe resolver acceso incluido en el plan o acordar alternativa antes de activar costos. Un check manual 200 no reemplaza monitoreo periódico. |
+| UI/API pública inaccesible con réplicas sanas | Ping UI/API con resultados periódicos `SUCCESS` verificados a las 19:27:44Z. Condiciones habilitadas UI `70092793` / API `70093035`: Critical >0 fallos al menos una vez en 5 min | Revisar resultados del monitor y acceso público. Estas condiciones nuevas todavía no tienen ensayo de falla acreditado; el ensayo anterior utilizó réplicas. |
 | Listado autenticado devuelve datos incorrectos | **Sin chequeo funcional PROD acreditado** | Requiere identidad/fixture PROD y resultados mínimos; no reutilizar credenciales DEV. Revisar SNI-85 con acceso autorizado. |
 | Colector privado detenido mientras el agente de host sigue sano | **Sin condición específica de ausencia de Swarm/storage completada** | Las alertas de valores no detectan por sí solas que el colector dejó de publicar. Agregar pérdida de señal específica y ensayarla antes de ofrecer ese escenario. |
 | Base con réplica sana pero conexión/bloqueos incorrectos | **Sin condición específica de dependencia SQL PROD completada** | Las métricas nativas llegan; eso no prueba alertas ni acceso de negocio. Revisar señales PostgreSQL/JDBC y acordar un ensayo aislado que no altere datos. |
@@ -47,23 +47,60 @@ Se verificó Infraestructura y entrega con **PROD** seleccionado: siete servicio
 1/1, muestras Swarm a las 13:32:49Z, host y muestreador recientes y tabla de digests.
 Llegar a `SnippetBackgroundSample` no demuestra que publicador/consumidor estén activos.
 
-## Ensayo: pendiente de acuerdo, no ejecutado
+## Ensayo ejecutado: UI restaurada y cierre verificado
 
-Propuesta explicada al usuario: detener sólo las réplicas de UI hasta 6 min,
-recuperación automática de respaldo a los 8 min. Interrumpe la página, mantiene
-API, bases y contenido. **No está aprobado el corte**; tampoco se programó un timer.
-Primero confirmar receptor y ventana, ausencia de despliegues concurrentes,
-réplicas originales, salud inicial y recuperación independiente de la conexión.
+El usuario aprobó detener sólo UI hasta 6 min, con restauración independiente de
+respaldo a los 8 min. **El ensayo ya ocurrió; no repetirlo al retomar.**
+Sólo se cambió la cantidad de réplicas de UI 1→0→1, bajo el lock de despliegue.
 
-Registrar: comienzo UTC, condición, enlace del incidente, workflow, `Sent` de cada
-canal, quién confirmó recepción y hora (idealmente pantalla bloqueada), recuperación
-HTTP/Swarm y cierre automático del incidente. `Sent` prueba envío, no recepción.
-Un mensaje de prueba del workflow tampoco acredita detección de la falla real.
-Todavía no hay un incidente PROD de ensayo para usar como respaldo en la defensa.
-La prueba del workflow indicó que el filtro no coincide con incidentes pasados;
-no se acreditó ningún envío de muestra ni se generó un incidente artificial.
-La lista de muting rules, sin filtros restrictivos, estaba vacía durante esta
-revisión. Volver a comprobarla al acordar la ventana y tras la promoción final.
+| Hecho | Hora UTC del 23/11/2026 |
+| --- | --- |
+| Corte UI; página 502 y API `/api/languages` 200 | 13:50:11.587Z |
+| Evento de apertura de incidente, faceta `ui` | 13:55:46.900Z |
+| Push de activación `SUCCESS`, “Sent to 1 devices” | 13:55:57.310Z |
+| Correo de activación `SUCCESS` | 13:55:57.734Z |
+| Restauración iniciada | 13:56:11.563Z |
+| Siete servicios saludables; UI nuevamente 200 | 13:56:17.979Z |
+| Evento de cierre del incidente | 14:01:43.733Z |
+| Push de cierre `SUCCESS`, “Sent to 1 devices” | 14:01:51.640Z |
+| Correo de cierre `SUCCESS` | 14:01:56.826Z |
+
+Incidente [949a7fc6-c98c-4b52-8973-4e45b07fd703](https://aiops.service.newrelic.com/accounts/8718557/incidents/949a7fc6-c98c-4b52-8973-4e45b07fd703/redirect),
+issue `9ce1b606-d2c9-43dd-8bc2-75a35a952698`, condición de réplicas `70091549`.
+Cierre comprobado mediante `NrAiIncident`; activación y cierre mediante
+`NrAiNotification`, consultados a las 19:27Z. `openTime=13:52Z` y
+`closeTime=13:56Z` son tiempos de la señal agregada; no son el momento de
+procesamiento del evento ni la hora física de restauración.
+
+El receipt remoto histórico quedó `RESTORED_AWAITING_ALERT_EVIDENCE`:
+`allSevenHealthy`, `templateUnchanged` y `releaseUnchanged` son verdaderos.
+Colector 1/1, unidad del ensayo terminada con éxito y timer de respaldo detenido
+tras comprobar recuperación. No se cambiaron imágenes, bases, volúmenes ni contenido.
+El receipt no fue reescrito; la evidencia posterior de cierre está en el JSON.
+
+**Envío acreditado; recepción humana pendiente.** Juanfran continúa como receptor
+móvil; no se lo contactó en esta verificación. Un envío exitoso a un dispositivo
+no prueba que alguien haya visto el aviso. No hace falta otro corte para solicitar
+esa confirmación. El intento previo de test del workflow no encontró incidentes;
+el ensayo real posterior sí produjo los envíos de la tabla.
+
+## Ping públicos verificados después del ensayo
+
+A las 19:27:44Z, `SyntheticCheck` mostró dos muestras de cada monitor en los
+30 minutos anteriores, desde `AWS_SA_EAST_1`: API último `SUCCESS` a las
+19:16:00.824Z y UI último `SUCCESS` a las 19:18:01.217Z.
+Las condiciones habilitadas UI `70092793` y API `70093035` pertenecen a la política
+`8369826`, cuentan `result='FAILED'`, excluyen `isMuted` y agrupan por ubicación
+y monitor. Disparan Critical >0 al menos una vez en cinco minutos.
+Esto describe el umbral, no garantiza entrega al celular dentro de cinco minutos.
+El ensayo de réplicas no valida por sí solo el disparo de estas condiciones nuevas.
+También se revalidaron manualmente UI y `/api/languages`: HTTP 200, TLS válido.
+
+La barrera Full/cargos observada a las 13:xxZ queda como antecedente; ya hay
+resultados Ping periódicos comprobados. Esta continuación sólo leyó New Relic,
+sin activar planes ni funciones pagas; no auditó cambios comerciales de otros operadores.
+El chequeo autenticado, SLO, recorrido completo de tableros, pérdida independiente
+del colector y alerta SQL específica siguen sin acreditarse.
 
 ## Antes de la presentación y después de la promoción final
 

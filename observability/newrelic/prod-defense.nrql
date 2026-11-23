@@ -27,3 +27,15 @@ FACET monitorName, location SINCE 1 hour ago
 SELECT latest(result), latest(failureCategory), latest(timestamp)
 FROM SnippetFunctionalCheck WHERE environment = 'prod'
 FACET checkName SINCE 1 day ago
+
+-- Historical UI drill: physical recovery 13:56:17.979Z, close event 14:01:43.733Z.
+-- Signal openTime/closeTime differ from event processing timestamps.
+SELECT timestamp, conditionName, event, incidentId, incidentLink, openTime, closeTime, targetName
+FROM NrAiIncident
+WHERE conditionName = 'PROD - Servicio del stack sin replicas disponibles'
+SINCE '2026-11-23 13:49:00 +0000' UNTIL '2026-11-23 14:10:00 +0000' LIMIT 100
+
+SELECT timestamp, destinationType, status, operation, trigger, workflowName, issueLink, notificationResult
+FROM NrAiNotification
+WHERE workflowName = 'snippet-searcher-prod-disponibilidad'
+SINCE '2026-11-23 13:49:00 +0000' UNTIL '2026-11-23 14:10:00 +0000' LIMIT 100
