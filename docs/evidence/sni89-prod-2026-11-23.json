@@ -1,5 +1,5 @@
 {
-  "status": "PARTIAL_VERIFIED_DRILL_CLOSED_HUMAN_RECEPTION_PENDING",
+  "status": "PARTIAL_VERIFIED_DRILL_CLOSED_HUMAN_RECEPTION_CONFIRMED",
   "environment": "prod",
   "accountId": 8718557,
   "inventoryAt": "2026-11-23T13:14:18Z",
@@ -131,7 +131,7 @@
   "failureInjected": true,
   "incidentUrl": "https://aiops.service.newrelic.com/accounts/8718557/incidents/949a7fc6-c98c-4b52-8973-4e45b07fd703/redirect",
   "notificationSentVerified": true,
-  "humanReceptionConfirmed": false,
+  "humanReceptionConfirmed": true,
   "incidentClosedVerified": true,
   "requiresFinalPromotionRevalidation": true,
   "paidAccessScope": "No paid feature or plan activated by this verification; does not establish whether another operator changed account access.",
@@ -199,7 +199,7 @@
     "queriedAt": "2026-11-23T19:27:11Z",
     "workflow": "snippet-searcher-prod-disponibilidad",
     "issueId": "9ce1b606-d2c9-43dd-8bc2-75a35a952698",
-    "humanReceptionConfirmed": false
+    "humanReceptionConfirmed": true
   },
   "publicChecks": {
     "source": "SyntheticCheck",
@@ -229,5 +229,43 @@
     "apiLanguagesHttp": 200,
     "tlsVerifyResult": 0,
     "client": "curl with certificate verification"
+  },
+  "humanReception": {
+    "source": "Thiago reported in chat on 2026-11-23: sí, Juanfran lo vio",
+    "receiver": "Juanfran",
+    "activationAndClosureIndividuallyConfirmed": false,
+    "receivedAt": null
+  },
+  "dashboardsReviewed": {
+    "dependencies": {
+      "environment": "prod",
+      "storageLocalUp": 1,
+      "storageLocalContentOk": 1,
+      "diskFreePercent": 69.842,
+      "sampleAt": "2026-11-23T21:36:55Z",
+      "postgresServices": [
+        "snippets-db",
+        "permissions-db"
+      ],
+      "redisSamplesAbsent": true
+    },
+    "application": {
+      "environment": "prod",
+      "apiSliPercent7d": 94.44,
+      "apiValidEvents7d": 54,
+      "apiTargetPercent": 99,
+      "sampleInsufficientBelow": 100,
+      "functionalResults7d": 0,
+      "publicPingLatestResult": "SUCCESS",
+      "browserRecentSamples": "No events in last hour at inspection; prior controlled visit remains historical evidence"
+    },
+    "scope": "Read-only UI inspection 2026-11-23 21:36Z–21:40Z. Dashboard SLI calculation does not prove a native Service Level resource exists."
+  },
+  "operationalContinuationBlockers": {
+    "macLocked": true,
+    "prodSsh": "Permission denied (publickey) with available agent/default identity; no credential changes",
+    "devSsh": "Connection timeout; not proof of VM power state",
+    "prodFunctionalIdentityAndFixtureVerified": false,
+    "nativeProdServiceLevelsVerified": false
   }
 }

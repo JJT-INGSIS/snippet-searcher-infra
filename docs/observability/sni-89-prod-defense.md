@@ -1,6 +1,6 @@
 # SNI-89 — Guía corta de monitoreo para la defensa
 
-Estado del 23/11/2026: **ensayo ejecutado y cierre verificado; recepción humana y cobertura restante pendientes**.
+Estado del 23/11/2026: **ensayo ejecutado y cierre verificado; recepción humana confirmada, cobertura restante pendiente**.
 Cuenta New Relic US `8718557`. Usar UTC para correlacionar evidencias.
 
 ## Qué está comprobado
@@ -78,10 +78,10 @@ Colector 1/1, unidad del ensayo terminada con éxito y timer de respaldo detenid
 tras comprobar recuperación. No se cambiaron imágenes, bases, volúmenes ni contenido.
 El receipt no fue reescrito; la evidencia posterior de cierre está en el JSON.
 
-**Envío acreditado; recepción humana pendiente.** Juanfran continúa como receptor
-móvil; no se lo contactó en esta verificación. Un envío exitoso a un dispositivo
-no prueba que alguien haya visto el aviso. No hace falta otro corte para solicitar
-esa confirmación. El intento previo de test del workflow no encontró incidentes;
+**Recepción humana confirmada por Thiago:** «sí, Juanfran lo vio».
+Juanfran continúa como receptor móvil; no se lo contactó desde esta verificación.
+No se informó la hora de lectura ni se confirmó cada mensaje por separado.
+La confirmación se agrega a los envíos y al cierre ya verificados; no se repitió el corte. El intento previo de test del workflow no encontró incidentes;
 el ensayo real posterior sí produjo los envíos de la tabla.
 
 ## Ping públicos verificados después del ensayo
@@ -136,4 +136,23 @@ límite comercial que anuncie el plan.
 Marco conceptual: análisis de trade-offs y registro de decisiones, capítulos 2/21
 del [índice de Fundamentals of Software Architecture, 2.ª ed.](https://www.oreilly.com/library/view/fundamentals-of-software/9781098175504/).
 La aplicación concreta es nuestra. No se activó Full, plan pago ni credencial nueva.
-SNI-89 continúa en progreso hasta completar acceso/cobertura y evidencia humana.
+SNI-89 continúa en progreso por cobertura pendiente y revalidación final. La
+recepción móvil ya fue confirmada por Thiago.
+
+## Continuación de aceptación — 23/11, 21:36Z–21:40Z
+
+Se recorrieron Dependencias y Aplicación seleccionando PROD. Ambas bases figuran
+en conexiones/bloqueos; storage local `up=1`, `contentOk=1`, disco libre 69,842%,
+con muestras de las 21:36:55Z. No hay muestras Redis, coherente con el inventario
+PROD local anterior. No se infiere por ello el inventario actual de DEV.
+
+Aplicación muestra Ping públicos SUCCESS. La fórmula API de siete días arroja
+94,44% sobre 54 solicitudes: volumen insuficiente según el mínimo de 100 del
+tablero. El chequeo autenticado tiene cero resultados. La fórmula del tablero
+no acredita un recurso SLO nativo; éste sigue pendiente de comprobar/configurar.
+
+La continuación por Azure/New Relic se interrumpió porque la Mac se bloqueó.
+SSH PROD rechazó la identidad disponible y DEV agotó el tiempo de conexión; no
+se modificaron claves ni reglas de red, ni se dedujo el estado de la VM del timeout.
+Quedan pendientes el inventario/mounts/backups actuales y la identidad/fixture
+propios de PROD para el chequeo autenticado.
