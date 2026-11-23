@@ -1,4 +1,3 @@
-# Test-only upstreams. Never deploy this file to dev/prod.
 services:
   nginx:
     extends:

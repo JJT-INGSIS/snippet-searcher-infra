@@ -1,4 +1,3 @@
-# Add only after reviewing the DEV candidate. Does not enable an agent or modify CD.
 version: "3.8"
 services:
   redis:

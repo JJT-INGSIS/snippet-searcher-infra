@@ -62,7 +62,6 @@ def require_auth_only(previous, release):
         require_production_identity(release)
     if without_auth(previous) != without_auth(release):
         raise ValueError('El corte Auth0 sólo admite cambiar identidad de UI y API')
-    # The confirmed legacy state remains a valid rollback target.
     if auth_environment(release)['AUTH_MODE'] == 'auth0' and ui_configuration(release)['identity']['mode'] != 'auth0':
         raise ValueError('UI y API Auth0 incompatibles')
 

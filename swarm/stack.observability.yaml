@@ -1,5 +1,3 @@
-# DNS aliases keep native New Relic remote entity names distinct across environments.
-# Additive candidate only; the SNI-80 agent must join this private network.
 version: "3.8"
 services:
   snippets-db:

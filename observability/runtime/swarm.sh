@@ -1,5 +1,4 @@
 #!/bin/sh
-# Public deployment metadata and replica counts, without environment/secrets.
 set -eu
 rows=$(/opt/runtime/docker service ls --filter label=com.docker.stack.namespace=snippet-searcher-dev --format '{{.Name}} {{.Replicas}} {{.Image}}')
 test -n "$rows"

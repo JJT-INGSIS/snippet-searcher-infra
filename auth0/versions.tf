@@ -9,8 +9,6 @@ terraform {
   }
 }
 
-# Credentials come from the operator environment, never from tfvars or outputs.
-# The explicit domain must agree with the reviewed tenant before any real plan.
 provider "auth0" {
   domain = var.tenant_domain
 }

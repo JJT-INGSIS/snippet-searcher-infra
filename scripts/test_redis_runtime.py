@@ -89,7 +89,6 @@ class RedisRuntimeTests(unittest.TestCase):
                 require_capacity(folder, lambda _: SimpleNamespace(free=1024**3), mem)
 
     def test_redis_transition_submits_no_unrelated_service_and_never_prunes(self):
-        # Test submission boundary independently of Compose; renders are tested with the real CLI separately.
         rendered = {'services': {name: {'image': image} for name, image in expected_images(candidate()).items()}}
         with patch('stack_runtime.render_release', return_value=rendered), \
                 patch('stack_runtime.validate_rendered', side_effect=json.dumps), \

@@ -93,8 +93,6 @@ def preflight(manifest, environment):
     else:
         subprocess.run(["docker", "stack", "config", "-c", str(ROOT / "swarm/stack.yaml")],
                        check=True, env=environment, stdout=subprocess.DEVNULL, timeout=30)
-    # Pull antes de modificar el stack: detecta falta de permiso, digest ausente
-    # o arquitectura incompatible sin reconstruir nada en la VM.
     for image in set(expected_images(manifest).values()):
         subprocess.run(["docker", "pull", "--platform", "linux/amd64", image], check=True, timeout=600)
         pulled = docker_json("image", "inspect", image)[0]
@@ -167,7 +165,6 @@ def reconcile_infrastructure(state, swarm):
             pass
         else:
             return finish_infrastructure(state, identity, operation, previous, 'recovered')
-    # Recover only known infra changes, never downgrade an application or database.
     swarm.require_recoverable_infrastructure(previous, candidate)
     try:
         swarm.apply_infrastructure(previous)
@@ -196,7 +193,7 @@ def deploy_infrastructure(state, requested, swarm, gate):
     if getattr(swarm, 'scope', None):
         swarm.rule(previous, candidate)
     if recovered_operation and candidate == previous:
-        return recovered_operation  # Reconciliation already verified this exact state.
+        return recovered_operation
     require_images(swarm, previous)
     swarm.verify(previous)
     preflight(candidate, {**os.environ, **validate_manifest(candidate)})
@@ -212,7 +209,7 @@ def deploy_infrastructure(state, requested, swarm, gate):
             evidence = select_evidence(api, name, tree, image)
             target = api.request('/branches/main')['commit']['sha']
             require_authorized_head(api, {**evidence, 'environment': 'prod', 'target-sha': target})
-    gate(candidate['environment'])  # Latest callers and active runs, under the shared lock.
+    gate(candidate['environment'])
     identity = 'infra-' + uuid4().hex
     operation = {'kind': 'infrastructure', 'state': 'updating', 'previous': upgrade_release(previous),
                  'candidate': candidate, 'started_at': datetime.now(timezone.utc).isoformat()}
@@ -221,12 +218,11 @@ def deploy_infrastructure(state, requested, swarm, gate):
     (state / 'operations').mkdir(mode=0o700, exist_ok=True)
     write_record(state / 'operations' / f'{identity}.json', operation)
     write_record(state / 'pending.json', {'operation': identity})
-    # Fence old Actions BEFORE applying any expanded resource; never restore v1 on rollback.
     write_record(state / 'release.json', upgrade_release(previous))
     try:
         swarm.apply_infrastructure(candidate)
     except (ValueError, RuntimeError, OSError, subprocess.SubprocessError):
-        pass  # Docker may have accepted the request before a transport timeout.
+        pass
     receipt = reconcile_infrastructure(state, swarm)
     if receipt['outcome'] != 'verified':
         raise RuntimeError('Cambio de infraestructura falló y fue recuperado; operación en rojo')
@@ -336,14 +332,11 @@ def main():
         return
     owner = pwd.getpwnam(os.environ.get("SUDO_USER") or pwd.getpwuid(os.getuid()).pw_name)
     state = Path(owner.pw_dir) / f".local/state/snippet-searcher/{manifest['environment']}"
-    # Crear cada directorio por separado: mkdir(parents=True) bajo sudo dejaría
-    # .local/state a nombre de root en una cuenta recién creada.
     for path in (state.parents[2], state.parents[1], state.parent, state):
         if not path.exists():
             path.mkdir(mode=0o700)
             if os.geteuid() == 0:
                 os.chown(path, owner.pw_uid, owner.pw_gid)
-    # El mismo lock que usa el borrador de CD, para evitar despliegues simultáneos.
     with (state / "deploy.lock").open("a") as lock:
         deadline = time.monotonic() + 1800
         while True:
@@ -395,7 +388,6 @@ def main():
                 validate_promotion(selected_manifest, dev_record)
             execute(selected_manifest, {**os.environ, **validate_manifest(selected_manifest)}, state)
         finally:
-            # sudo no debe dejar el registro inaccesible para azureuser/CD.
             if os.geteuid() == 0:
                 for path in (state.parent, state, *state.rglob("*")):
                     os.chown(path, owner.pw_uid, owner.pw_gid)

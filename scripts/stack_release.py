@@ -43,7 +43,6 @@ def storage_provider(manifest):
 
 
 def auth_environment(manifest):
-    # Public API settings are part of the release, not the deploy runner's environment.
     auth = manifest.get('auth', {})
     if not isinstance(auth, dict) or set(auth) - {'mode', 'issuer', 'audience'}:
         raise ValueError('Configuración de autenticación desconocida')
@@ -281,7 +280,6 @@ def select_release(requested, previous, change_infrastructure=False):
     validate_manifest(previous)
     if previous['environment'] != requested['environment']:
         raise ValueError('El registro pertenece a otro ambiente')
-    # Reapplying infrastructure takes current app AND database references.
     if not change_infrastructure:
         return deepcopy(previous)
     selected = upgrade_release(previous)
@@ -292,7 +290,6 @@ def select_release(requested, previous, change_infrastructure=False):
             raise ValueError('La incorporación de Redis no combina otros cambios de infraestructura/UI')
     if not set(infrastructure(previous)) <= set(infrastructure(requested)):
         raise ValueError('Retirar infraestructura persistente requiere un procedimiento específico')
-    # Configuration changes preserve app/database versions, receipts and unknown metadata.
     selected.update(infrastructure=deepcopy(infrastructure(requested)))
     if storage_provider(requested) != storage_provider(previous):
         raise ValueError('Cambiar proveedor requiere una transición de datos independiente (SNI-19/36)')

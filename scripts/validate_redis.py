@@ -55,7 +55,6 @@ def check(base, candidate, release):
     for service in services.values():
         if any(('PASSWORD' in key and not key.endswith('_FILE')) or key.endswith('_TOKEN')
                for key in service.get('environment', {})):
-            # Existing base secrets are configtree files; Redis must not introduce credential environment.
             raise ValueError('Credencial en environment inspeccionable')
 
 

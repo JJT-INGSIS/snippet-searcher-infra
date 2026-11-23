@@ -85,7 +85,6 @@ def verify_asset(release, stack):
 
 def verify_ui(release):
     from stack_release import ui_configuration
-    # Read real runtime config as well as HTML; SPA fallback must not fake config health.
     with urllib.request.urlopen('http://ui:8080/', timeout=10) as response:
         assert response.status == 200 and 'text/html' in response.headers.get('Content-Type', '')
         assert response.read(1048576)

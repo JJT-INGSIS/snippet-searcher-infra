@@ -132,7 +132,6 @@ def exercise(component, seconds, directory):
             receipt.update(status='RESTORED_AWAITING_ALERT_EVIDENCE', functionalRecoveryAt=now(),
                            originalTemplatePreserved=True)
             save()
-            # A fired transient timer may already be gone. Health and the API receipt certify recovery.
             subprocess.run(['systemctl', 'stop', unit + '.timer'], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL, check=False, timeout=20)
         print(json.dumps(receipt, separators=(',', ':')), flush=True)

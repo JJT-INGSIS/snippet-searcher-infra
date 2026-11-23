@@ -235,7 +235,6 @@ def run(evidence_path, architecture):
             )
             assert "NOPERM" in denied.stdout
         evidence["cases"]["redisNoKeyWriteOrConfigAccess"] = True
-        # Two real sessions create a lock wait; the custom metric contains no query text.
         first = subprocess.Popen(
             [
                 *command,
@@ -333,7 +332,6 @@ def run(evidence_path, architecture):
             m.get("up") == 1 and not m.get("error") for m in rows
         )
         evidence["cases"]["flexAcceptsActualSamples"] = [m["service"] for m in rows]
-        # Read-only is an isolated mount; no application/database filesystem is filled.
         read_only = json.loads(json.dumps(fixture))
         read_only["services"]["probe"]["volumes"][0] = "content:/data:ro"
         (root / "readonly.json").write_text(json.dumps(read_only))
@@ -362,7 +360,6 @@ def run(evidence_path, architecture):
             "failed": failed,
             "recovered": True,
         }
-        # The real Asset stays running while its real Azurite backend is unavailable.
         compose("stop", "azurite")
         unavailable = storage("asset-service")
         assert unavailable["up"] == 0
@@ -375,7 +372,6 @@ def run(evidence_path, architecture):
             compose("start", target)
             wait(lambda: native(service))
             evidence["cases"][target + "UnavailableAndRecovered"] = True
-        # A fixed 8 MiB tmpfs belongs ONLY to this Redis QA instance.
         compose(
             "exec",
             "-T",
@@ -399,7 +395,6 @@ def run(evidence_path, architecture):
         compose("exec", "-T", "redis", "rm", "/data/sni82-ballast")
         wait(lambda: redis("db.aofLastWriteStatus") == "ok", 30)
         evidence["cases"]["aofFullFilesystemErrorAndRecovery"] = True
-        # A malformed optional monitoring credential disables only the observer.
         monitor_secret = root / "secrets/obs_redis_password"
         original_secret = monitor_secret.read_text()
         monitor_secret.write_text("invalid")

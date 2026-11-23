@@ -21,8 +21,6 @@ x-app-deploy: &app-deploy
 
 x-execution-deploy: &execution-deploy
   <<: *app-deploy
-  # Execution sessions are process-local: never overlap old/new coordinators,
-  # including releases without the optional Redis overlay.
   update_config:
     <<: *app-update
     order: stop-first

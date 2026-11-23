@@ -1,6 +1,3 @@
-# SNI-33: additive candidate, NOT consumed by bootstrap/CD until SNI-43 integration.
-# Render together with stack.yaml. Rendering is safe; deployment requires the
-# environment inventory, data cutover approval and compatible release tooling.
 version: "3.8"
 
 services:

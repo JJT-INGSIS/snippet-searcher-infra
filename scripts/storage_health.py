@@ -29,7 +29,6 @@ def filesystem(path):
 
 
 def local(path):
-    # The configured mount and private directory must not resolve through symlinks.
     root = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     directory = None
     name = uuid4().hex
@@ -79,8 +78,6 @@ def local(path):
 
 
 def asset(base, environment, timeout):
-    # A stable private fixture bounds abandoned writes after a transport interruption.
-    # Only one scheduled instance may own each environment's fixture.
     path = (
         "/v1/asset/infra-sni82-" + environment + "/00000000-0000-4000-8000-000000000082"
     )
@@ -119,7 +116,6 @@ def sample(settings):
                 if "baseUrl" not in settings
                 else settings["baseUrl"]
             )
-            # Reuse the existing URL validator without using a process proxy or credentials.
             from urllib.parse import urlsplit
 
             url = urlsplit(parsed)
@@ -156,7 +152,6 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--service", required=True)
     args = parser.parse_args()
-    # Validation and identity are shared with the config generator.
     from observability_config import validate
 
     config = validate(json.loads(args.config.read_text()))
@@ -191,5 +186,4 @@ if __name__ == "__main__":
     try:
         main()
     except (ValueError, OSError, StopIteration):
-        # No config content, URL, object body or exception details in telemetry/logs.
         raise SystemExit("Invalid storage probe configuration") from None

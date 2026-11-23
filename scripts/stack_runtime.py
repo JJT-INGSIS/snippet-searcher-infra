@@ -48,7 +48,6 @@ def render_release(release):
         data['secrets'][key] = {'external': True, 'name': 'snippet-searcher-prod-auth0-directory-v1'}
     data.pop('name', None)
     data['version'] = '3.8'
-    # Compose supplies project names. Swarm must own these resources per environment.
     for section in ('networks', 'volumes'):
         for resource in data.get(section, {}).values():
             if not resource.get('external'):
@@ -65,7 +64,6 @@ def render_release(release):
                            for key, (spec, _) in registered_configs.items()}
     if set(data['services']) != set(expected_images(release)):
         raise ValueError('El render no coincide con el inventario autorizado')
-    # Avoid Compose-only healthcheck/default fields unsupported by stack deploy.
     for service in data['services'].values():
         for resources in service.get('deploy', {}).get('resources', {}).values():
             if 'cpus' in resources:
@@ -84,8 +82,6 @@ def render_release(release):
 
 
 def stack_document(data):
-    # Compose JSON already retains $$ for the next interpolation by stack deploy.
-    # Escaping it again leaves $$ in the container shell (PID rather than a variable).
     return json.dumps(data)
 
 
@@ -101,7 +97,6 @@ def require_configs(release, docker_json, create=False):
     registered = config_files(release)
     if not registered:
         return
-    # Read the index once: an inspect/list failure is not proof of absence.
     found = subprocess.check_output(['docker', 'config', 'ls', '--format', '{{.Name}}'],
                                     text=True, timeout=30).splitlines()
     for key, (spec, file) in registered.items():
@@ -135,8 +130,6 @@ def verify_service_configuration(release, docker_json, application=None):
         snippets = docker_json('service', 'inspect', f'{stack}_snippets-service')[0]
         env = dict(entry.split('=', 1) for entry in snippets['Spec']['TaskTemplate']['ContainerSpec'].get('Env', []))
         expected_auth = auth_environment(release)
-        # Legacy records/tasks have no AUTH_* variables. Preserve that transition,
-        # but require exact values after an explicit auth configuration is recorded.
         if 'auth' in release or 'AUTH_MODE' in env:
             if any(env.get(key, '') != value for key, value in expected_auth.items()):
                 raise ValueError('Configuración efectiva de autenticación distinta del registro')
@@ -181,7 +174,6 @@ def apply_release(release, docker_json, redis_transition=False):
     require_reconciled_stack(release['environment'])
     rendered = render_release(release)
     if redis_transition:
-        # Never --prune: leave every unrelated service untouched, including its task template.
         allowed = {'redis', 'snippets-service', 'printscript-service'}
         rendered['services'] = {name: spec for name, spec in rendered['services'].items() if name in allowed}
     document = validate_rendered(rendered)

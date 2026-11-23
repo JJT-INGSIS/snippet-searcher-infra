@@ -45,12 +45,10 @@ def verify(stack):
         if int(migrations) < 1:
             raise RuntimeError(f'{service}: faltan migraciones de la aplicación')
         print(f'PASS SQL autenticado {service}; migraciones={migrations}', flush=True)
-    # Check storage permission as the actual non-root user without writing content.
     if application != 'ui' and (release is None or storage_provider(release) == 'local'):
         subprocess.run(['docker', 'exec', container(stack, 'snippets-service'), 'sh', '-ec',
                         'test "$(id -u)" = 10001 && test -w "$STORAGE_LOCAL_DIRECTORY"'], check=True, timeout=30)
         print('PASS storage local montado y escribible para uid 10001', flush=True)
-    # App startup log proves JDBC/Flyway, direct SQL above verifies both actual schemas.
     if application != 'ui':
         logs = subprocess.check_output(['docker', 'service', 'logs', '--tail', '200', f'{stack}_snippets-service'], stderr=subprocess.STDOUT, text=True, timeout=30)
         if 'jdbc:postgresql://snippets-db:5432/snippets' not in logs:

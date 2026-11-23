@@ -71,7 +71,6 @@ def main():
         subprocess.run([*ssh, destination, f'umask 077; mkdir -p {remote}'], check=True, timeout=30)
         bundle = directory / 'scripts.tar'
         create_bundle(bundle)
-        # Serialize bundle installation too: another service can use this revision.
         identity = operation_id(request)
         uploaded = f'{remote}/{identity}.tar'
         subprocess.run([*scp, str(bundle), f'{destination}:{uploaded}'], check=True, timeout=60)
@@ -81,8 +80,6 @@ def main():
         envelope = json.dumps({'request': request, 'token': os.environ.get('GH_TOKEN', '')})
         command = [*ssh, destination,
                    f'sudo -n python3 -B {remote}/scripts/deploy_service.py']
-        # Retry the same identity after transport loss. The VM journal, not the
-        # SSH exit code, determines whether to verify, recover, or submit an update.
         for attempt in range(2):
             try:
                 result = subprocess.run(command, input=envelope, text=True, timeout=3600)

@@ -1,8 +1,6 @@
 #!/bin/sh
 set -eu
 
-# Configuration is controlled by operators, not the incoming Host header.
-# Restrict substitutions so an invalid env value cannot inject NGINX directives.
 case "${PROXY_HOSTNAME:-}" in
     ''|*[!a-z0-9.-]*|.*|*..*|*.) echo 'Invalid PROXY_HOSTNAME' >&2; exit 1 ;;
 esac

@@ -48,8 +48,6 @@ def collect(service, config_path=Path("/opt/runtime/config.json")):
         timeout=20,
         check=True,
     )
-    # Native integrations can exit zero with metrics=[] on outage. Preserve that
-    # output verbatim; never fabricate a healthy sample or replay an old result.
     json.loads(result.stdout)
     return result.stdout
 

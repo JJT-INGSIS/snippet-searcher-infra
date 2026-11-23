@@ -119,7 +119,6 @@ def check_routes_and_failures(port):
         require(result.status == expected and result.headers.get("Content-Type") == "application/problem+json", "API error became SPA HTML")
         require(json.loads(result.body)["status"] == expected, "Problem Details changed")
     require(request(port, "/api/snippets", headers={"Host": "attacker.test"}).status == 404, "Unknown Host reached a backend")
-    # Send only an oversized Content-Length: reject before sending/storing 8 MiB.
     require(request(port, "/api/snippets", "POST", headers={"Content-Length": str(8 * 1024 * 1024 + 1)}).status == 413,
             "Oversized body was not rejected")
     large = b"x" * (1024 * 1024)
@@ -159,7 +158,6 @@ def verify(browser=False):
             print(f"SNI-52 browser fixture: http://localhost:{port} (transport only)", flush=True)
             input("Press Enter or Ctrl+C to clean up the isolated project: ")
             return
-        # Start with NO upstreams: runtime DNS must not prevent proxy startup.
         compose("up", "-d", "--wait", "--wait-timeout", "30", "nginx")
         compose("exec", "-T", "nginx", "nginx", "-t")
         port = int(capture("port", "nginx", "8080").rsplit(":", 1)[1])
@@ -183,8 +181,6 @@ def verify(browser=False):
         require(request(port, "/api/slow", timeout=70).status == 504, "Slow API did not time out")
         require(55 <= time.monotonic() - started < 70, "Read timeout does not match 60s configuration")
         print("PASS real 60s read timeout", flush=True)
-        # A timed-out upstream may be excluded briefly by NGINX passive failure
-        # accounting. Wait for its bounded recovery before testing a UI outage.
         eventually(port, "/api/snippets", 200)
         compose("stop", "--timeout", "2", "ui")
         require(request(port, "/").status in (502, 504), "UI outage did not produce a gateway error")
@@ -209,8 +205,6 @@ def verify(browser=False):
             require(sensitive not in logs, "Proxy logs included sensitive request data")
         print("PASS independent outages and upstream container/IP replacement without proxy restart; sanitized logs", flush=True)
     finally:
-        # This generated project has no database or persistent production content.
-        # No volumes, old configs, stack or resources outside this project removed.
         compose("down", "--timeout", "5")
 
 

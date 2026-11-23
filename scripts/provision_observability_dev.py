@@ -80,7 +80,6 @@ def provision():
         raise ValueError(
             "Monitoring private directory exists; do not overwrite credentials"
         )
-    # Finish all collision/health checks before creating anything.
     for service in ("snippets-db", "permissions-db", "redis"):
         healthy(service)
     for service, db in (("snippets-db", "snippets"), ("permissions-db", "permissions")):
@@ -119,7 +118,6 @@ def provision():
         ("permissions-db", "permissions", names[1]),
     ):
         sql = (SOURCE / "observability/sql/postgresql-monitor.sql").read_text()
-        # Read the password through stdin, not docker exec arguments, labels or service environment.
         docker(
             "exec",
             "-i",
@@ -197,7 +195,6 @@ if __name__ == "__main__":
         StopIteration,
         subprocess.SubprocessError,
     ) as error:
-        # Never print psql/Redis stderr or CompletedProcess: credentials may occur there.
         print(
             type(error).__name__
             + ": provisioning stopped; inspect current state and protected files before retrying"

@@ -1,5 +1,3 @@
-# Runtime contract only. SNI-42 supplies the real UI image and runtime configuration.
-# No default/dummy digest; not selected until UI is explicitly installed in the release.
 version: "3.8"
 services:
   ui:

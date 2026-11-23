@@ -153,7 +153,6 @@ class RecoveryTests(unittest.TestCase):
             identity = json.loads((state / 'pending.json').read_text())['operation']
             operation = json.loads((state / 'operations' / (identity + '.json')).read_text())
             self.assertEqual(operation['scope'], 'auth')
-            # Simulate an interrupted two-service replacement: API new, UI old.
             swarm.ui = copy.deepcopy(previous.get('ui', {}))
             with patch('scoped_deploy.ScopedSwarm', return_value=swarm):
                 receipt = reconcile(state, InfrastructureSwarm(previous))

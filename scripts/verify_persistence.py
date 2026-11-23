@@ -51,7 +51,6 @@ def verify(stack):
             before=database_snapshot(stack,service)
             old_id=container(stack,service)
             subprocess.run(['docker','service','update','--detach','--force',f'{stack}_{service}'],check=True,timeout=30)
-            # Docker may still show the previous healthy task briefly.
             for attempt in range(90):
                 try:
                     if container(stack,service)!=old_id: break

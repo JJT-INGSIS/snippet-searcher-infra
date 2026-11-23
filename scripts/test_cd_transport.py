@@ -153,8 +153,6 @@ class RunnerContractTests(unittest.TestCase):
                 commands.append(command)
                 if command[0] == 'ssh' and 'sudo -n python3' in command[-1]:
                     submitted.append(kwargs['input'])
-                    # First connection lost after submission; retry reads the same
-                    # operation instead of inventing a different request.
                     return subprocess.CompletedProcess(command, 255 if len(submitted) == 1 else 0)
                 if command[0] == 'scp' and '/operations/' in command[-2]:
                     record = {'state': outcome, 'request': request(),

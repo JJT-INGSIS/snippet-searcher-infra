@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 
 
 HOSTS = {'dev': 'jjt-snippets-dev.duckdns.org', 'prod': 'jjt-snippets-prod.duckdns.org'}
-# Explicit project ports, not a general-purpose scanner. SSH is intentionally excluded.
 PRIVATE_PORTS = (2375, 2376, 2377, 3000, 5432, 5434, 6379, 7946, 8080, 8081, 8082, 8083, 9000, 10000, 10001, 10002)
 
 
@@ -79,7 +78,6 @@ def port_closed(host, port):
             return False
     except (TimeoutError, ConnectionRefusedError):
         return True
-    # DNS and other OS errors are inconclusive, never a passing firewall test.
 
 
 def verify(environment):
@@ -113,8 +111,6 @@ def verify(environment):
         headers = {'X-Dev-Actor-Id': identity['actorId']} if identity.get('mode') == 'dev' else {}
         require(request(host, path, headers=headers)[0] in (401, 403, 404), f'Ruta interna expuesta: {path}')
     blocked = request(host, '/api/languages', headers={'Origin': 'https://untrusted.invalid'})
-    # Empty policy leaves public responses readable only same-origin; an explicit
-    # allowlist may reject the request outright. Neither grants the hostile origin.
     require(blocked[0] in (200, 403), 'Respuesta inesperada al origen no autorizado')
     require(header(blocked[1], 'Access-Control-Allow-Origin') is None, 'Origen no autorizado recibió permiso')
     with ThreadPoolExecutor(max_workers=5) as pool:

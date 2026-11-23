@@ -27,7 +27,6 @@ def require_redis_cd(reader=read_file):
     if len(pins) != 1 or pins[0] == LEGACY_REVISION:
         raise ValueError('El CD Redis requiere un SHA nuevo y completo de infraestructura')
     revision = pins[0]
-    # Confirm the pinned scripts, rather than trusting a new workflow tag alone.
     for path, marker in (
             ('scripts/redis_runtime.py', 'def verify_effective('),
             ('scripts/stack_runtime.py', 'redis_transition'),
