@@ -156,3 +156,27 @@ SSH PROD rechazó la identidad disponible y DEV agotó el tiempo de conexión; n
 se modificaron claves ni reglas de red, ni se dedujo el estado de la VM del timeout.
 Quedan pendientes el inventario/mounts/backups actuales y la identidad/fixture
 propios de PROD para el chequeo autenticado.
+
+## Chequeo autenticado preparado
+
+El runner independiente está en
+[prod-functional](../../observability/newrelic/prod-functional/README.md), con
+fixture SNI-89, configuración privada y unidades systemd exclusivamente PROD.
+Conserva el patrón de DEV: login real, listado HTTP 200, nombre exacto y contenido
+esperado; publicación mínima de resultado. La raíz de condiciones/SLO es
+independiente y no modifica el plan DEV. La frecuencia prevista es cada seis horas.
+
+Validación local: 341 pruebas Python, incluidas tres garantías de privacidad y
+credencial ausente; sintaxis de los specs/configuración comprobada. Terraform
+1.13.5 fmt/validate aprobado con credencial ficticia sólo para validación local;
+no se ejecutó plan/apply ni se llamó a New Relic para crear recursos. Esto no acredita
+instalación ni éxito del chequeo. Falta acceso administrativo al tenant Auth0
+`jjt-snippet-searcher` para verificar/provisionar una identidad propia de PROD:
+la sesión de Thiago en el tenant del proyecto tiene el rol Editor - Specific Apps,
+sin User Management; sólo muestra las aplicaciones DEV. El acceso al tenant
+fue recuperado, pero ese rol no permite verificar ni crear el usuario dedicado.
+
+Service Levels sigue mostrando la barrera Full con advertencia de cargos.
+Plan Summary y Plans & Pricing no pudieron cargar la información de la cuenta.
+No se activó acceso pago ni se supuso un costo. Los SLO nativos preparados
+conservan los objetivos ya usados en DEV: 99% API y 96% listado, en siete días.

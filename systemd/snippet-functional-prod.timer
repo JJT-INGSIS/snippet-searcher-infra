@@ -1,0 +1,10 @@
+[Unit]
+Description=Chequeo funcional de Snippet Searcher PROD cada seis horas
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*-*-* 00,06,12,18:10:00 UTC
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Chequeo funcional autenticado de Snippet Searcher PROD
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/snippet-observability/prod/functional-auth0.json
+
+[Service]
+Type=oneshot
+UMask=0077
+LimitCORE=0
+TimeoutStartSec=4min
+ExecStart=/usr/bin/python3 -B /opt/snippet-observability/prod/functional/run.py
