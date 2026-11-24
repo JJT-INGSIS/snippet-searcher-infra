@@ -1,10 +1,9 @@
 # Tests: creación y ejecución
 
-US8–10 se precisan en el [contrato SNI-45](../execution-contract.md).
-Canal aprobado: NDJSON con `fetch`, inputs mediante POST, snapshot y comparación.
-US16 permanece fuera de SNI-45 y usa la [ADR-001 / SNI-27](../adr-001-async-processing.md):
-`SnippetUpdated`, outbox y Redis Streams después de confirmar una actualización.
-Es diseño futuro; no acredita workers ni aceptación funcional integrada.
+El [contrato de ejecución](../execution-contract.md) describe el canal NDJSON,
+el snapshot y la comparación de resultados. Los tests automáticos usan
+`SnippetUpdated`, outbox y Redis Streams al confirmar una actualización
+según el [modelo asíncrono](../async-processing-design.md).
 
 `snippets-service` conserva las definiciones y compara salidas reales con esperadas. `Language`, módulo interno, delega la ejecución a PrintScript por HTTP; los tests automáticos se ejecutan después de confirmar una actualización.
 
@@ -14,9 +13,9 @@ sequenceDiagram
     participant S as snippets-service
     participant P as permissions-service
     participant ST as SnippetContentStorage
-    participant O as Publicador outbox en snippets - FUTURO
-    participant R as Redis Streams - FUTURO
-    participant B as Worker de Snippets - FUTURO
+    participant O as Publicador outbox en Snippets
+    participant R as Redis Streams
+    participant B as Worker de Snippets
     participant L as Language interno
     participant PS as printscript-service
 
@@ -33,7 +32,7 @@ sequenceDiagram
         end
         S->>S: Validar estructura y persistir en BD snippets
         S-->>UI: Test creado sin exigir que pase
-    else Ejecutar test manual - US9 FUTURO
+    else Ejecutar test manual
         UI->>S: Ejecutar test
         S->>S: Comprobar snippet y pertenencia del test
         break Recurso inexistente
@@ -45,7 +44,8 @@ sequenceDiagram
             S-->>UI: Error sin recuperar ni ejecutar contenido
         end
         S->>S: Fijar revisión del código y definición del test
-        Note over S,ST: Uso futuro: recuperar contenido de esa revisión
+        S->>ST: Leer el original asociado al snapshot
+        ST-->>S: Código
         S->>L: Ejecutar código con inputs del test
         L->>PS: HTTP con código, versión e inputs
         loop Cada output producido
@@ -70,21 +70,27 @@ sequenceDiagram
         ST-->>B: Código del update confirmado
         loop Cada test del snapshot
             B->>L: Ejecutar código con inputs y capacidad disponible
-            L->>PS: HTTP con código, versión e inputs
+            L->>PS: Operación durable con código, versión e inputs
             PS-->>L: Outputs o error
             L-->>B: Resultado
             B->>S: Comparar y persistir resultado/progreso sin revertir update
         end
-        B->>S: Persistir estado terminal del trabajo
-        B->>R: ACK explícito
+        B->>S: Persistir progreso y estado del trabajo
+        opt Estado terminal o recuperación UNKNOWN persistida
+            B->>R: ACK de la entrega
+        end
         UI->>S: Polling de progreso autorizado
         S-->>UI: Estado del trabajo separado del guardado
     end
 ```
 
-- **Requerimientos:** crear un test requiere ser owner y admite expectativas que no se cumplan; ejecutar manualmente requiere acceso y entrega output incremental en la futura US9. US16 ejecuta todos los tests tras actualizar, sin revertir el guardado.
-- **Contrato US8–10 aprobado por Thiago:** snapshot coherente de código y definición; comparación exacta de secuencias, sin normalización. Una ejecución activa por actor y cuatro globales inicialmente, con un coordinador por servicio y sin cola. Ver detalles y trade-offs en SNI-45; no son capacidades runtime ya verificadas.
-- **Errores y persistencia:** diferencia de outputs tras finalización normal es test fallido; falla técnica o inicio incierto es otro resultado. El canal del intérprete conserva retención acotada; no confundirla con auditoría de negocio. SNI-48 tiene historial durable interno aprobado y PR #47 en revisión al consultar Linear el 29/10/2026; verificar integración antes de reutilizarlo.
-- **Aprobado SNI-27 / US16 futuro:** cada update confirmado conserva trabajo y snapshot durable de código/tests. Una edición posterior puede borrar el blob activo anterior: retener la referencia necesaria hasta completar el trabajo. Resultados históricos no se presentan como actuales. Reentregar un evento no autoriza repetir un inicio PrintScript incierto. Backpressure, ACK y recuperación están en el [diseño mínimo](../async-processing-design.md).
+El dueño administra los tests. Un usuario con acceso puede ejecutar un test
+del snippet. La comparación usa la secuencia exacta de outputs. Una
+discrepancia tras terminar normalmente se distingue de una falla técnica.
+
+Los tests automáticos usan el código y las definiciones del snapshot del
+update. Una edición posterior invalida su vigencia para el resultado actual.
+El guardado del snippet se confirma en una operación separada del resultado
+del lote.
 
 [Volver a la referencia de arquitectura](../README.md)
