@@ -9,6 +9,7 @@ instrumentación. Los servicios conservan su código y Dockerfile en sus reposit
 | Servicios, responsabilidades y flujos de usuario | [Arquitectura](docs/architecture/README.md) |
 | Azure, SSH, DNS, NGINX, TLS, datos y Redis | [Operación de infraestructura](docs/operations.md) |
 | Publicación, promoción por digest y recuperación | [Despliegues](docs/deployment.md) |
+| Imagen, configuración pública y pruebas de la UI | [README de la UI](https://github.com/JJT-INGSIS/snippet-searcher-ui/blob/dev/README.md) |
 | New Relic, alertas y verificación previa a la defensa | [Observabilidad](docs/observability/README.md) |
 | Tenant, aplicaciones, directorio y Terraform | [Auth0](auth0/README.md) |
 
