@@ -66,11 +66,11 @@ def execute_check(fixture_action=None):
             f'exec cypress run --browser electron --headless --spec {spec}',
         ])
         try:
-            execution = subprocess.run(command, stdout=subprocess.PRODNULL, stderr=subprocess.PRODNULL,
-                                       stdin=subprocess.PRODNULL, timeout=180, check=False)
+            execution = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       stdin=subprocess.DEVNULL, timeout=180, check=False)
         except subprocess.TimeoutExpired:
-            subprocess.run(['/usr/bin/docker', 'rm', '-f', NAME], stdout=subprocess.PRODNULL,
-                           stderr=subprocess.PRODNULL, timeout=15, check=False)
+            subprocess.run(['/usr/bin/docker', 'rm', '-f', NAME], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=15, check=False)
             return 'FAILURE', 'RUNNER'
 
         stage_path = Path(result) / 'stage'

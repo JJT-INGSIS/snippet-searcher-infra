@@ -3,6 +3,8 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from contextlib import nullcontext
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,6 +21,29 @@ class ProdFunctionalTest(unittest.TestCase):
                 with patch.object(runner.subprocess, 'run') as execute:
                     self.assertEqual(runner.execute_check(), ('FAILURE', 'CONFIGURATION'))
                     execute.assert_not_called()
+
+    def test_browser_execution_and_timeout_cleanup_discard_output(self):
+        with tempfile.TemporaryDirectory() as folder:
+            credentials = Path(folder) / 'test-auth0.json'
+            credentials.touch()
+            (Path(folder) / 'stage').write_text('COMPLETE')
+            with patch.object(runner, 'CREDENTIALS', credentials):
+                with patch.object(runner.tempfile, 'TemporaryDirectory', return_value=nullcontext(folder)):
+                    with patch.object(runner.subprocess, 'run') as execute:
+                        execute.return_value = SimpleNamespace(returncode=0)
+                        self.assertEqual(runner.execute_check(), ('SUCCESS', 'NONE'))
+                        self.assertEqual(execute.call_args.kwargs['stdin'], runner.subprocess.DEVNULL)
+                        self.assertEqual(execute.call_args.kwargs['stdout'], runner.subprocess.DEVNULL)
+                        self.assertEqual(execute.call_args.kwargs['stderr'], runner.subprocess.DEVNULL)
+
+                        execute.side_effect = [
+                            runner.subprocess.TimeoutExpired(cmd='docker run', timeout=180),
+                            SimpleNamespace(returncode=0),
+                        ]
+                        self.assertEqual(runner.execute_check(), ('FAILURE', 'RUNNER'))
+                        self.assertEqual(execute.call_args.args[0], ['/usr/bin/docker', 'rm', '-f', runner.NAME])
+                        self.assertEqual(execute.call_args.kwargs['stdout'], runner.subprocess.DEVNULL)
+                        self.assertEqual(execute.call_args.kwargs['stderr'], runner.subprocess.DEVNULL)
 
     def test_event_has_only_minimal_prod_result_without_credentials(self):
         class Receipt:
