@@ -7,6 +7,7 @@ instrumentación. Los servicios conservan su código y Dockerfile en sus reposit
 | Qué buscás | Dónde está |
 | --- | --- |
 | Servicios, responsabilidades y flujos de usuario | [Arquitectura](docs/architecture/README.md) |
+| Recorrido de las 16 historias, parser y observabilidad | [Guía de defensa](docs/defense.md) |
 | Azure, SSH, DNS, NGINX, TLS, datos y Redis | [Operación de infraestructura](docs/operations.md) |
 | Publicación, promoción por digest y recuperación | [Despliegues](docs/deployment.md) |
 | Imagen, configuración pública y pruebas de la UI | [README de la UI](https://github.com/JJT-INGSIS/snippet-searcher-ui/blob/dev/README.md) |
