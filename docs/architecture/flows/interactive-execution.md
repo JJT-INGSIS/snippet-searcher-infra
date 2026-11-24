@@ -1,9 +1,8 @@
-# Ejecución interactiva — US10 futura
+# Ejecución interactiva
 
-El [contrato SNI-45](../execution-contract.md) precisa API pública e
-interna, eventos y límites. NDJSON con `fetch` y POST separados para inputs están
-aprobados; los motivos y costos aceptados se registran al final del contrato.
-Cancelar HTTP no acredita que el intérprete se haya detenido.
+El [contrato de ejecución](../execution-contract.md) describe las dos APIs,
+los eventos y los límites. La UI recibe NDJSON con `fetch` y usa POST para
+inputs y cancelación.
 
 PrintScript conserva el estado transitorio del intérprete. `snippets-service` autoriza el inicio, asocia la ejecución al usuario y transmite outputs y solicitudes de input mediante `Language`, su módulo interno.
 
@@ -12,11 +11,10 @@ sequenceDiagram
     actor UI as Usuario mediante UI
     participant S as snippets-service
     participant P as permissions-service
-    participant ST as Storage FUTURO
+    participant ST as SnippetContentStorage
     participant L as Language interno
     participant PS as printscript-service
 
-    Note over UI,PS: Workflow futuro: ejecución interactiva de US10
     UI->>S: Iniciar ejecución del snippet
     S->>S: Comprobar existencia
     break Snippet inexistente
@@ -29,7 +27,8 @@ sequenceDiagram
     end
 
     S->>S: Fijar revisión del código
-    Note over S,ST: Uso futuro: recuperar contenido de esa revisión
+    S->>ST: Leer el contenido de la revisión seleccionada
+    ST-->>S: Código
     S->>L: Iniciar ejecución con código y versión
     L->>PS: Iniciar por HTTP
     PS-->>L: Ejecución iniciada o error
@@ -38,7 +37,8 @@ sequenceDiagram
         S-->>UI: Error de inicio
     end
     S->>S: Asociar ejecución con actor y snippet
-    S-->>UI: Ejecución iniciada
+    S-->>UI: Descriptor de la ejecución
+    UI->>S: Abrir canal de eventos con cursor
 
     loop Mientras la ejecución está activa
         alt Se produce una salida
@@ -64,8 +64,8 @@ sequenceDiagram
     S-->>UI: Ejecución terminada o interrumpida
 ```
 
-- **Requerimiento:** US10 necesita outputs e inputs durante la ejecución. La forma concreta del canal incremental debe acordarse con la UI; una respuesta final única no cumple el flujo.
-- **Propuestas:** permitir ejecución a quien tiene acceso, fijar la revisión ejecutada y verificar la asociación usuario/ejecución al recibir inputs. No se requiere persistir sesiones como datos de negocio ni reanudarlas tras reiniciar el intérprete.
-- **Errores:** distinguir error del programa, caída del servicio y límite de ejecución; informar terminación sin dejar a la UI esperando indefinidamente. Definir límites de tiempo, espera de input y salida antes de implementar.
+Cerrar el stream permite una reconexión acotada por cursor. La cancelación
+es una operación separada. La ejecución conserva el snapshot del inicio y
+distingue errores del programa, límites y fallas técnicas.
 
 [Volver a la referencia de arquitectura](../README.md)

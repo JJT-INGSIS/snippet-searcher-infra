@@ -1,9 +1,9 @@
-# Chequeo autenticado y SLO de PROD — SNI-89
+# Chequeo autenticado y SLO de PROD
 
 Preparación para la cuenta US 8718557 y política 8369826. El código reutiliza
 el recorrido probado en DEV sin cambiar sus archivos ni su timer. Usa cuenta,
 fixture, hostname, configuración privada y nombres exclusivamente de PROD.
-No está desplegado ni acreditado por tener estos archivos.
+La instalación se acredita con el timer y los eventos recibidos en New Relic.
 
 ## Cuenta y privacidad
 
@@ -44,7 +44,7 @@ Un HTTP 200 de Event API sin `success=true` y receipt no se considera envío vá
 
 ## Condiciones y SLO
 
-`alerts/` es una raíz Terraform independiente, como la raíz existente de SNI-86:
+`alerts/` es una raíz Terraform independiente, como la raíz de monitoreo operativo de DEV:
 prepararla no introduce variables obligatorias ni recursos PROD en el plan DEV.
 Requiere `newrelic_account_id=8718557`, `prod_alert_policy_id=8369826` y el GUID
 verificado de `snippets-service (prod)`. La User API key va sólo en el entorno
@@ -59,4 +59,4 @@ como muestra suficiente por el solo hecho de tener un porcentaje.
 La UI de Service Levels exige Full y advierte cargos. No activar ese acceso ni
 aplicar el plan como si estuviera autorizado un costo no informado. Estos archivos
 preparan el resultado; no acreditan recursos SLO nativos ni resultados del chequeo.
-Hasta resolver acceso/cuenta y observar resultados, SNI-89 sigue In Progress.
+Verificá el estado operativo en la [guía de observabilidad](../../../docs/observability/README.md#evidencia-y-defensa).

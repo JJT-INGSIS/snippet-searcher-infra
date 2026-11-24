@@ -31,4 +31,6 @@ terraform -chdir=auth0 test
 
 Las pruebas usan un proveedor simulado y no requieren credenciales de Auth0. Para un plan real de DEV, usá [`development.tfvars.example`](development.tfvars.example) como base para el archivo local `development.tfvars` y cargá `AUTH0_CLIENT_ID` y `AUTH0_CLIENT_SECRET` solo en el proceso de Terraform. Confirmá el tenant y revisá el plan antes de cualquier apply. Guardá el estado local, los planes y la credencial en almacenamiento protegido.
 
-Para preparar el manifiesto de runtime se usa `scripts/bootstrap_swarm.py plan` con `--auth0-dev` o `--auth0-prod`, según el ambiente. Consultá el [manual de infraestructura](../README.md) para los pasos de despliegue y recuperación.
+Para preparar el manifiesto de runtime se usa `scripts/bootstrap_swarm.py plan` con `--auth0-dev` o `--auth0-prod`, según el ambiente. Revisá el candidato y usá el alcance de infraestructura `--auth-only` cuando corresponda. Este alcance modifica Snippets y UI y conserva las imágenes. Ver [despliegues y recuperación](../docs/deployment.md#cambios-al-stack).
+
+Verificá `identity.mode=auth0` en `/app-config.json`, la ruta pública `/api/languages` y el 401 de una consulta protegida sin credencial. Después completá el login y comprobá un listado autenticado. Validá también la búsqueda de destinatarios cuando se configura el directorio. Evitá registrar tokens o datos OAuth. [Contrato de autorización](../docs/architecture/authentication-authorization-contract.md).

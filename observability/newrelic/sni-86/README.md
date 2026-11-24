@@ -1,7 +1,6 @@
 # Terraform de alertas, tableros y SLO de DEV
 
-Este directorio es una raíz independiente. Las políticas y workflows de
-SNI-84 se referencian por ID. Los monitores y el chequeo SNI-85 conservan el
+Este directorio es una raíz independiente. Las políticas y workflows existentes se referencian por ID. Los monitores y el chequeo funcional de DEV conservan el
 estado de [la raíz padre](../README.md).
 
 ## Ejecutar en la cuenta del equipo
@@ -31,4 +30,4 @@ importar las condiciones, tableros y SLO existentes antes de planificar.
 y `newrelic_service_level` con `ACCOUNT_ID:SLI_ID:GUID`. Confirmar los
 identificadores con la API. Los archivos de estado y los planes están
 excluidos por Git. La clave de usuario se puede revocar después de aplicar.
-Ver el [runbook](../../../docs/observability/sni-86-alerts-dashboards.md).
+Ver el [runbook](../../../docs/observability/README.md).

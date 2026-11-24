@@ -1,101 +1,25 @@
-# SNI-45 — Contrato de tests y ejecución incremental
+# Contrato de tests y ejecución incremental
 
-Estado: **contrato v1 aprobado por Thiago para revisión del equipo** el 24 de
-octubre de 2026. Es una entrega de diseño y fixtures, no endpoints implementados,
-ejecución integrada ni aprobación de los demás responsables.
+La UI usa `fetch` con NDJSON para recibir eventos y POST separados para inputs
+y cancelación. Snippets autoriza y delega por HTTP a PrintScript mediante
+Language. Un stream cerrado y una ejecución cancelada son estados distintos.
+Los [fixtures v1](../contracts/execution-v1.json) documentan el formato y se
+validan en CI.
 
-Fuente de verdad del contrato: este documento y sus
-[fixtures](../contracts/execution-v1.json). Los repos consumidores deben enlazar
-esta versión en vez de mantener copias divergentes o un repositorio de DTOs.
+## Límites configurables
 
-## Canal aprobado
+PrintScript configura, por defecto, 120 s de duración total, 30 s de espera
+por input, 15 s de reconexión, 60 s de retención terminal y buffer de 256
+eventos o 256 KiB. La capacidad interactiva se verifica en el runtime. El
+stack usa un coordinador activo por servicio y `stop-first` para Snippets
+y PrintScript. Un reemplazo puede interrumpir sesiones en memoria.
+[Operación del stack](../deployment.md#cambios-al-stack).
 
-El 24 de octubre de 2026, Thiago respondió «sí» a la propuesta de utilizar
-**streaming con `fetch` para recibir eventos y POST separados para entregar inputs**.
-
-La UI se comunica únicamente con Snippets. Language adapta la comunicación HTTP
-con PrintScript; el navegador no controla directamente el intérprete.
-
-Motivo: recibir outputs antes de terminar y conservar headers de identidad y
-autorización en el transporte HTTP existente, sin introducir WebSocket.
-No se colocan tokens ni identidades confiadas en querystrings.
-
-Alternativas consideradas:
-
-- Polling de eventos: simplifica el intercambio HTTP y recuperar desde una posición,
-  pero agrega requests y latencia entre producir y mostrar cada salida.
-- WebSocket: ofrece un canal bidireccional, pero exige gestionar su conexión,
-  autorización y recuperación, sin una necesidad adicional identificada por ahora.
-
-Costos aceptados: el cliente debe procesar fragmentos y límites de eventos, tratar
-desconexiones y manejar reconexión explícitamente. NGINX debe permitir entregar
-eventos sin acumularlos. Cerrar un stream no acredita cancelar el trabajo real.
-
-Thiago aprobó además el framing NDJSON, capacidad acotada y límites configurables
-el 24 de octubre de 2026, respondiendo «s» a las tres propuestas. Cambiar el canal
-o framing más adelante afectaría UI, Snippets, Language y el proxy.
-
-En el mensaje siguiente «sí», Thiago aprobó una réplica inicial por coordinador,
-buffer de 256 eventos/256 KiB, retención terminal de 60 s, snapshot comprobado con
-hasta tres intentos, comparación exacta, sobrantes informativos, entorno vacío y
-no repetir automáticamente un inicio incierto. El registro de decisiones del final
-resume sus costos; no supone aprobación del equipo ni autoriza despliegues.
-
-## Restricciones comprobadas
-
-- `ProgramOutput.writeLine(line)` permite observar cada salida mediante callback.
-- `ProgramInput.readLine(prompt)` es síncrono y devuelve un string o `null`.
-- `Interpreter.interpret` no expone una operación pública de cancelación. SNI-47
-  debe demostrar interrupción y liberación efectivas; no basta cerrar HTTP o marcar
-  el resultado como cancelado.
-- Las definiciones pertenecen a Snippets; PrintScript interpreta, y Permissions
-  conserva las relaciones de acceso. Este ticket no agrega storage ni un broker.
-
-Fuentes locales revisadas: `printscript-runtime` e `interpreter` del repositorio
-PrintScript. La verificación de SNI-47 deberá usar la dependencia publicada que
-realmente consume el servicio, no asumir equivalencia con un checkout local.
-
-## Decisiones aprobadas, todavía sin implementación runtime
-
-### Framing
-
-NDJSON: un objeto JSON por línea con tipo y secuencia. Reutiliza JSON y
-evita implementar el framing SSE, pero requiere ensamblar líneas entre fragmentos
-y programar replay/reconexión. SSE con `fetch` conserva un formato estandarizado
-para eventos e IDs, aunque requiere su parser y no obtiene automáticamente el
-comportamiento de `EventSource`.
-
-### Capacidad y desconexiones
-
-Una ejecución activa por actor y cuatro globales inicialmente,
-sin cola; rechazar capacidad agotada. Conservar la sesión durante una
-ventana de reconexión de 15 segundos y cancelarla si no se recupera el consumidor.
-Es más acotado que mantener sesiones indefinidas, pero una desconexión prolongada
-puede interrumpir el trabajo. Una nueva ejecución requiere una acción explícita,
-no un reinicio automático al reconectar. La restricción inicial de una réplica
-por coordinador hace aplicable el límite; escalar exige revisar este contrato.
-
-### Límites iniciales configurables
-
-120 segundos totales, 30 segundos por espera de input, código de hasta
-1 MiB UTF-8, cada input de hasta 8 KiB UTF-8 y salida acumulada de hasta 1 MiB UTF-8.
-Buffer limitado a 256 eventos y 256 KiB serializados. Alcanzar
-un límite debe tener resultado explícito, no perder eventos silenciosamente.
-
-Los valores acotan recursos y facilitan pruebas, pero restringen programas largos
-y usuarios que tarden en responder. Los defaults pueden cambiarse por
-configuración; los consumidores deberán conocer los límites efectivos.
-
-Los bytes de código, input y salida se cuentan en UTF-8 decodificado, no por
-caracteres ni tamaño de JSON. Los bytes del buffer sí incluyen la representación
-serializada. Aplicar ambas cotas (eventos y bytes), no elegir solo una.
 
 ## API y responsabilidades
 
-Las siguientes rutas constituyen el contrato para revisión del equipo,
-no rutas implementadas. Se reutilizan UUID canónicos y Problem Details como
-convenciones existentes. UI usa prefijo relativo `/api`; las rutas de la tabla
-son las que recibe Snippets después de que NGINX quite ese prefijo.
+La UI usa el prefijo relativo `/api`. La tabla muestra las rutas
+que recibe Snippets después del proxy.
 
 | Método y ruta Snippets | Entrada | Respuesta de contrato |
 | --- | --- | --- |
@@ -108,9 +32,9 @@ son las que recibe Snippets después de que NGINX quite ese prefijo.
 | POST `/executions/{executionId}/inputs` | `{requestId, value}` | 200, aceptación/repetición compatible |
 | POST `/executions/{executionId}/cancel` | `{}` | 202, cancelación solicitada; no acredita trabajo liberado |
 
-No aceptar código, owner, actor ni resultados en el body público de inicio. El
-actor viene del contexto ya establecido: header de desarrollo solo en dev, sin
-actor por defecto. No introducir Auth0 como parte de este contrato.
+El body público de inicio sólo admite los campos del contrato. Snippets resuelve
+al actor desde el contexto de [identidad](authentication-authorization-contract.md)
+del ambiente.
 
 Crear una definición requiere ownership; listar y empezar una ejecución requieren
 lectura. Snippets comprueba pertenencia del test al snippet, existencia confirmada
@@ -202,12 +126,11 @@ vacío es un input, no ausencia ni EOF. No aceptar inputs adelantados ni para TE
 Solicitar cancelación coloca estado CANCELLING. El terminal CANCELLED se emite
 solo al verificar que el intérprete ya terminó y liberó sus recursos. Una carrera
 con terminación conserva el primer resultado final fijado de forma atómica.
-SNI-47 debe cubrir espera de input, cómputo y buffer lleno. No basta cancelar un
-Future: el worker debe detenerse efectivamente y no dejar sesiones huérfanas.
+El cupo se libera cuando se confirma la terminación del trabajo.
 
 ## Desconexiones, límites y reinicio
 
-La ventana aprobada de reconexión es de 15 s desde detectar desconexión; también
+La ventana de reconexión es de 15 s desde detectar desconexión; también
 aplica a una sesión creada que nunca abre el stream. El timeout total de 120 s
 incluye input y reconexión; nunca se extiende por actividad del cliente. En TEST
 no se emite input-required: los inputs vienen del test.
@@ -231,7 +154,7 @@ lastSeq es 400 `invalid-cursor`; un segundo consumidor activo es 409
 
 Retener descriptor, historial acotado e IDs de input por 60 s tras el
 terminal y luego eliminar los datos transitorios. No confundir esta retención con
-persistencia de definiciones: estas sí son durables en Snippets (SNI-46). Este
+persistencia de definiciones: estas son durables en Snippets. Este
 contrato no exige persistencia histórica de resultados; al expirar la sesión se
 pierde su resultado transitorio. Agregar un histórico sería otro alcance. Reiniciar
 PrintScript pierde las sesiones activas; Snippets informa INTERRUPTED si puede
@@ -251,7 +174,7 @@ liberarla. No liberar cupos por desconexión antes de detener el trabajo.
 Los buffers/retenciones son por sesión y por salto de transporte; no por usuario.
 Los descriptores terminales no consumen cupo de ejecución, pero sí tienen limpieza.
 
-El despliegue posterior debe evitar dos coordinadores simultáneos con contadores
+El despliegue evita dos coordinadores simultáneos con contadores
 independientes, también durante rolling updates. Un reemplazo interrumpe las
 sesiones activas; `replicas: 1` con actualización start-first no acredita por sí
 solo el límite global. Este ticket no modifica la estrategia de despliegue.
@@ -268,13 +191,12 @@ no escapa `/` ni caracteres Unicode no ASCII y no inserta espacios ni BOM. Los
 vectores en fixtures fijan el cálculo para proveedores y consumidores.
 
 Hoy metadatos y referencia se consultan por operaciones separadas; combinarlas
-sin coordinación no garantiza snapshot. Una actualización también puede borrar
-el blob anterior. SNI-48/49 deben resolver lectura coherente y retención durante
-esa lectura, o rechazar/reintentar de forma acotada sin ejecutar una mezcla.
+sin coordinación no garantiza un snapshot. Si el blob deja de ser recuperable
+durante la lectura, el flujo reintenta de forma acotada o devuelve un error.
 No mantener una transacción de BD durante toda la ejecución ni prometer un
 versionado histórico que no existe.
 
-Mecanismo aprobado: leer lenguaje, versión y referencia juntos
+Mecanismo de lectura: leer lenguaje, versión y referencia juntos
 en una única consulta; leer ese blob inmutable; verificar nuevamente la tupla de
 referencia/lenguaje/versión antes de iniciar. Si cambió o el blob fue eliminado por
 un update concurrente, repetir como máximo tres veces y luego devolver conflicto,
@@ -316,52 +238,15 @@ allí continúa siendo 200 con valid:false; Language lo traduce en su borde.
 Un input timeout o límite del programa iniciado es evento terminal, no un HTTP 504
 retroactivo. No exponer código/output ni existencia privada al actor incorrecto.
 
-SNI-52 configura las rutas de eventos sin buffering ni caché/reintentos, incluyendo
+NGINX configura las rutas de eventos sin buffering ni caché/reintentos, incluyendo
 la conexión Snippets–PrintScript. Heartbeat de transporte cada 10 s como
 evento `heartbeat` con data `{}` y seq normal; no output ni avance de input.
 Permite mantener vivo el canal bajo el timeout de inactividad de NGINX, sin
-confundirlo con el deadline total. No cambiar el proxy en este ticket.
+confundirlo con el deadline total.
 
 ## Fixtures y comprobación
 
-Desde la raíz de infra: `python3 -B -m unittest discover -s scripts -p 'test_execution_contract.py' -v`.
-Los fixtures incluyen éxito, comparación fallida, espera de input, actor incorrecto,
-timeout, EOF sin terminal y cambio de snapshot. Las pruebas verifican consistencia,
-fragmentación UTF-8/NDJSON y comparación exacta. **No ejecutan PrintScript, HTTP,
-autorización ni un backend:** no sustituyen las pruebas reales de SNI-47/48/49/53.
-Los diagnósticos del ejemplo de runtime son ilustrativos: SNI-47 conserva los
-identificadores reales de la biblioteca, no implementa la regla ficticia del fixture.
-
-Verificación local del 24 de octubre de 2026: 20 pruebas específicas y 119 pruebas
-totales de infra, todas exitosas; ejecutar nuevamente el comando de regresión indicado en
-la entrega si cambia un fixture. La suite existente descubre automáticamente el
-archivo nuevo en CI, sin modificar el workflow ni credenciales.
-
-## Registro de decisiones y entrega al equipo
-
-Las aprobaciones anteriores de Thiago se aplican a este diseño, no a despliegues.
-Se registraron siguiendo la skill `design-tradeoffs`.
-
-| Elección | Alternativa descartada | Motivo y costo aceptado | Revisar cuando |
-| --- | --- | --- | --- |
-| fetch + NDJSON + POST de inputs | polling, SSE framing, WebSocket | HTTP y JSON existentes; parser incremental/reconexión propios | otra necesidad bidireccional o incompatibilidad real |
-| Una réplica por coordinador, 1 por actor/4 globales sin cola | coordinación distribuida o cola | menos infraestructura; menor disponibilidad/escalado y rechazo en saturación | se necesiten réplicas o mayor capacidad |
-| Replay limitado, 60 s de retención, 256 eventos/256 KiB | historial durable o ilimitado | memoria acotada; no toda desconexión puede recuperarse | necesidad de resultados históricos/reanudación |
-| Snapshot verificado, hasta tres lecturas | histórico completo o transacción larga | conserva coherencia sin histórico; puede rechazar bajo concurrencia | se necesiten revisiones históricas o aumenten conflictos |
-| Comparación exacta, sobrantes informativos | normalizar texto o fallar por inputs sobrantes | predecible; espacios/Unicode distintos fallan y sobrantes no diagnostican error | cambie el requisito funcional |
-| Entorno vacío | variables runtime o allowlist | evita exponer secretos/configuración; readEnvironment no encuentra valores | se acuerden variables públicas explícitas |
-| Sin repetición automática del inicio | inicio idempotente durable | evita duplicar por retry sin añadir persistencia; resultado incierto tras timeout | se requiera recuperación transparente |
-
-Rutas, estados y nombres concretan el contrato siguiendo las convenciones de
-UUID, headers y Problem Details existentes; no acreditan aprobación de los demás
-responsables. Compartir esta entrega con SNI-46/47/48/49/50/51/52 para revisión y
-desarrollo paralelo. SNI-53 debe verificar los proveedores reales juntos.
-
-La entrega local de documentación y fixtures está preparada; no se cambió el estado
-del ticket en Linear. No hay endpoints runtime nuevos, despliegues ni garantías
-de reanudación durable. Los repos de Snippets/PrintScript deben enlazar este
-contrato en sus entregas; no se modifican aquí sus branches ni pipelines locales.
-
-Referencias: [NDJSON](https://github.com/ndjson/ndjson-spec),
-[streaming con fetch](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Using_readable_streams).
-
+`python3 -B -m unittest discover -s scripts -p 'test_execution_contract.py' -v`
+valida la consistencia de los fixtures, la fragmentación UTF-8/NDJSON y la
+comparación exacta de salidas. Las pruebas de los servicios comprueban la
+ejecución y la autorización. [Ingreso y TLS](../operations.md#ingreso-y-tls).
