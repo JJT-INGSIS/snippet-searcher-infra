@@ -15,14 +15,18 @@ flowchart LR
     S --> PG[(PostgreSQL Snippets)]
     P --> PP[(PostgreSQL Permissions)]
     S --> ST[SnippetContentStorage]
-    S <-->|Outbox y consumidor| R[(Redis Streams)]
-    PS -.->|Operaciones durables| R
+    S <-->|Streams: outbox y consumidor| R[(Redis)]
+    PS -.->|Estado y resultados de operaciones durables| R
+    UI -.->|Login con PKCE| AUTH["Auth0 (externo)"]
+    S -.->|JWKS y Management API| AUTH
 ```
 
-El diagrama muestra las dependencias disponibles. Redis y el proveedor de storage
-se determinan por la configuración efectiva del ambiente. Los servicios
-interactúan por HTTP para pedidos puntuales. Los lotes asíncronos se apoyan en un
-outbox transaccional y Redis Streams. [Decisión de arquitectura](adr-001-async-processing.md) ·
+Auth0 es una dependencia externa. La UI inicia el login y Snippets consulta
+las claves públicas para validar tokens y la Management API para buscar
+destinatarios. Redis y el proveedor de storage dependen de la configuración de
+cada ambiente. Snippets publica los eventos del outbox transaccional en Redis
+Streams y los procesa con su consumidor. PrintScript conserva el estado y los
+resultados de sus operaciones durables en Redis cuando están habilitadas. [Decisión de arquitectura](adr-001-async-processing.md) ·
 [Procesamiento asíncrono](async-processing-design.md).
 
 ## Flujos principales
