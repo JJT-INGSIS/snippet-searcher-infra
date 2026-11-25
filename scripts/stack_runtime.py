@@ -40,12 +40,18 @@ def render_release(release):
                           ('max_content_bytes', 1048576)):
         settings['STORAGE_ASSET_' + name.upper()] = str(asset.get(name, default))
     data = render(files, settings)
-    if release['environment'] == 'prod' and settings['AUTH_MODE'] == 'auth0':
-        key = 'auth0_directory_prod'
+    if settings['AUTH_MODE'] == 'auth0':
+        environment = release['environment']
+        if environment == 'dev':
+            public = json.loads((ROOT / 'auth0/development.public.json').read_text())
+            client_id = public['directory_client_id']
+        else:
+            client_id = 'wa4O5PHWRFY7ekVtsoF3lzHlegDAZ3Tb'
+        key = f'auth0_directory_{environment}'
         snippets = data['services']['snippets-service']
-        snippets['environment']['AUTH0_DIRECTORY_CLIENT_ID'] = 'wa4O5PHWRFY7ekVtsoF3lzHlegDAZ3Tb'
+        snippets['environment']['AUTH0_DIRECTORY_CLIENT_ID'] = client_id
         snippets['secrets'].append({'source': key, 'target': 'snippets.directory.auth0.client-secret'})
-        data['secrets'][key] = {'external': True, 'name': 'snippet-searcher-prod-auth0-directory-v1'}
+        data['secrets'][key] = {'external': True, 'name': f'snippet-searcher-{environment}-auth0-directory-v1'}
     data.pop('name', None)
     data['version'] = '3.8'
     for section in ('networks', 'volumes'):

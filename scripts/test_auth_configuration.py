@@ -46,7 +46,10 @@ class AuthConfigurationTests(unittest.TestCase):
             self.assertEqual(settings['AUTH_MODE'], 'auth0')
             self.assertEqual(settings['AUTH_AUDIENCE'], AUTH['audience'])
             from stack_release import expected_images
-            return {'services': {name: {} for name in expected_images(release)}}
+            return {
+                'services': {name: {'environment': {}, 'secrets': []} for name in expected_images(release)},
+                'secrets': {},
+            }
         with patch('validate_asset_config.render', side_effect=render), \
                 patch.dict('os.environ', {'AUTH_MODE': 'dev', 'AUTH_AUDIENCE': 'wrong'}):
             render_release(release)

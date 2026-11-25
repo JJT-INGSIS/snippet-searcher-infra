@@ -91,7 +91,17 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(after['services'][service], spec)
         old = before['services']['snippets-service']
         new = after['services']['snippets-service']
-        self.assertEqual(old['secrets'], new['secrets'])
+        directory = 'auth0_directory_dev'
+        self.assertEqual(new['secrets'], old['secrets'] + [
+            {'source': directory, 'target': 'snippets.directory.auth0.client-secret'},
+        ])
+        self.assertNotIn('AUTH0_DIRECTORY_CLIENT_ID', old['environment'])
+        self.assertEqual(new['environment']['AUTH0_DIRECTORY_CLIENT_ID'], PUBLIC['directory_client_id'])
+        self.assertEqual(after['secrets'], {**before['secrets'], directory: {
+            'external': True, 'name': 'snippet-searcher-dev-auth0-directory-v1',
+        }})
+        self.assertNotIn('AUTH0_DIRECTORY_CLIENT_ID', after['services']['ui']['environment'])
+        self.assertEqual(after['services']['ui'].get('secrets'), before['services']['ui'].get('secrets'))
         for key, value in old['environment'].items():
             if not key.startswith('AUTH_') and key != 'SNIPPETS_CORS_ALLOWED_ORIGINS':
                 self.assertEqual(new['environment'][key], value)
