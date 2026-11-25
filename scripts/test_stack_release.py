@@ -16,6 +16,31 @@ def manifest(environment='dev'):
 
 
 class ReleaseContractTests(unittest.TestCase):
+    def test_dev_auth0_directory_is_mounted_only_in_snippets(self):
+        from auth_rollout import plan_identity
+        from stack_runtime import render_release
+        from test_expanded_release import expanded
+
+        release = bootstrap_swarm.plan_release(expanded('dev', ui=True, assets=False),
+                                              'jjt-snippets-dev.duckdns.org', tls=True)
+        before = render_release(release)
+        after = render_release(plan_identity(release, 'dev'))
+        key = 'auth0_directory_dev'
+        mount = {'source': key, 'target': 'snippets.directory.auth0.client-secret'}
+
+        self.assertNotIn(key, before['secrets'])
+        self.assertNotIn('AUTH0_DIRECTORY_CLIENT_ID', before['services']['snippets-service']['environment'])
+        self.assertEqual(after['secrets'][key],
+                         {'external': True, 'name': 'snippet-searcher-dev-auth0-directory-v1'})
+        self.assertNotIn('auth0_directory_prod', after['secrets'])
+        snippets = after['services']['snippets-service']
+        self.assertEqual(snippets['environment']['AUTH0_DIRECTORY_CLIENT_ID'], '5rzcz41tCfhi3ZUpfm3DLmVBI0jgZ1Fo')
+        self.assertEqual(snippets['secrets'], before['services']['snippets-service']['secrets'] + [mount])
+        for name, service in after['services'].items():
+            if name != 'snippets-service':
+                self.assertNotIn(mount, service.get('secrets', []))
+                self.assertNotIn('AUTH0_DIRECTORY_CLIENT_ID', service.get('environment', {}))
+
     def test_reapply_preserves_current_app_and_database_references_without_mutation(self):
         requested = manifest()
         current = {**requested, 'images': {**requested['images'], 'permissions-service': 'ghcr.io/jjt-ingsis/permissions-service@sha256:' + 'a'*64}, 'database_image': 'postgres:18.6-bookworm@sha256:' + 'b'*64}
