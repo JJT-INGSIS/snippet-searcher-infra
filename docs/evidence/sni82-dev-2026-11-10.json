@@ -1,0 +1,119 @@
+{
+  "timestamp": "2026-11-10T12:39:55.288185+00:00",
+  "environment": "dev",
+  "version": "sni82-runtime-v1",
+  "native": {
+    "snippets-db": {
+      "metricCount": 4,
+      "eventTypes": [
+        "PgCustomQuerySample",
+        "PostgresqlDatabaseSample",
+        "PostgresqlInstanceSample"
+      ]
+    },
+    "permissions-db": {
+      "metricCount": 4,
+      "eventTypes": [
+        "PgCustomQuerySample",
+        "PostgresqlDatabaseSample",
+        "PostgresqlInstanceSample"
+      ]
+    },
+    "redis": {
+      "metricCount": 2,
+      "eventTypes": [
+        "RedisKeyspaceSample",
+        "RedisSample"
+      ]
+    }
+  },
+  "storage": [
+    {
+      "environment": "dev",
+      "service": "storage-local",
+      "version": "sni82-runtime-v1",
+      "kind": "local",
+      "availableBytes": 19942748160,
+      "totalBytes": 30084825088,
+      "availableInodes": 3583107,
+      "writeOk": 1,
+      "readOk": 1,
+      "contentOk": 1,
+      "deleteOk": 1,
+      "up": 1,
+      "reason": "ok",
+      "durationMs": 3.81
+    },
+    {
+      "environment": "dev",
+      "service": "snippets-db-disk",
+      "version": "sni82-runtime-v1",
+      "kind": "filesystem",
+      "availableBytes": 19942748160,
+      "totalBytes": 30084825088,
+      "availableInodes": 3583107,
+      "up": 1,
+      "reason": "ok",
+      "durationMs": 0.037
+    },
+    {
+      "environment": "dev",
+      "service": "permissions-db-disk",
+      "version": "sni82-runtime-v1",
+      "kind": "filesystem",
+      "availableBytes": 19942748160,
+      "totalBytes": 30084825088,
+      "availableInodes": 3583107,
+      "up": 1,
+      "reason": "ok",
+      "durationMs": 0.035
+    },
+    {
+      "environment": "dev",
+      "service": "redis-disk",
+      "version": "sni82-runtime-v1",
+      "kind": "filesystem",
+      "availableBytes": 19942748160,
+      "totalBytes": 30084825088,
+      "availableInodes": 3583107,
+      "up": 1,
+      "reason": "ok",
+      "durationMs": 0.034
+    }
+  ],
+  "agentDispatchVerified": true,
+  "pinnedAgentFlexVerified": [
+    {
+      "name": "snippet-storage-local",
+      "eventType": "SnippetStorageSample",
+      "metricCount": 2
+    },
+    {
+      "name": "snippet-snippets-db-disk",
+      "eventType": "SnippetStorageSample",
+      "metricCount": 2
+    },
+    {
+      "name": "snippet-permissions-db-disk",
+      "eventType": "SnippetStorageSample",
+      "metricCount": 2
+    },
+    {
+      "name": "snippet-redis-disk",
+      "eventType": "SnippetStorageSample",
+      "metricCount": 2
+    },
+    {
+      "name": "snippet-swarm",
+      "eventType": "SnippetSwarmSample",
+      "metricCount": 9
+    }
+  ],
+  "newRelicIngestionVerified": false,
+  "newRelicKeyCreation": {
+    "created": false,
+    "message": "You do not have permission to create this key."
+  },
+  "testCasesPassed": 222,
+  "applicationTasksHealthy": 8
+}

@@ -1,0 +1,52 @@
+{
+  "environment": "dev",
+  "version": "sni82-v1",
+  "intervalSeconds": 60,
+  "postgres": [
+    {
+      "service": "snippets-db",
+      "host": "dev-snippets-db",
+      "port": 5432,
+      "database": "snippets",
+      "username": "nri_monitor",
+      "passwordFile": "/run/secrets/obs_snippets_db_password"
+    },
+    {
+      "service": "permissions-db",
+      "host": "dev-permissions-db",
+      "port": 5432,
+      "database": "permissions",
+      "username": "nri_monitor",
+      "passwordFile": "/run/secrets/obs_permissions_db_password"
+    }
+  ],
+  "redis": {
+    "service": "redis",
+    "host": "dev-redis",
+    "port": 6379,
+    "username": "nri_monitor",
+    "passwordFile": "/run/secrets/obs_redis_password"
+  },
+  "storage": [
+    {
+      "kind": "local",
+      "service": "storage-local",
+      "path": "/observed/snippets-content"
+    },
+    {
+      "kind": "filesystem",
+      "service": "snippets-db-disk",
+      "path": "/observed/snippets-db"
+    },
+    {
+      "kind": "filesystem",
+      "service": "permissions-db-disk",
+      "path": "/observed/permissions-db"
+    },
+    {
+      "kind": "filesystem",
+      "service": "redis-disk",
+      "path": "/observed/redis"
+    }
+  ]
+}

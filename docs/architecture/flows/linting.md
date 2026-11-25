@@ -2,15 +2,20 @@
 
 [Volver al índice de arquitectura](../README.md)
 
-US14 permite configurar reglas predefinidas; US15 exige evaluarlas sobre los snippets sin hacer esperar al usuario y con recuperación ante fallos. Los resultados alimentan listado y detalle. El reprocesamiento masivo es **futuro**; la secuencia siguiente es una **propuesta de diseño**.
+US14 configura reglas por HTTP síncrono; US15 evalúa snippets en segundo plano con
+recuperación. Los resultados alimentan listado y detalle. El evento
+`LintRulesChanged` usa outbox y Redis Streams según el
+[modelo de procesamiento asíncrono](../async-processing-design.md).
 
 ```mermaid
 sequenceDiagram
     actor UI as Usuario mediante UI
     participant S as snippets-service
     participant P as permissions-service
-    participant B as Proceso de fondo en snippets - FUTURO
-    participant ST as Storage de cátedra - FUTURO
+    participant O as Publicador outbox en Snippets
+    participant R as Redis Streams
+    participant B as Worker de Snippets
+    participant ST as SnippetContentStorage
     participant L as Language interno
     participant PS as printscript-service
 
@@ -23,13 +28,18 @@ sequenceDiagram
     alt Configuración inválida o servicio indisponible
         S-->>UI: Error, conservar configuración anterior
     else Configuración admitida
-        S->>S: Guardar configuración y trabajo pendiente en una transacción local
+        S->>S: Commit de configuración, revisión, trabajo y outbox
         break Fallo de persistencia local
             S-->>UI: Cambio de reglas no confirmado
         end
         S-->>UI: Configuración guardada, evaluación pendiente
+        Note over UI,S: Una selección sin cambios no crea un lote nuevo
 
-        B->>S: Retomar trabajo durable
+        O->>S: Leer outbox confirmado
+        O->>R: Publicar LintRulesChanged
+        B->>R: Leer mediante Consumer Group
+        R-->>B: Evento
+        B->>S: Retomar trabajo durable y comprobar revisión de reglas
         S->>P: Obtener IDs propios del usuario
         P-->>S: IDs o error transitorio
         break No se pudieron consultar los permisos
@@ -40,10 +50,10 @@ sequenceDiagram
 
         loop Cada snippet pendiente
             B->>S: Obtener revisión y metadatos
-            B-->>ST: Uso futuro al recuperar contenido
+            B->>ST: Recuperar revisión de contenido
             ST-->>B: Código
             B->>L: Lintear con reglas del trabajo
-            L->>PS: HTTP con código, versión y reglas
+            L->>PS: Operación durable con código, versión, reglas y revisión del procesador
             PS-->>L: Cumplimiento, infracciones o error
             L-->>B: Resultado
 
@@ -56,9 +66,15 @@ sequenceDiagram
             end
         end
         B->>S: Registrar finalización o errores parciales
+        opt Estado terminal o recuperación UNKNOWN persistida
+            B->>R: ACK de la entrega
+        end
     end
 ```
 
-- **Propuesta:** configuración por owner, lenguaje y versión; sólo se procesan sus snippets propios. El catálogo y significado de reglas pertenecen a PrintScript; la selección y los resultados persistidos pertenecen a snippets-service.
-- **Requerimiento:** linting informa infracciones. **Propuesta:** distinguir cumple, incumple, pendiente y no evaluado por error. Una caída del procesador no significa incumplimiento; linting no modifica el código ni reemplaza la validación del parser.
-- **Requerimiento US15:** progreso durable y recuperación de fallos. **Propuesta:** proceso de fondo dentro de snippets-service con HTTP por elemento, sin elegir todavía broker. Ante caída de permissions, mantener el trabajo pendiente. Ante resultados obsoletos, evaluar la revisión vigente. El storage futuro sólo participa al recuperar contenido; su contrato queda pendiente.
+- Las reglas se guardan por dueño, lenguaje y versión. Se evalúan los snippets
+  propios de ese alcance y sólo se exponen resultados vigentes.
+- Una falla técnica se distingue de una infracción. El lint conserva el código
+  original. PrintScript conoce el catálogo y Snippets persiste el resultado.
+- La evaluación se recupera desde el trabajo durable y verifica vigencia al
+  publicar, incluyendo la revisión de código, reglas y procesador.

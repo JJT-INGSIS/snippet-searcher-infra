@@ -7,7 +7,8 @@ from pathlib import Path
 import subprocess
 
 from stack_release import (DATABASE_SERVICES, NGINX_FILES, SERVICES, expected_images,
-                           infrastructure, storage_provider, ui_environment, validate_manifest)
+                           apm_enabled, auth_environment, background_flags, cors_environment, infrastructure,
+                           storage_provider, ui_environment, validate_manifest)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -24,18 +25,35 @@ def render_release(release):
         settings.update(PROXY_HOSTNAME=components['nginx']['hostname'], PROXY_PUBLIC_PORT='443')
     if 'asset-service' in components:
         files.append('swarm/stack.asset.yaml')
+    if 'redis' in components:
+        files.append('swarm/stack.redis.yaml')
     if 'ui' in release['images']:
         files.append('swarm/stack.ui.yaml')
         settings.update(ui_environment(release))
+    if apm_enabled(release):
+        files.append('swarm/stack.apm.yaml')
+    if any(background_flags(release).values()):
+        files.append('swarm/stack.background.yaml')
     settings['STORAGE_PROVIDER'] = storage_provider(release)
     asset = release.get('asset', {})
     for name, default in (('container', 'snippets'), ('connect_timeout', '2s'), ('read_timeout', '5s'),
                           ('max_content_bytes', 1048576)):
         settings['STORAGE_ASSET_' + name.upper()] = str(asset.get(name, default))
     data = render(files, settings)
+    if settings['AUTH_MODE'] == 'auth0':
+        environment = release['environment']
+        if environment == 'dev':
+            public = json.loads((ROOT / 'auth0/development.public.json').read_text())
+            client_id = public['directory_client_id']
+        else:
+            client_id = 'wa4O5PHWRFY7ekVtsoF3lzHlegDAZ3Tb'
+        key = f'auth0_directory_{environment}'
+        snippets = data['services']['snippets-service']
+        snippets['environment']['AUTH0_DIRECTORY_CLIENT_ID'] = client_id
+        snippets['secrets'].append({'source': key, 'target': 'snippets.directory.auth0.client-secret'})
+        data['secrets'][key] = {'external': True, 'name': f'snippet-searcher-{environment}-auth0-directory-v1'}
     data.pop('name', None)
     data['version'] = '3.8'
-    # Compose supplies project names. Swarm must own these resources per environment.
     for section in ('networks', 'volumes'):
         for resource in data.get(section, {}).values():
             if not resource.get('external'):
@@ -45,12 +63,17 @@ def render_release(release):
     if 'nginx' in components:
         for name in SERVICES:
             data['services'][name].pop('ports', None)
+    from redis_runtime import config_files
+    registered_configs = config_files(release)
+    if registered_configs:
         data['configs'] = {key: {'external': True, 'name': spec['name']}
-                           for key, spec in components['nginx']['configs'].items()}
+                           for key, (spec, _) in registered_configs.items()}
     if set(data['services']) != set(expected_images(release)):
         raise ValueError('El render no coincide con el inventario autorizado')
-    # Avoid Compose-only healthcheck/default fields unsupported by stack deploy.
     for service in data['services'].values():
+        for resources in service.get('deploy', {}).get('resources', {}).values():
+            if 'cpus' in resources:
+                resources['cpus'] = str(resources['cpus'])
         service.pop('profiles', None)
         for key in ('command', 'entrypoint'):
             if service.get(key) is None:
@@ -65,8 +88,6 @@ def render_release(release):
 
 
 def stack_document(data):
-    # Compose JSON already retains $$ for the next interpolation by stack deploy.
-    # Escaping it again leaves $$ in the container shell (PID rather than a variable).
     return json.dumps(data)
 
 
@@ -78,27 +99,34 @@ def validate_rendered(data):
 
 
 def require_configs(release, docker_json, create=False):
-    proxy = infrastructure(release).get('nginx')
-    if not proxy:
+    from redis_runtime import config_files
+    registered = config_files(release)
+    if not registered:
         return
-    # Read the index once: an inspect/list failure is not proof of absence.
     found = subprocess.check_output(['docker', 'config', 'ls', '--format', '{{.Name}}'],
                                     text=True, timeout=30).splitlines()
-    for key, spec in proxy['configs'].items():
+    for key, (spec, file) in registered.items():
         if spec['name'] in found:
             actual = docker_json('config', 'inspect', spec['name'])[0]
             content = base64.b64decode(actual['Spec']['Data'], validate=True)
         else:
-            content = (ROOT / NGINX_FILES[key]).read_bytes()
+            content = (ROOT / file).read_bytes()
         if hashlib.sha256(content).hexdigest() != spec['sha256']:
             raise ValueError('La config tiene otro contenido que el registrado')
         if create and spec['name'] not in found:
-            subprocess.run(['docker', 'config', 'create', spec['name'], str(ROOT / NGINX_FILES[key])],
+            subprocess.run(['docker', 'config', 'create', spec['name'], str(ROOT / file)],
                            check=True, timeout=30)
 
 
 def verify_service_configuration(release, docker_json, application=None):
     stack = f'snippet-searcher-{release["environment"]}'
+    from apm_runtime import require_apm_configuration
+    require_apm_configuration(release, docker_json, application)
+    from background_runtime import require_background_configuration
+    require_background_configuration(release, docker_json, application)
+    if 'redis' in infrastructure(release):
+        from redis_runtime import verify_effective
+        verify_effective(release, docker_json, application)
     if 'ui' in release['images'] and application in (None, 'ui'):
         actual = docker_json('service', 'inspect', f'{stack}_ui')[0]['Spec']['TaskTemplate']['ContainerSpec']
         values = dict(entry.split('=', 1) for entry in actual.get('Env', []))
@@ -107,6 +135,13 @@ def verify_service_configuration(release, docker_json, application=None):
     if application != 'ui':
         snippets = docker_json('service', 'inspect', f'{stack}_snippets-service')[0]
         env = dict(entry.split('=', 1) for entry in snippets['Spec']['TaskTemplate']['ContainerSpec'].get('Env', []))
+        expected_auth = auth_environment(release)
+        if 'auth' in release or 'AUTH_MODE' in env:
+            if any(env.get(key, '') != value for key, value in expected_auth.items()):
+                raise ValueError('Configuración efectiva de autenticación distinta del registro')
+        if 'auth' in release.get('ui', {}):
+            if any(env.get(key, '') != value for key, value in cors_environment(release).items()):
+                raise ValueError('Origen CORS efectivo distinto del ingreso UI registrado')
         if env.get('STORAGE_PROVIDER', 'local') != storage_provider(release):
             raise ValueError('Proveedor efectivo distinto del registro')
         if storage_provider(release) == 'asset':
@@ -140,8 +175,14 @@ def verify_service_configuration(release, docker_json, application=None):
                     raise ValueError('Sólo NGINX puede publicar puertos web en el stack ampliado')
 
 
-def apply_release(release, docker_json):
-    document = validate_rendered(render_release(release))
+def apply_release(release, docker_json, redis_transition=False):
+    from observability_deployment import require_reconciled_stack
+    require_reconciled_stack(release['environment'])
+    rendered = render_release(release)
+    if redis_transition:
+        allowed = {'redis', 'snippets-service', 'printscript-service'}
+        rendered['services'] = {name: spec for name, spec in rendered['services'].items() if name in allowed}
+    document = validate_rendered(rendered)
     require_configs(release, docker_json, create=True)
     subprocess.run(['docker', 'stack', 'deploy', '--resolve-image', 'always', '-c', '-',
                     f'snippet-searcher-{release["environment"]}'], input=document, text=True, check=True, timeout=180)

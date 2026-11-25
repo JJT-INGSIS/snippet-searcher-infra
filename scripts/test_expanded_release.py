@@ -294,7 +294,7 @@ class InfrastructureRecoveryTests(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt): self.deploy()
         self.swarm.failure = True
         with self.assertRaisesRegex(RuntimeError, 'interrumpida fue recuperada'): self.deploy()
-        self.assertEqual(len(self.swarm.applications), 2)  # Candidate, then restore; no new candidate.
+        self.assertEqual(len(self.swarm.applications), 2)
         self.assertEqual(self.swarm.current, expected_images(self.previous))
         self.assertFalse((self.state / 'pending.json').exists())
 
@@ -353,7 +353,6 @@ class RuntimeBoundaryTests(unittest.TestCase):
             Swarm('dev').require_recoverable_infrastructure(value, value)
 
     def test_deployment_submits_exactly_the_validated_document_without_temporary_files(self):
-        # docker compose config --format json retains the Compose $$ escape.
         data = {'services': {'database': {'healthcheck': {'test': ['CMD-SHELL', 'echo "$$POSTGRES_USER"']}}}}
         with patch('stack_runtime.render_release', return_value=data), \
                 patch('stack_runtime.require_configs'), patch('stack_runtime.subprocess.run') as docker:
@@ -460,7 +459,7 @@ class UIEvidenceTests(unittest.TestCase):
 
 
 class RolloutGateTests(unittest.TestCase):
-    def api(self, reference='v0.6.2', active=False):
+    def api(self, reference='v0.6.8', active=False):
         class API:
             def __init__(self, repository, token): self.repository = repository
             def request(self, path):

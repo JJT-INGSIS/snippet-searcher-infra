@@ -10,7 +10,7 @@ x-app-deploy: &app-deploy
   restart_policy:
     condition: any
     delay: 10s
-  update_config:
+  update_config: &app-update
     parallelism: 1
     order: start-first
     monitor: 60s
@@ -19,11 +19,21 @@ x-app-deploy: &app-deploy
     parallelism: 1
     order: stop-first
 
+x-execution-deploy: &execution-deploy
+  <<: *app-deploy
+  update_config:
+    <<: *app-update
+    order: stop-first
+
 services:
   snippets-service:
     image: ${SNIPPETS_IMAGE:?Definir SNIPPETS_IMAGE}
     environment:
       SPRING_PROFILES_ACTIVE: ${DEPLOY_ENV:?Definir DEPLOY_ENV}
+      AUTH_MODE: ${AUTH_MODE:-disabled}
+      SNIPPETS_CORS_ALLOWED_ORIGINS: ${SNIPPETS_CORS_ALLOWED_ORIGINS:-}
+      AUTH_ISSUER: ${AUTH_ISSUER:-}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
       SPRING_CONFIG_IMPORT: configtree:/run/secrets/
       SPRING_DATASOURCE_URL: jdbc:postgresql://snippets-db:5432/snippets
       SPRING_DATASOURCE_USERNAME: snippets
@@ -44,7 +54,7 @@ services:
       timeout: 8s
       retries: 5
       start_period: 90s
-    deploy: *app-deploy
+    deploy: *execution-deploy
 
   permissions-service:
     image: ${PERMISSIONS_IMAGE:?Definir PERMISSIONS_IMAGE}
@@ -80,7 +90,7 @@ services:
       timeout: 8s
       retries: 5
       start_period: 90s
-    deploy: *app-deploy
+    deploy: *execution-deploy
 
   snippets-db:
     image: ${POSTGRES_IMAGE:?Definir POSTGRES_IMAGE}

@@ -1,0 +1,51 @@
+{
+  "status": "INVENTORY_VERIFIED_ROLLOUT_NOT_APPLIED",
+  "environment": "prod",
+  "at": "2026-11-19T22:45:08.314821Z",
+  "releaseSha256": "7ff76b89edaf122267db31def465ad864c03a5c306c1d67248de2b7af9f30e86",
+  "hostname": "jjt-snippets-prod.duckdns.org",
+  "services": 7,
+  "storage": "local",
+  "redis": false,
+  "asset": false,
+  "auth": "disabled",
+  "apm": false,
+  "background": {
+    "publisher": false,
+    "consumer": false
+  },
+  "pendingJournal": false,
+  "currentJvmImagesHaveNewRelicLauncher": false,
+  "monitoringConfigurationApplied": false,
+  "auth0Access": {
+    "tenant": "jjt-snippet-searcher",
+    "role": "Editor - Specific Apps",
+    "visibleApplications": [
+      "snippet-searcher-dev-ui",
+      "snippet-searcher-dev-directory"
+    ],
+    "productionResourceAdministrationAvailable": false
+  },
+  "requires": [
+    "Resolver recepcion humana y matriz restante SNI-87",
+    "Administrador: configurar/asignar recursos Auth0 PROD separados",
+    "Revisar promocion de imagenes instrumentadas y sus migraciones antes de activar APM",
+    "Instalar runtime y permisos minimos PROD con candidato revisado",
+    "Validar check autenticado, ingesta, alertas y recuperacion PROD"
+  ],
+  "vmAfterInspection": "STOPPED_DEALLOCATED",
+  "candidate": {
+    "status": "REVIEW_ONLY_NOT_APPLIED",
+    "script": "scripts/production_observability_candidate.py",
+    "localUnitTests": 309,
+    "composeValidation": "PASS",
+    "swarmStackValidation": "PASS",
+    "runtimeReceptionVerified": false
+  },
+  "mainCallerVersions": {
+    "snippets-service": "v0.6.2",
+    "permissions-service": "v0.6.2",
+    "printscript-service": "v0.6.2",
+    "snippet-searcher-ui": "v0.6.2"
+  }
+}

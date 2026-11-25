@@ -1,0 +1,50 @@
+-- SNI-87: operator queries, account 8718557. Replace UTC ranges for another run.
+-- An incident is not phone receipt. Preserve notification-log delivery separately.
+SELECT timestamp, conditionName, event, incidentId, incidentLink, openTime, closeTime
+FROM NrAiIncident
+SINCE '2026-11-19 21:40:00 +0000' UNTIL '2026-11-19 22:45:00 +0000' LIMIT 200;
+
+-- Real failed creation: controller -> preparation -> HTTP client under the same trace.
+SELECT name, appName, traceId, `trace.id`, duration
+FROM Span WHERE traceId = 'e445dc4168aa0769cd0f24ef55bdd62a'
+OR `trace.id` = 'e445dc4168aa0769cd0f24ef55bdd62a'
+SINCE '2026-11-19 21:55:00 +0000' UNTIL '2026-11-19 22:05:00 +0000' LIMIT 100;
+
+-- Compare stall and recovery; max lag/outbox/eligible age/PEL are all zero in recovery.
+SELECT filter(max(oldestPendingSeconds), WHERE aspect = 'outbox') AS outbox_s,
+filter(max(lag), WHERE aspect = 'stream' AND lagKnown = true) AS lag,
+filter(max(pending), WHERE aspect = 'stream') AS pending,
+filter(max(oldestEligibleSeconds), WHERE aspect = 'jobs' AND reaction = 'all') AS eligible_s
+FROM SnippetBackgroundSample WHERE environment = 'dev'
+SINCE '2026-11-19 22:12:00 +0000' UNTIL '2026-11-19 22:48:00 +0000' TIMESERIES 1 minute;
+
+-- Expected business errors are observed but not counted as technical 5xx failures.
+SELECT count(*), latest(status), latest(path),
+filter(count(*), WHERE status >= 500 AND status < 600) AS technicalFailures
+FROM Log WHERE environment = 'dev' AND logtype = 'nginx-ingress'
+AND request_id IN ('7fed94c9e33b947dfa664ed67b75dfdb',
+'ff39f353725aac43c86d4370407c2b6b','071c3615c59d9fc0e4a13a0821cc3b30')
+FACET request_id
+SINCE '2026-11-19 22:19:00 +0000' UNTIL '2026-11-19 22:24:00 +0000';
+
+-- Quiet traffic is distinct from lost host telemetry; no outage is injected here.
+SELECT filter(count(*), WHERE eventType() = 'SystemSample') AS hostSamples,
+filter(count(*), WHERE eventType() = 'Log' AND logtype = 'nginx-ingress'
+AND route IN ('api','executions') AND path != '/api/languages'
+AND ((status >= 200 AND status < 300) OR (status >= 500 AND status < 600))) AS eligibleApiRequests
+FROM SystemSample, Log WHERE environment = 'dev'
+SINCE '2026-11-20 00:00:00 +0000' UNTIL '2026-11-20 00:30:00 +0000' TIMESERIES 5 minutes;
+
+SELECT count(*) FROM NrAiIncident WHERE event = 'open'
+SINCE '2026-11-20 00:15:00 +0000' UNTIL '2026-11-20 00:30:00 +0000';
+
+-- Delivery log is not human receipt; do not include emails or webhook payloads.
+SELECT timestamp, destinationType, status, operation, trigger, workflowName,
+issueLink, issueName, notificationResult
+FROM NrAiNotification
+SINCE '2026-11-19 21:40:00 +0000' UNTIL NOW LIMIT 500;
+
+-- targetName identifies the Swarm facet; adjacent public symptoms may stay open.
+SELECT timestamp, conditionId, conditionName, event, incidentId, targetName,
+signalId, openTime, closeTime
+FROM NrAiIncident SINCE '2026-11-20 01:02:00 +0000' UNTIL NOW LIMIT 200;

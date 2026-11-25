@@ -2,28 +2,38 @@
 
 [Volver al índice de arquitectura](../README.md)
 
-La consigna general exige revalidar snippets cuando cambia el parser. La secuencia es una **propuesta de procesamiento futuro**: trabajo durable sobre todos los snippets del lenguaje afectado, sin cambiar su versión declarada de lenguaje.
+Una activación administrativa explícita registra el evento
+`ParserVersionActivated`. El worker revalida los snippets del ámbito afectado
+y conserva su versión declarada de lenguaje. El despliegue de una imagen por
+sí solo no encola trabajo. [Procesamiento asíncrono](../async-processing-design.md).
 
 ```mermaid
 sequenceDiagram
-    actor O as Operación interna de actualización
+    actor O as Operador autorizado
     participant S as snippets-service
-    participant B as Proceso de fondo en snippets - FUTURO
-    participant ST as Storage de cátedra - FUTURO
+    participant P as Publicador outbox en Snippets
+    participant R as Redis Streams
+    participant B as Worker de Snippets
+    participant ST as SnippetContentStorage
     participant L as Language interno
     participant PS as printscript-service
 
-    O->>S: Nueva versión del parser para un lenguaje
-    S->>S: Guardar trabajo de revalidación en BD snippets
+    O->>S: Activar explícitamente una revisión del parser
+    S->>S: Autorizar y comprobar identidad disponible del procesador
+    S->>S: Commit de activación, trabajo y outbox
     break Fallo de persistencia local
         S-->>O: Trabajo no confirmado
     end
-    S-->>O: Trabajo registrado
-    B->>S: Retomar pendientes de todos los snippets afectados
+    S-->>O: Activación confirmada, revalidación pendiente
+    P->>S: Leer outbox confirmado
+    P->>R: Publicar ParserVersionActivated
+    B->>R: Leer mediante Consumer Group
+    R-->>B: Evento
+    B->>S: Deduplicar y retomar pendientes del ámbito afectado
 
     loop Cada snippet pendiente
         S-->>B: Revisión de contenido y versión declarada del lenguaje
-        B-->>ST: Uso futuro al recuperar esa revisión
+        B->>ST: Recuperar esa revisión
         ST-->>B: Código
         B->>L: Validar con el procesador actualizado
         L->>PS: HTTP con código y versión declarada del lenguaje
@@ -40,8 +50,12 @@ sequenceDiagram
         end
     end
     B->>S: Registrar finalización o errores parciales
+    opt Estado terminal o recuperación UNKNOWN persistida
+        B->>R: ACK de la entrega
+    end
 ```
 
-- **Requerimiento de la consigna:** revalidar ante cambios del parser. **Propuesta:** disparador interno y alcance por lenguaje, para todos los owners. No requiere inventar un rol global de administrador ni consultar permisos de un usuario.
-- **Propuesta:** distinguir versión del lenguaje, versión del procesador y revisión del contenido. Conservar los snippets que pasan a ser inválidos y sus diagnósticos; no migrar lenguaje, borrar contenido ni reejecutar automáticamente tests o formatting sin otro requerimiento.
-- **Propuesta:** reutilizar el procesamiento durable de lotes, conservar avances y continuar ante errores individuales. Language selecciona la integración; PrintScript procesa por HTTP. El storage futuro sólo aparece al recuperar contenido y no se define su interfaz.
+La activación usa un comando interno auditable, un ámbito por lenguaje y
+versiones, y una identidad verificable del parser. La revalidación conserva
+el código y guarda diagnósticos aunque el snippet pase a ser inválido.
+[Comando y contrato en Snippets](https://github.com/JJT-INGSIS/snippets-service/blob/dev/docs/parser-revalidation.md).

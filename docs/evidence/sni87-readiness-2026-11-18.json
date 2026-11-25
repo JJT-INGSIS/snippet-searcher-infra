@@ -1,0 +1,81 @@
+{
+  "ticket": "SNI-87",
+  "date": "2026-11-18",
+  "status": "BLOCKED_ON_ALERT_ACCEPTANCE",
+  "scope": "Read-only prerequisite review and operational handoff; no new fault drill",
+  "technicalPrerequisite": {
+    "status": "UPSTREAM_VERIFIED",
+    "sourceTicket": "SNI-83",
+    "sourceTicketState": "Done",
+    "source": "docs/observability/sni-83-background-signals.md",
+    "sourceCommit": "9bca18d",
+    "environment": "dev",
+    "consumerPaused": {
+      "dateUtc": "2026-11-18",
+      "signalObservedFrom": "01:54",
+      "lag": 1,
+      "outboxPending": 0,
+      "eligibleAgeIncreasedSecondsPerMinute": 60
+    },
+    "consumerResumed": {
+      "recoveryWindowUtc": "2026-11-18 02:44-02:52",
+      "lag": 0,
+      "pel": 0,
+      "outboxPending": 0,
+      "eligibleAgeSeconds": 0
+    },
+    "reexecutedBySni87": false,
+    "notificationProvenByThisSource": false
+  },
+  "deploymentContract": {
+    "centralCd": "v0.6.8",
+    "infraRevision": "cbd30f98224f82919fc5b12211aed49c36aef308",
+    "rejectedForInfrastructureCuts": "v0.6.7",
+    "scope": "background-only",
+    "affectedServices": ["snippets-service", "printscript-service"],
+    "pause": "plan --consumer off; deploy --infrastructure --background-only",
+    "restoreActiveBaseline": "plan --consumer on; deploy --infrastructure --background-only",
+    "approximateAnonymousRequestsPerCut": 30,
+    "anonymousRequestsPerHourPerIp": 60,
+    "maximumManualCutsPerHour": 2,
+    "restoreBudgetMustBeReserved": true
+  },
+  "liveReadOnlyObservations": {
+    "newRelicAccount": 8718557,
+    "alertConditionsCount": 3,
+    "alertConditions": [
+      "DEV - API publica no disponible",
+      "DEV - Certificado requiere revision",
+      "DEV - UI publica no disponible"
+    ],
+    "consumerBacklogConditionPresent": false,
+    "listingContentConditionPresent": false,
+    "devVmState": "Stopped (deallocated)"
+  },
+  "blockingDeliveries": [
+    {
+      "ticket": "SNI-86",
+      "stateObserved": "Todo",
+      "needed": "Effective alert conditions, evaluation windows and mobile workflow for the three main scenarios"
+    },
+    {
+      "ticket": "SNI-85",
+      "stateObserved": "Todo",
+      "needed": "Functional fixture check and controlled 200-with-missing-fixture mechanism"
+    }
+  ],
+  "sni87Acceptance": {
+    "printscriptDuringCreation": "NOT_EXECUTED",
+    "listing200MissingFixture": "NOT_EXECUTED",
+    "consumerStoppedWithNotification": "NOT_EXECUTED",
+    "incidentUrl": null,
+    "deviceReceivedAt": null
+  },
+  "operationsPerformed": {
+    "devVmStarted": false,
+    "manualCuts": 0,
+    "prodChanged": false,
+    "alertConditionsChanged": false,
+    "teammateTicketsChanged": false
+  }
+}

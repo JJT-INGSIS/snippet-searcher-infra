@@ -32,7 +32,6 @@ def verify(candidate_path, service):
         if name!=service and current['images'][name]!=previous['images'][name]:
             raise RuntimeError('Other recorded image changed')
     print(f'PASS independent update {service}; other tasks and references preserved',flush=True)
-    # Reapply the original baseline manifest: the record must prevent rollback.
     subprocess.run([sys.executable,str(bootstrap),'deploy',str(bootstrap.parent.parent/'swarm/dev-release.json')],check=True)
     reapplied={name:container(stack,name) for name in names}
     latest=json.loads(record_path.read_text())

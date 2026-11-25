@@ -1,0 +1,318 @@
+{
+  "completedAt": "2026-11-17T02:01:21.982923+00:00",
+  "workflowVersion": "v0.6.5",
+  "callers": [
+    {
+      "repo": "permissions-service",
+      "pr": 29,
+      "merge": "356c42c3669f26d5792359d2f9dedcda40fde722",
+      "run": 43992935983,
+      "outcome": "verified",
+      "prUrl": "https://github.com/JJT-INGSIS/permissions-service/pull/29",
+      "runUrl": "https://github.com/JJT-INGSIS/permissions-service/actions/runs/43992935983",
+      "mergedAt": "2026-11-17T01:06:06Z",
+      "pipelineConclusion": "success"
+    },
+    {
+      "repo": "printscript-service",
+      "pr": 34,
+      "merge": "34417c3a29171764cc7b75e56cae906ae8d64e3e",
+      "run": 43994598934,
+      "outcome": "verified",
+      "prUrl": "https://github.com/JJT-INGSIS/printscript-service/pull/34",
+      "runUrl": "https://github.com/JJT-INGSIS/printscript-service/actions/runs/43994598934",
+      "mergedAt": "2026-11-17T01:18:42Z",
+      "pipelineConclusion": "success"
+    },
+    {
+      "repo": "snippets-service",
+      "pr": 72,
+      "merge": "9b8be24a818684319fc378d96302867849385280",
+      "run": 43995950736,
+      "outcome": "verified",
+      "prUrl": "https://github.com/JJT-INGSIS/snippets-service/pull/72",
+      "runUrl": "https://github.com/JJT-INGSIS/snippets-service/actions/runs/43995950736",
+      "mergedAt": "2026-11-17T01:29:17Z",
+      "pipelineConclusion": "success"
+    },
+    {
+      "repo": "snippet-searcher-ui",
+      "pr": 24,
+      "merge": "c714e1f0f29fdaaad161cf3ea4f7343d2ef75a2c",
+      "run": 43997632629,
+      "outcome": "verified",
+      "prUrl": "https://github.com/JJT-INGSIS/snippet-searcher-ui/pull/24",
+      "runUrl": "https://github.com/JJT-INGSIS/snippet-searcher-ui/actions/runs/43997632629",
+      "mergedAt": "2026-11-17T01:42:36Z",
+      "pipelineConclusion": "success"
+    }
+  ],
+  "runtime": {
+    "at": "2026-11-17T01:58:56.271602+00:00",
+    "host": "vm-snippet-dev",
+    "images": {
+      "snippets-service": "ghcr.io/jjt-ingsis/snippets-service@sha256:4197e1e627650a5dc5f51f168f67f9b72a85186ab8cda972e63285740379aa32",
+      "permissions-service": "ghcr.io/jjt-ingsis/permissions-service@sha256:d2827838ee4062fcd554506b41d2c3890fbc5b84bccf72aa221582d9b8d7fb4f",
+      "printscript-service": "ghcr.io/jjt-ingsis/printscript-service@sha256:85b4ef068b1eaa71cd2b1dd6a38c387f20d5e2f9763166c5e8ecb4df1680f5a0",
+      "ui": "ghcr.io/jjt-ingsis/snippet-searcher-ui@sha256:6df79904b1584adc415f765138488de81313a3a01f6670df7d96482424bb7aee"
+    },
+    "pendingJournalPresent": false,
+    "operations": [
+      {
+        "service": "printscript-service",
+        "run": 43994598934,
+        "state": "verified",
+        "outcome": "verified"
+      },
+      {
+        "service": "ui",
+        "run": 43997632629,
+        "state": "verified",
+        "outcome": "verified"
+      },
+      {
+        "service": "permissions-service",
+        "run": 43992935983,
+        "state": "verified",
+        "outcome": "verified"
+      },
+      {
+        "service": "snippets-service",
+        "run": 43995950736,
+        "state": "verified",
+        "outcome": "verified"
+      }
+    ],
+    "monitorCompatibilityVerified": true
+  },
+  "dependencyAcceptance": {
+    "timestamp": "2026-11-17T01:52:53.884785+00:00",
+    "environment": "dev",
+    "version": "sni82-runtime-v1",
+    "native": {
+      "snippets-db": {
+        "metricCount": 4,
+        "eventTypes": [
+          "PgCustomQuerySample",
+          "PostgresqlDatabaseSample",
+          "PostgresqlInstanceSample"
+        ]
+      },
+      "permissions-db": {
+        "metricCount": 4,
+        "eventTypes": [
+          "PgCustomQuerySample",
+          "PostgresqlDatabaseSample",
+          "PostgresqlInstanceSample"
+        ]
+      },
+      "redis": {
+        "metricCount": 2,
+        "eventTypes": [
+          "RedisKeyspaceSample",
+          "RedisSample"
+        ]
+      }
+    },
+    "storage": [
+      {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-runtime-v1",
+        "kind": "local",
+        "availableBytes": 18802249728,
+        "totalBytes": 30084825088,
+        "availableInodes": 3565862,
+        "writeOk": 1,
+        "readOk": 1,
+        "contentOk": 1,
+        "deleteOk": 1,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 4.979
+      },
+      {
+        "environment": "dev",
+        "service": "snippets-db-disk",
+        "version": "sni82-runtime-v1",
+        "kind": "filesystem",
+        "availableBytes": 18802249728,
+        "totalBytes": 30084825088,
+        "availableInodes": 3565862,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 0.033
+      },
+      {
+        "environment": "dev",
+        "service": "permissions-db-disk",
+        "version": "sni82-runtime-v1",
+        "kind": "filesystem",
+        "availableBytes": 18802249728,
+        "totalBytes": 30084825088,
+        "availableInodes": 3565862,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 0.038
+      },
+      {
+        "environment": "dev",
+        "service": "redis-disk",
+        "version": "sni82-runtime-v1",
+        "kind": "filesystem",
+        "availableBytes": 18802249728,
+        "totalBytes": 30084825088,
+        "availableInodes": 3565862,
+        "up": 1,
+        "reason": "ok",
+        "durationMs": 0.039
+      }
+    ],
+    "agentDispatchVerified": true,
+    "pinnedAgentFlexVerified": [
+      {
+        "name": "snippet-storage-local",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-snippets-db-disk",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-permissions-db-disk",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-redis-disk",
+        "eventType": "SnippetStorageSample",
+        "metricCount": 2
+      },
+      {
+        "name": "snippet-swarm",
+        "eventType": "SnippetSwarmSample",
+        "metricCount": 9
+      }
+    ],
+    "newRelicIngestionVerified": false
+  },
+  "externalNewRelicReception": {
+    "account": 8718557,
+    "verified": true,
+    "nativeLatestUTC": "2026-11-17 01:54:10–01:54:14",
+    "storageLatestUTC": "2026-11-17 01:55:16–01:55:17",
+    "note": "External reception verified separately. Local acceptance intentionally retains newRelicIngestionVerified=false.",
+    "observationMethod": "New Relic query console, account 8718557; UTC display, independently of local helper.",
+    "operatorEvidenceSha256": {
+      "pilot-native-newrelic.txt": "3146ef7813e09b58da84836c60837f06f18c53ee73f3c30da0be334990fbaefb",
+      "pilot-storage-newrelic.txt": "a1ec7121335e9f4ebf5e904bea8c6ee6fdd896cdcbde2823f26e0bece0a05e88",
+      "dev-deallocated-final.png": "b3f68c346b973e75f733cbc4f9acc5f1d38378c8885d192f2b9b7b9caf25bf2e"
+    },
+    "nativeQuery": "SELECT count(*), latest(label.environment), latest(label.service), latest(label.version), latest(timestamp) FROM PostgresqlInstanceSample, RedisSample FACET entityName SINCE 5 minutes ago LIMIT MAX",
+    "storageQuery": "SELECT latest(up), latest(contentOk), latest(timestamp) FROM SnippetStorageSample WHERE up IS NOT NULL FACET environment, service, version SINCE 5 minutes ago LIMIT MAX",
+    "nativeRows": [
+      {
+        "entityName": "pg-instance:dev-permissions-db:5432",
+        "count": 5,
+        "environment": "dev",
+        "service": "permissions-db",
+        "version": "sni82-runtime-v1",
+        "latestAt": "2026-11-17T01:54:14Z"
+      },
+      {
+        "entityName": "pg-instance:dev-snippets-db:5432",
+        "count": 5,
+        "environment": "dev",
+        "service": "snippets-db",
+        "version": "sni82-runtime-v1",
+        "latestAt": "2026-11-17T01:54:12Z"
+      },
+      {
+        "entityName": "instance:dev-redis:6379",
+        "count": 5,
+        "environment": "dev",
+        "service": "redis",
+        "version": "sni82-runtime-v1",
+        "latestAt": "2026-11-17T01:54:10Z"
+      }
+    ],
+    "storageRows": [
+      {
+        "environment": "dev",
+        "service": "permissions-db-disk",
+        "version": "sni82-runtime-v1",
+        "up": 1,
+        "contentOk": null,
+        "latestAt": "2026-11-17T01:55:17Z"
+      },
+      {
+        "environment": "dev",
+        "service": "redis-disk",
+        "version": "sni82-runtime-v1",
+        "up": 1,
+        "contentOk": null,
+        "latestAt": "2026-11-17T01:55:17Z"
+      },
+      {
+        "environment": "dev",
+        "service": "snippets-db-disk",
+        "version": "sni82-runtime-v1",
+        "up": 1,
+        "contentOk": null,
+        "latestAt": "2026-11-17T01:55:16Z"
+      },
+      {
+        "environment": "dev",
+        "service": "storage-local",
+        "version": "sni82-runtime-v1",
+        "up": 1,
+        "contentOk": 1,
+        "latestAt": "2026-11-17T01:55:16Z"
+      }
+    ]
+  },
+  "azureFinalState": "Detenido (desasignado)",
+  "productionStartedOrChanged": false,
+  "limitations": [
+    "JDBC/pool instrumentation pending SNI-81",
+    "DEV shared-dependency failure/recovery and alert acceptance pending coordinated SNI-86/SNI-87 window",
+    "Active storage is local; Asset/Azurite not activated",
+    "Auth0 acceptance not established by these deployment checks"
+  ],
+  "scope": "Healthy DEV telemetry and CD compatibility only. No shared-dependency failure/alert acceptance, JDBC/pool, OAuth or PROD acceptance.",
+  "verifiedDiagnosticQueries": {
+    "beginTime": "2026-11-17T01:50:00Z",
+    "endTime": "2026-11-17T01:57:00Z",
+    "fieldNamesVerifiedWithKeyset": true,
+    "postgresql": [
+      {
+        "entityName": "database:permissions",
+        "service": "permissions-db",
+        "db.connections": 11,
+        "db.maxconnections": 100,
+        "db.deadlocksPerSecond": 0
+      },
+      {
+        "entityName": "database:snippets",
+        "service": "snippets-db",
+        "db.connections": 11,
+        "db.maxconnections": 100,
+        "db.deadlocksPerSecond": 0
+      }
+    ],
+    "redis": [
+      {
+        "entityName": "instance:dev-redis:6379",
+        "service": "redis",
+        "system.usedMemoryBytes": 1093752,
+        "system.maxmemoryBytes": 134217728,
+        "db.aofLastWriteStatus": "ok",
+        "db.aofLastBgrewriteStatus": "ok",
+        "net.connectedClients": 1
+      }
+    ],
+    "jdbcPoolMeasured": false
+  }
+}

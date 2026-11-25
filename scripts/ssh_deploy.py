@@ -13,10 +13,24 @@ from github_cd import operation_id, validate_request
 
 BUNDLE_SCRIPTS = ('deploy_service.py', 'github_cd.py', 'stack_release.py', 'wait_for_stack.py',
                   'verify_stack.py', 'internal_http.py', 'smoke_tests.py', 'bootstrap_swarm.py',
-                  'stack_runtime.py', 'rollout_checks.py', 'validate_asset_config.py', 'asset_probe.py')
+                  'stack_runtime.py', 'rollout_checks.py', 'validate_asset_config.py', 'asset_probe.py',
+                  'validate_nginx_config.py', 'redis_runtime.py', 'redis_cd.py', 'redis_preflight.py',
+                  'observability_deployment.py', 'scoped_deploy.py', 'apm_runtime.py', 'background_runtime.py', 'auth_rollout.py')
 BUNDLE_FILES = ('swarm/stack.yaml', 'swarm/stack.ingress.yaml', 'swarm/stack.tls.yaml', 'swarm/stack.asset.yaml',
-                'swarm/stack.ui.yaml', 'nginx/nginx.conf', 'nginx/templates/redirect.conf.template',
-                'nginx/templates/tls.conf.template', 'nginx/templates/routes.conf.template', 'nginx/validate-env.sh')
+                'swarm/stack.ui.yaml', 'swarm/stack.apm.yaml', 'swarm/stack.background.yaml', 'nginx/nginx.conf', 'nginx/templates/redirect.conf.template',
+                'nginx/templates/tls.conf.template', 'nginx/templates/routes.conf.template', 'nginx/validate-env.sh',
+                'swarm/stack.redis.yaml', 'redis/redis.conf', 'redis/entrypoint.sh', 'redis/healthcheck.sh',
+                'auth0/development.public.json', 'auth0/production.public.json')
+
+
+def create_bundle(destination):
+    root = Path(__file__).resolve().parent.parent
+    with tarfile.open(destination, 'w') as archive:
+        for relative in (*('scripts/' + name for name in BUNDLE_SCRIPTS), *BUNDLE_FILES):
+            path = root / relative
+            if path.is_symlink():
+                raise ValueError('No se permiten enlaces en el bundle')
+            archive.add(path, arcname=relative, recursive=False)
 
 
 def connection_options(host, user, port, directory):
@@ -56,18 +70,7 @@ def main():
         remote = f'/home/{user}/.local/share/snippet-searcher/cd/{revision}'
         subprocess.run([*ssh, destination, f'umask 077; mkdir -p {remote}'], check=True, timeout=30)
         bundle = directory / 'scripts.tar'
-        with tarfile.open(bundle, 'w') as archive:
-            for name in BUNDLE_SCRIPTS:
-                path = Path(__file__).resolve().parent / name
-                if path.is_symlink():
-                    raise ValueError('No se permiten enlaces en el bundle de scripts')
-                archive.add(path, arcname=f'scripts/{path.name}', recursive=False)
-            for relative in BUNDLE_FILES:
-                path = Path(__file__).resolve().parent.parent / relative
-                if path.is_symlink():
-                    raise ValueError('No se permiten enlaces en recursos del bundle')
-                archive.add(path, arcname=relative, recursive=False)
-        # Serialize bundle installation too: another service can use this revision.
+        create_bundle(bundle)
         identity = operation_id(request)
         uploaded = f'{remote}/{identity}.tar'
         subprocess.run([*scp, str(bundle), f'{destination}:{uploaded}'], check=True, timeout=60)
@@ -77,8 +80,6 @@ def main():
         envelope = json.dumps({'request': request, 'token': os.environ.get('GH_TOKEN', '')})
         command = [*ssh, destination,
                    f'sudo -n python3 -B {remote}/scripts/deploy_service.py']
-        # Retry the same identity after transport loss. The VM journal, not the
-        # SSH exit code, determines whether to verify, recover, or submit an update.
         for attempt in range(2):
             try:
                 result = subprocess.run(command, input=envelope, text=True, timeout=3600)

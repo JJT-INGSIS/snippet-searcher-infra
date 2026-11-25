@@ -56,7 +56,6 @@ class Handler(BaseHTTPRequestHandler):
                                        "body": data.decode("utf-8"), "headers": dict(self.headers)}).encode(), "application/json")
 
     def execution_request(self, identity, operation, data):
-        # Transport fixture only: no interpreter, permissions or durable sessions.
         with LOCK:
             stream = STREAMS.setdefault(identity, {"gate": threading.Event(), "finished": False, "action": None})
         if operation is None:
@@ -85,13 +84,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
-            # Deliberately unsafe upstream policy: ingress must override it once.
             self.send_header("Cache-Control", "public, max-age=3600")
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
             if identity.endswith("000005"):
-                # Longer than the real 60s inactivity timeout, with 10s heartbeats.
                 try:
                     self.wfile.write(event(identity, 1, "started", {"mode": "INTERACTIVE"}))
                     self.wfile.flush()
@@ -110,7 +107,6 @@ class Handler(BaseHTTPRequestHandler):
                 for seq, (kind, content) in enumerate(records, 1):
                     if seq > after:
                         raw = event(identity, seq, kind, content)
-                        # A Unicode character may straddle reads; a chunk is not an event.
                         split = raw.find("🌎".encode()) + 1 if kind == "output" else len(raw)
                         self.wfile.write(raw[:split])
                         self.wfile.flush()
@@ -119,7 +115,7 @@ class Handler(BaseHTTPRequestHandler):
                             self.wfile.write(raw[split:])
                             self.wfile.flush()
                 if identity.endswith("000002"):
-                    return  # Intentional EOF with no terminal, not a successful execution.
+                    return
                 if not stream["gate"].wait(8):
                     outcome = "TECHNICAL_FAILURE"
                 else:
@@ -147,7 +143,6 @@ class Handler(BaseHTTPRequestHandler):
     do_OPTIONS = handle_request
 
     def log_message(self, *args):
-        # Fixtures receive fake Authorization values. Never log requests/headers.
         pass
 
 

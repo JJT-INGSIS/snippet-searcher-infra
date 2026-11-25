@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  snippets-db:
+    networks:
+      default:
+        aliases: ["${DEPLOY_ENV:?Definir DEPLOY_ENV}-snippets-db"]
+  permissions-db:
+    networks:
+      default:
+        aliases: ["${DEPLOY_ENV:?Definir DEPLOY_ENV}-permissions-db"]
+networks:
+  default: {}

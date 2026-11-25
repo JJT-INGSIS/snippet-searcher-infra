@@ -17,6 +17,9 @@ from verify_asset_persistence import local_engine
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_HOST = "snippet.test:8088"
+ACCESS_FIELDS = {"time", "request_id", "method", "path", "route", "status", "bytes_sent", "request_time",
+                 "upstream", "upstream_status", "upstream_connect_time", "upstream_response_time"}
+ROUTES = {"api", "executions", "ui"}
 
 
 @dataclass(frozen=True)
@@ -85,11 +88,22 @@ def check_transport(port):
         require(received.get("x-forwarded-for") != "203.0.113.123" and "," not in received.get("x-forwarded-for", ""),
                 "Client-controlled forwarding chain trusted")
         require(re.fullmatch(r"[a-f0-9]{32}", received.get("x-request-id", "")), "Request ID was not replaced")
+        require(result.headers.get("X-Request-ID") == received["x-request-id"], "Response lacks the generated request ID")
     nested = request(port, "/api/api/snippets")
     require(json.loads(nested.body)["path"] == "/api/snippets", "Prefix must be removed exactly once")
     for route in ("/languages", "/users"):
         require(json.loads(request(port, "/api" + route).body)["path"] == route, "Public route mapping failed")
     print("PASS method/query/UTF-8 body, Authorization/idempotence, canonical Host and forwarding headers", flush=True)
+
+
+def check_access_log(logs):
+    lines = [json.loads(line) for line in logs.splitlines() if line.startswith("{")]
+    require(bool(lines), "NGINX wrote no JSON access lines")
+    require(all(set(line) == ACCESS_FIELDS for line in lines), "Access line fields changed")
+    require({line["route"] for line in lines} == ROUTES, "Access lines do not classify every route")
+    require(all("?" not in line["path"] for line in lines), "Access line included a query string")
+    require(all(re.fullmatch(r"[a-f0-9]{32}", line["request_id"]) for line in lines), "Access line lacks request ID")
+    print("PASS JSON access lines with route, upstream and request ID; no query", flush=True)
 
 
 def check_routes_and_failures(port):
@@ -105,7 +119,6 @@ def check_routes_and_failures(port):
         require(result.status == expected and result.headers.get("Content-Type") == "application/problem+json", "API error became SPA HTML")
         require(json.loads(result.body)["status"] == expected, "Problem Details changed")
     require(request(port, "/api/snippets", headers={"Host": "attacker.test"}).status == 404, "Unknown Host reached a backend")
-    # Send only an oversized Content-Length: reject before sending/storing 8 MiB.
     require(request(port, "/api/snippets", "POST", headers={"Content-Length": str(8 * 1024 * 1024 + 1)}).status == 413,
             "Oversized body was not rejected")
     large = b"x" * (1024 * 1024)
@@ -145,7 +158,6 @@ def verify(browser=False):
             print(f"SNI-52 browser fixture: http://localhost:{port} (transport only)", flush=True)
             input("Press Enter or Ctrl+C to clean up the isolated project: ")
             return
-        # Start with NO upstreams: runtime DNS must not prevent proxy startup.
         compose("up", "-d", "--wait", "--wait-timeout", "30", "nginx")
         compose("exec", "-T", "nginx", "nginx", "-t")
         port = int(capture("port", "nginx", "8080").rsplit(":", 1)[1])
@@ -169,8 +181,6 @@ def verify(browser=False):
         require(request(port, "/api/slow", timeout=70).status == 504, "Slow API did not time out")
         require(55 <= time.monotonic() - started < 70, "Read timeout does not match 60s configuration")
         print("PASS real 60s read timeout", flush=True)
-        # A timed-out upstream may be excluded briefly by NGINX passive failure
-        # accounting. Wait for its bounded recovery before testing a UI outage.
         eventually(port, "/api/snippets", 200)
         compose("stop", "--timeout", "2", "ui")
         require(request(port, "/").status in (502, 504), "UI outage did not produce a gateway error")
@@ -189,13 +199,12 @@ def verify(browser=False):
         require(previous["Id"] != current["Id"] and old_ip != new_ip, "Fixture did not actually change its container/IP")
         eventually(port, "/api/snippets", 200)
         require(identity("nginx")["Id"] == proxy_id, "Proxy was recreated to recover DNS")
-        logs = capture("logs", "--no-color", "nginx")
+        logs = capture("logs", "--no-color", "--no-log-prefix", "nginx")
+        check_access_log(logs)
         for sensitive in ("fixture-not-a-real-token", "550e8400-e29b-41d4-a716-446655440000", "attacker-value", "name=a%2Fb"):
             require(sensitive not in logs, "Proxy logs included sensitive request data")
         print("PASS independent outages and upstream container/IP replacement without proxy restart; sanitized logs", flush=True)
     finally:
-        # This generated project has no database or persistent production content.
-        # No volumes, old configs, stack or resources outside this project removed.
         compose("down", "--timeout", "5")
 
 

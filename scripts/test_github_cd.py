@@ -62,8 +62,6 @@ class EvidenceTests(unittest.TestCase):
     def test_historical_inactive_evidence_survives_status_retention(self):
         historical = deployment()
         historical['status'] = 'inactive'
-        # No statuses or log endpoint exists on the fake: selection must use the
-        # explicit persisted receipt and successful original workflow attempt.
         self.api.records = [
             {'task': 'deploy', 'environment': 'dev', 'payload': {}},
             {**deployment(), 'payload': {**receipt(), 'source-tree': 'f' * 40}},

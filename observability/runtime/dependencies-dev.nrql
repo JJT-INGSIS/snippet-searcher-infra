@@ -1,0 +1,58 @@
+-- Ejecutar cada SELECT por separado en la cuenta 8718557.
+-- Consultas verificadas en DEV el 16/11/2026; no son políticas de alerta.
+-- Con DEV desasignada no se esperan muestras nuevas.
+
+-- JDBC/pool: nombres y consultas entregados por SNI-81 el 17/11/2026.
+-- Aplicaciones instrumentadas: snippets-service (dev), permissions-service (dev).
+-- No confundir ocupación de HikariCP con conexiones del servidor PostgreSQL.
+SELECT latest(newrelic.timeslice.value)
+FROM Metric
+WHERE appName IN ('snippets-service (dev)', 'permissions-service (dev)')
+  AND metricTimesliceName LIKE 'Database Connection/HikariCP/%'
+FACET appName, metricTimesliceName SINCE 30 minutes ago LIMIT MAX
+
+-- Duración de spans JDBC, no tiempo de espera del pool ni una métrica SQL derivada.
+SELECT count(*), average(duration * 1000), percentile(duration * 1000, 95)
+FROM Span
+WHERE appName IN ('snippets-service (dev)', 'permissions-service (dev)')
+  AND name LIKE 'Datastore/statement/Postgres/%'
+FACET appName, name SINCE 30 minutes ago LIMIT MAX
+
+-- Integraciones nativas: identidad, ambiente, versión y frescura.
+SELECT count(*), latest(label.environment), latest(label.service),
+  latest(label.version), latest(blocked_sessions), latest(timestamp)
+FROM PostgresqlInstanceSample, PgCustomQuerySample, RedisSample
+FACET eventType(), entityName
+SINCE 10 minutes ago LIMIT MAX
+
+-- Conexiones del servidor PostgreSQL, NO ocupación del pool JDBC de la JVM.
+-- Nombres comprobados con keyset() y consulta real sobre el piloto final.
+SELECT latest(db.connections), latest(db.maxconnections),
+  latest(db.deadlocksPerSecond)
+FROM PostgresqlDatabaseSample WHERE label.environment = 'dev'
+FACET entityName, label.service
+SINCE 10 minutes ago LIMIT MAX
+
+-- Redis: memoria y estado de escritura/rewrite AOF. Estados son strings.
+SELECT latest(system.usedMemoryBytes), latest(system.maxmemoryBytes),
+  latest(db.aofLastWriteStatus), latest(db.aofLastBgrewriteStatus),
+  latest(net.connectedClients)
+FROM RedisSample WHERE label.environment = 'dev'
+FACET entityName, label.service
+SINCE 10 minutes ago LIMIT MAX
+
+-- Storage: separar muestras de salud de metadatos del agente sin up.
+-- contentOk sólo aplica al probe de contenido, no a los de filesystem.
+SELECT count(*), latest(up), latest(contentOk), latest(availableBytes),
+  latest(timestamp)
+FROM SnippetStorageSample WHERE up IS NOT NULL
+FACET environment, service, version
+SINCE 10 minutes ago LIMIT MAX
+
+-- Inventario de recepción: no atribuye salud a un componente por contar eventos.
+SELECT count(*)
+FROM SystemSample, ContainerSample, PostgresqlInstanceSample,
+  PostgresqlDatabaseSample, PgCustomQuerySample, RedisSample,
+  SnippetStorageSample, SnippetSwarmSample
+FACET eventType()
+SINCE 10 minutes ago LIMIT MAX

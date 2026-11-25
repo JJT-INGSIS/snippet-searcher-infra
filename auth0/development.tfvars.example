@@ -1,0 +1,8 @@
+# Copy to an ignored development.tfvars only AFTER creating the real tenant.
+# These comments are instructions; there are deliberately no runnable fake values.
+# tenant_domain = "<exact development tenant hostname>"
+# api_audience = "<reviewed HTTPS identifier for the Snippets development API>"
+# database_connection_id = "<con_ id of the selected Auth0 database connection>"
+# access_token_lifetime_seconds = <agreed positive integer>
+# ui_origins = ["http://localhost:5173", "https://jjt-snippets-dev.duckdns.org"]
+# Confirm the local port and DEV hostname before using the example origins.

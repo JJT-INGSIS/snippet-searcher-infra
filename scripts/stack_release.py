@@ -15,6 +15,7 @@ APPLICATIONS = {name: {'repository': f'JJT-INGSIS/{name}', 'package': f'ghcr.io/
 APPLICATIONS['ui'] = {'repository': 'JJT-INGSIS/snippet-searcher-ui',
                       'package': 'ghcr.io/jjt-ingsis/snippet-searcher-ui', 'variable': 'UI_IMAGE'}
 INFRA_PACKAGES = {'nginx': 'nginx:1.30.6-alpine',
+                  'redis': 'redis:7.4.7-alpine',
                   'asset-service': 'ghcr.io/austral-ingsis/snippet-asset-service',
                   'azurite': 'mcr.microsoft.com/azure-storage/azurite:3.35.0'}
 NGINX_FILES = {'nginx_main': 'nginx/nginx.conf', 'nginx_redirect': 'nginx/templates/redirect.conf.template',
@@ -41,14 +42,67 @@ def storage_provider(manifest):
     return manifest.get('storage_provider', 'local')
 
 
+def auth_environment(manifest):
+    auth = manifest.get('auth', {})
+    if not isinstance(auth, dict) or set(auth) - {'mode', 'issuer', 'audience'}:
+        raise ValueError('Configuración de autenticación desconocida')
+    mode = auth.get('mode', 'dev' if manifest['environment'] == 'dev' else 'disabled')
+    if not isinstance(mode, str) or mode not in {'disabled', 'dev', 'auth0'} \
+            or (mode == 'dev' and manifest['environment'] != 'dev'):
+        raise ValueError('Modo de identidad incompatible con el ambiente')
+    issuer, audience = auth.get('issuer', ''), auth.get('audience', '')
+    if not isinstance(issuer, str) or not isinstance(audience, str):
+        raise ValueError('Issuer/audience deben ser texto')
+    if mode == 'auth0':
+        if not isinstance(issuer, str) or not re.fullmatch(r'https://[A-Za-z0-9.-]+/', issuer):
+            raise ValueError('Auth0 requiere issuer HTTPS exacto con slash final')
+        if not isinstance(audience, str) or not audience or audience.strip() != audience:
+            raise ValueError('Auth0 requiere audience explícita')
+    elif issuer or audience:
+        raise ValueError('Issuer/audience sólo corresponden al modo auth0')
+    return {'AUTH_MODE': mode, 'AUTH_ISSUER': issuer, 'AUTH_AUDIENCE': audience}
+
+
 def ui_configuration(manifest):
-    actor = manifest.get('ui', {}).get('dev_actor', '')
+    ui = manifest.get('ui', {})
+    actor = ui.get('dev_actor', '')
+    if 'auth' in ui:
+        auth = ui['auth']
+        if not isinstance(auth, dict) or set(auth) != {'domain', 'client_id', 'audience'} or actor:
+            raise ValueError('UI requiere parámetros públicos Auth0 completos y sin actor dev')
+        domain, client, audience = (auth[key] for key in ('domain', 'client_id', 'audience'))
+        if not isinstance(domain, str) or len(domain) > 253 or '..' in domain or '.' not in domain \
+                or not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?', domain):
+            raise ValueError('Domain Auth0 de UI inválido')
+        if not isinstance(client, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,128}', client):
+            raise ValueError('Client ID público de UI inválido')
+        if not isinstance(audience, str) or len(audience) > 512 \
+                or not re.fullmatch(r'https://[A-Za-z0-9._~:/-]+', audience):
+            raise ValueError('Audience Auth0 de UI inválida')
+        api = auth_environment(manifest)
+        if api != {'AUTH_MODE': 'auth0', 'AUTH_ISSUER': 'https://' + domain + '/', 'AUTH_AUDIENCE': audience}:
+            raise ValueError('Auth0 de UI y API deben corresponder al mismo ambiente')
+        return {'environment': manifest['environment'], 'identity': {
+            'mode': 'auth0', 'domain': domain, 'clientId': client, 'audience': audience}}
     return {'environment': manifest['environment'],
             'identity': {'mode': 'dev', 'actorId': actor} if actor else {'mode': 'disabled'}}
 
 
 def ui_environment(manifest):
-    return {'APP_ENV': manifest['environment'], 'UI_DEV_ACTOR': manifest.get('ui', {}).get('dev_actor', '')}
+    identity = ui_configuration(manifest)['identity']
+    return {'APP_ENV': manifest['environment'], 'UI_DEV_ACTOR': identity.get('actorId', ''),
+            'UI_AUTH_DOMAIN': identity.get('domain', ''), 'UI_AUTH_CLIENT_ID': identity.get('clientId', ''),
+            'UI_AUTH_AUDIENCE': identity.get('audience', '')}
+
+
+def cors_environment(manifest):
+    origin = ''
+    if 'auth' in manifest.get('ui', {}):
+        proxy = infrastructure(manifest).get('nginx', {})
+        if not proxy.get('tls'):
+            raise ValueError('UI Auth0 remota requiere el ingreso HTTPS registrado')
+        origin = 'https://' + proxy['hostname']
+    return {'SNIPPETS_CORS_ALLOWED_ORIGINS': origin}
 
 
 def expected_images(manifest):
@@ -63,6 +117,8 @@ def permanent_services(manifest, application=None):
     if application == 'ui':
         return {'ui': names['ui']}
     selected = set(STACK_SERVICES)
+    if 'redis' in infrastructure(manifest):
+        selected.add('redis')
     if storage_provider(manifest) == 'asset':
         selected.update(('asset-service', 'azurite'))
     return {name: image for name, image in names.items() if name in selected}
@@ -104,7 +160,7 @@ def validate_manifest(manifest):
     database = manifest['database']['image'] if version == 2 else manifest.get('database_image')
     if not isinstance(database, str) or not re.fullmatch(rf'postgres:18\.6-bookworm@{DIGEST}', database):
         raise ValueError('PostgreSQL 18.6-bookworm requiere digest exacto')
-    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui')):
+    if version == 1 and any(key in manifest for key in ('infrastructure', 'storage_provider', 'database', 'ui', 'auth', 'apm', 'background')):
         raise ValueError('Ampliar el inventario requiere schema_version=2')
     if version == 2:
         if 'database_image' in manifest:
@@ -113,7 +169,39 @@ def validate_manifest(manifest):
     settings = {APPLICATIONS[name]['variable']: image for name, image in images.items()}
     settings.update(POSTGRES_IMAGE=database, DEPLOY_ENV=manifest['environment'],
                     SNIPPET_RELEASE=json.dumps(manifest, separators=(',', ':')))
+    settings.update(auth_environment(manifest))
+    settings.update(cors_environment(manifest))
+    apm_enabled(manifest)
+    settings.update(background_environment(manifest))
     return settings
+
+
+def apm_enabled(manifest):
+    apm = manifest.get('apm', {'enabled': False})
+    if not isinstance(apm, dict) or set(apm) != {'enabled'} or type(apm['enabled']) is not bool:
+        raise ValueError('Configuración APM desconocida')
+    return apm['enabled']
+
+
+BACKGROUND_FLAGS = ('publisher', 'consumer')
+
+
+def background_flags(manifest):
+    background = manifest.get('background', {flag: False for flag in BACKGROUND_FLAGS})
+    if not isinstance(background, dict) or set(background) != set(BACKGROUND_FLAGS) \
+            or any(type(value) is not bool for value in background.values()):
+        raise ValueError('Configuración de procesamiento de fondo desconocida')
+    if any(background.values()) and 'redis' not in infrastructure(manifest):
+        raise ValueError('El procesamiento de fondo requiere Redis instalado')
+    return background
+
+
+def background_environment(manifest):
+    background = background_flags(manifest)
+    text = {True: 'true', False: 'false'}
+    return {'SNIPPETS_OUTBOX_ENABLED': text[background['publisher']],
+            'SNIPPETS_WORKER_ENABLED': text[background['consumer']],
+            'PRINTSCRIPT_OPERATIONS_ENABLED': text[any(background.values())]}
 
 
 def validate_components(manifest):
@@ -121,6 +209,12 @@ def validate_components(manifest):
     if not isinstance(components, dict) or not set(components) <= set(INFRA_PACKAGES):
         raise ValueError('Componente de infraestructura desconocido')
     for name, spec in components.items():
+        if name == 'redis':
+            from redis_runtime import validate
+            if not isinstance(spec, dict):
+                raise ValueError('Configuración Redis inválida')
+            validate(spec, manifest['environment'])
+            continue
         if not isinstance(spec, dict) or not isinstance(spec.get('image'), str) or not re.fullmatch(
                 re.escape(INFRA_PACKAGES[name]) + rf'@{DIGEST}', spec['image']):
             raise ValueError(f'{name}: paquete exacto por digest requerido')
@@ -136,12 +230,13 @@ def validate_components(manifest):
     if 'ui' in manifest['images'] and 'nginx' not in components:
         raise ValueError('UI requiere entrada NGINX explícita')
     ui = manifest.get('ui', {})
-    if not isinstance(ui, dict) or set(ui) - {'dev_actor'} or (ui and 'ui' not in manifest['images']):
+    if not isinstance(ui, dict) or set(ui) - {'dev_actor', 'auth'} or (ui and 'ui' not in manifest['images']):
         raise ValueError('Configuración UI desconocida o sin aplicación instalada')
     actor = ui.get('dev_actor', '')
     if not isinstance(actor, str) or (actor and (manifest['environment'] != 'dev' or
             not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@|/-]{0,127}', actor))):
         raise ValueError('Identidad UI de desarrollo inválida o habilitada en prod')
+    ui_configuration(manifest)
     if 'nginx' in components:
         proxy = components['nginx']
         host = proxy.get('hostname', '')
@@ -185,13 +280,16 @@ def select_release(requested, previous, change_infrastructure=False):
     validate_manifest(previous)
     if previous['environment'] != requested['environment']:
         raise ValueError('El registro pertenece a otro ambiente')
-    # Reapplying infrastructure takes current app AND database references.
     if not change_infrastructure:
         return deepcopy(previous)
     selected = upgrade_release(previous)
+    if 'redis' in infrastructure(requested) and 'redis' not in infrastructure(previous):
+        unrelated = {name: spec for name, spec in infrastructure(requested).items() if name != 'redis'}
+        if unrelated != infrastructure(previous) or set(requested['images']) != set(previous['images']) \
+                or requested.get('ui', {}) != previous.get('ui', {}):
+            raise ValueError('La incorporación de Redis no combina otros cambios de infraestructura/UI')
     if not set(infrastructure(previous)) <= set(infrastructure(requested)):
         raise ValueError('Retirar infraestructura persistente requiere un procedimiento específico')
-    # Configuration changes preserve app/database versions, receipts and unknown metadata.
     selected.update(infrastructure=deepcopy(infrastructure(requested)))
     if storage_provider(requested) != storage_provider(previous):
         raise ValueError('Cambiar proveedor requiere una transición de datos independiente (SNI-19/36)')
@@ -202,6 +300,12 @@ def select_release(requested, previous, change_infrastructure=False):
         selected['images'][name] = requested['images'][name]
     if 'ui' in requested:
         selected['ui'] = deepcopy(requested['ui'])
+    if 'auth' in requested:
+        selected['auth'] = deepcopy(requested['auth'])
+    if 'apm' in requested:
+        selected['apm'] = deepcopy(requested['apm'])
+    if 'background' in requested:
+        selected['background'] = deepcopy(requested['background'])
     validate_manifest(selected)
     return selected
 

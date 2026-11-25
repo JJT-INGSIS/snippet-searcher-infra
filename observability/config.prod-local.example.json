@@ -1,0 +1,41 @@
+{
+  "environment": "prod",
+  "version": "sni88-inventory-20261119",
+  "intervalSeconds": 60,
+  "postgres": [
+    {
+      "service": "snippets-db",
+      "host": "snippets-db",
+      "port": 5432,
+      "database": "snippets",
+      "username": "nri_monitor",
+      "passwordFile": "/run/secrets/obs_snippets_db_password"
+    },
+    {
+      "service": "permissions-db",
+      "host": "permissions-db",
+      "port": 5432,
+      "database": "permissions",
+      "username": "nri_monitor",
+      "passwordFile": "/run/secrets/obs_permissions_db_password"
+    }
+  ],
+  "redis": null,
+  "storage": [
+    {
+      "kind": "local",
+      "service": "storage-local",
+      "path": "/observed/snippets-content"
+    },
+    {
+      "kind": "filesystem",
+      "service": "snippets-db-disk",
+      "path": "/observed/snippets-db"
+    },
+    {
+      "kind": "filesystem",
+      "service": "permissions-db-disk",
+      "path": "/observed/permissions-db"
+    }
+  ]
+}

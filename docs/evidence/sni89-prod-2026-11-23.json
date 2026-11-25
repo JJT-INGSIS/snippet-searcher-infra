@@ -1,0 +1,271 @@
+{
+  "status": "PARTIAL_VERIFIED_DRILL_CLOSED_HUMAN_RECEPTION_CONFIRMED",
+  "environment": "prod",
+  "accountId": 8718557,
+  "inventoryAt": "2026-11-23T13:14:18Z",
+  "vm": "vm-snippet-prod",
+  "vmStartedForReview": true,
+  "applicationAndDependencyServices": 7,
+  "allSevenHealthy": true,
+  "collectorReplicas": "1/1",
+  "agentAndLogsRunning": true,
+  "release": {
+    "storageProvider": "local",
+    "infrastructure": [
+      "nginx"
+    ],
+    "authMode": "auth0",
+    "apmEnabled": true,
+    "background": {},
+    "pendingJournal": false,
+    "images": {
+      "snippets-service": "sha256:31aad197f2e7fe6635a447c325fbd656d2ff140418b6d190a483fefb4a1e1655",
+      "permissions-service": "sha256:b5b7f7fdd2f155fd9c8741d41b82527b316d860550738609073e9302508a0045",
+      "printscript-service": "sha256:22875816f4392f0d5f03d0b5e16d4d24c1ef2a25c9865ee340c158b4df6300c9",
+      "ui": "sha256:eef033e82b3eda328548a24ecb4939a75cd3b38e712c8716915187ed5ed64c68"
+    }
+  },
+  "recentEventTypesObserved": [
+    "SystemSample",
+    "SnippetSwarmSample",
+    "SnippetStorageSample",
+    "PostgresqlInstanceSample",
+    "PostgresqlDatabaseSample",
+    "PgCustomQuerySample",
+    "Transaction",
+    "Log"
+  ],
+  "apiLanguages": {
+    "httpStatus": 200,
+    "tlsVerifyResult": 0
+  },
+  "browser": {
+    "appName": "snippet-searcher-prod-ui",
+    "visitAt": "2026-11-23T13:17:24Z",
+    "PageView": 1,
+    "PageViewTiming": 3
+  },
+  "alerts": {
+    "policyId": 8369826,
+    "replicasConditionId": 70091549,
+    "replicasDurationSeconds": 120,
+    "hostLossConditionId": 70091779,
+    "hostLossSeconds": 300,
+    "storageConditionId": 70091854,
+    "storageDurationSeconds": 120,
+    "workflow": "snippet-searcher-prod-disponibilidad",
+    "workflowEnabledAndPolicyFilterRechecked": true,
+    "emailDestination": "snippet-searcher-equipo-alertas",
+    "initialPushDestination": "snippet-searcher-juanfran-push",
+    "preparedOwnPushDestination": "snippet-searcher-thiago-prod-push",
+    "ownPushAssociatedWithWorkflow": false,
+    "designatedReceiver": "Juanfran, human confirmation deferred by user",
+    "ownPushDeviceReceptionConfirmed": false,
+    "publicUiConditionId": 70092793,
+    "publicApiConditionId": 70093035,
+    "publicCriticalThreshold": "above 0 at least once in 5 minutes",
+    "publicConditionsEnabled": true
+  },
+  "reproduction": {
+    "aggregationWindowSeconds": 60,
+    "aggregationMethod": "event_flow",
+    "aggregationDelaySeconds": 120,
+    "gapFill": "none",
+    "replicasQuery": "SELECT filter(count(*), WHERE running = 0 OR running < desired) FROM SnippetSwarmSample WHERE environment = 'prod' FACET service",
+    "storageQuery": "SELECT filter(count(*), WHERE up = 0 OR contentOk = 0) FROM SnippetStorageSample WHERE environment = 'prod' AND service = 'storage-local' AND up IS NOT NULL",
+    "hostLossQuery": "SELECT count(*) FROM SystemSample WHERE environment = 'prod' AND hostname = 'vm-snippet-prod'",
+    "thresholdOperator": "above",
+    "thresholdValue": 0,
+    "thresholdOccurrences": "ALL",
+    "hostOpenOnExpiration": true,
+    "hostCloseOnExpiration": false,
+    "workflowPolicyFilter": [
+      8369826
+    ],
+    "workflowEmailTriggers": [
+      "ACTIVATED",
+      "ACKNOWLEDGED",
+      "CLOSED",
+      "INVESTIGATING"
+    ],
+    "workflowPushTriggers": [
+      "ACTIVATED",
+      "ACKNOWLEDGED",
+      "CLOSED"
+    ],
+    "warning": "Public configuration recorded from UI; import/reconcile existing IDs rather than creating duplicate alerts"
+  },
+  "controlledTrafficAt": "2026-11-23T13:38:25Z",
+  "controlledTraffic": {
+    "snippetsLanguages": 200,
+    "permissionsMissingOwnership": 404,
+    "printscriptValidate": {
+      "status": 200,
+      "valid": true
+    }
+  },
+  "accountConsumption": {
+    "window": "1 day",
+    "approxReportedGigabytes": 0.298,
+    "source": "NrConsumption",
+    "separatesDevProd": false,
+    "billingForecast": false
+  },
+  "paidAccessActivated": false,
+  "accessBarrier": "Historical at 13:xxZ: Synthetics UI required Full and warned of charges. Later public Ping data and enabled conditions verified read-only; current plan/billing not audited.",
+  "publicProdSyntheticChecksVerified": true,
+  "authenticatedFunctionalCheckVerified": false,
+  "prodSlosVerified": false,
+  "mutingRulesRevalidated": true,
+  "mutingRulesFound": 0,
+  "infrastructureDashboard": {
+    "environmentSelected": "PROD",
+    "servicesAtOneOfOne": 7,
+    "swarmSampleAt": "2026-11-23T13:32:49Z"
+  },
+  "workflowTest": {
+    "attempted": true,
+    "result": "Filter does not match any past issues; no send verified"
+  },
+  "failureWindowApproved": true,
+  "failureInjected": true,
+  "incidentUrl": "https://aiops.service.newrelic.com/accounts/8718557/incidents/949a7fc6-c98c-4b52-8973-4e45b07fd703/redirect",
+  "notificationSentVerified": true,
+  "humanReceptionConfirmed": true,
+  "incidentClosedVerified": true,
+  "requiresFinalPromotionRevalidation": true,
+  "paidAccessScope": "No paid feature or plan activated by this verification; does not establish whether another operator changed account access.",
+  "drill": {
+    "component": "ui",
+    "faultAt": "2026-11-23T13:50:11.587Z",
+    "restoreStartedAt": "2026-11-23T13:56:11.563Z",
+    "healthRecoveredAt": "2026-11-23T13:56:17.979Z",
+    "originalReplicas": 1,
+    "holdSeconds": 360,
+    "backupTimerSeconds": 480,
+    "uiHttpDuringFault": 502,
+    "apiLanguagesHttpDuringFault": 200,
+    "allSevenHealthyAfterRecovery": true,
+    "collectorAfterRecovery": "1/1",
+    "templateUnchanged": true,
+    "releaseUnchanged": true,
+    "backupTimerStoppedAfterRecovery": true,
+    "receiptStatus": "RESTORED_AWAITING_ALERT_EVIDENCE",
+    "receiptStatusScope": "Historical remote receipt; closure verified later in New Relic, receipt not rewritten",
+    "incidentId": "949a7fc6-c98c-4b52-8973-4e45b07fd703",
+    "issueId": "9ce1b606-d2c9-43dd-8bc2-75a35a952698",
+    "conditionId": 70091549,
+    "facet": "ui",
+    "incidentOpenEventAt": "2026-11-23T13:55:46.900Z",
+    "incidentCloseEventAt": "2026-11-23T14:01:43.733Z",
+    "signalOpenTime": "2026-11-23T13:52:00.000Z",
+    "signalCloseTime": "2026-11-23T13:56:00.000Z",
+    "timeSemantics": "openTime/closeTime are signal timestamps; event timestamp records later alert processing, not the physical restoration time.",
+    "repeatedDuringVerification": false,
+    "source": "Prior session receipt snapshot /tmp/sni89-restoration-azure.txt; NrAiIncident read in New Relic at 2026-11-23T19:27:30Z"
+  },
+  "notifications": [
+    {
+      "at": "2026-11-23T13:55:57.310Z",
+      "destinationType": "MOBILE_PUSH",
+      "trigger": "STATE_CHANGE",
+      "status": "SUCCESS",
+      "notificationResult": "Sent to 1 devices"
+    },
+    {
+      "at": "2026-11-23T13:55:57.734Z",
+      "destinationType": "EMAIL",
+      "trigger": "STATE_CHANGE",
+      "status": "SUCCESS",
+      "notificationResult": null
+    },
+    {
+      "at": "2026-11-23T14:01:51.640Z",
+      "destinationType": "MOBILE_PUSH",
+      "trigger": "INCIDENT_CLOSED",
+      "status": "SUCCESS",
+      "notificationResult": "Sent to 1 devices"
+    },
+    {
+      "at": "2026-11-23T14:01:56.826Z",
+      "destinationType": "EMAIL",
+      "trigger": "INCIDENT_CLOSED",
+      "status": "SUCCESS",
+      "notificationResult": null
+    }
+  ],
+  "notificationEvidence": {
+    "source": "NrAiNotification, read-only New Relic query",
+    "queriedAt": "2026-11-23T19:27:11Z",
+    "workflow": "snippet-searcher-prod-disponibilidad",
+    "issueId": "9ce1b606-d2c9-43dd-8bc2-75a35a952698",
+    "humanReceptionConfirmed": true
+  },
+  "publicChecks": {
+    "source": "SyntheticCheck",
+    "queriedAt": "2026-11-23T19:27:44Z",
+    "windowStart": "2026-11-23T18:57:44Z",
+    "location": "AWS_SA_EAST_1",
+    "monitors": [
+      {
+        "name": "snippet-searcher-prod-api-disponibilidad",
+        "latestResult": "SUCCESS",
+        "latestAt": "2026-11-23T19:16:00.824Z",
+        "sampleCount": 2
+      },
+      {
+        "name": "snippet-searcher-prod-ui-disponibilidad",
+        "latestResult": "SUCCESS",
+        "latestAt": "2026-11-23T19:18:01.217Z",
+        "sampleCount": 2
+      }
+    ],
+    "failureDrillVerified": false,
+    "scope": "Recent periodic public Ping results; does not prove authenticated business behavior or test the new Ping conditions."
+  },
+  "manualHttpRecheck": {
+    "at": "2026-11-23T19:29:30+00:00",
+    "uiHttp": 200,
+    "apiLanguagesHttp": 200,
+    "tlsVerifyResult": 0,
+    "client": "curl with certificate verification"
+  },
+  "humanReception": {
+    "source": "Thiago reported in chat on 2026-11-23: sí, Juanfran lo vio",
+    "receiver": "Juanfran",
+    "activationAndClosureIndividuallyConfirmed": false,
+    "receivedAt": null
+  },
+  "dashboardsReviewed": {
+    "dependencies": {
+      "environment": "prod",
+      "storageLocalUp": 1,
+      "storageLocalContentOk": 1,
+      "diskFreePercent": 69.842,
+      "sampleAt": "2026-11-23T21:36:55Z",
+      "postgresServices": [
+        "snippets-db",
+        "permissions-db"
+      ],
+      "redisSamplesAbsent": true
+    },
+    "application": {
+      "environment": "prod",
+      "apiSliPercent7d": 94.44,
+      "apiValidEvents7d": 54,
+      "apiTargetPercent": 99,
+      "sampleInsufficientBelow": 100,
+      "functionalResults7d": 0,
+      "publicPingLatestResult": "SUCCESS",
+      "browserRecentSamples": "No events in last hour at inspection; prior controlled visit remains historical evidence"
+    },
+    "scope": "Read-only UI inspection 2026-11-23 21:36Z–21:40Z. Dashboard SLI calculation does not prove a native Service Level resource exists."
+  },
+  "operationalContinuationBlockers": {
+    "macLocked": true,
+    "prodSsh": "Permission denied (publickey) with available agent/default identity; no credential changes",
+    "devSsh": "Connection timeout; not proof of VM power state",
+    "prodFunctionalIdentityAndFixtureVerified": false,
+    "nativeProdServiceLevelsVerified": false
+  }
+}

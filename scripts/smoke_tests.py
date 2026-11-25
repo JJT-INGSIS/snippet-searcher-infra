@@ -69,7 +69,6 @@ def request(
         try:
             incoming = urlopen(outgoing, timeout=timeout)
         except HTTPError as error:
-            # HTTP errors still have a response body, including Problem Details.
             incoming = error
         with incoming:
             status = incoming.status

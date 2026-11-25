@@ -1,0 +1,33 @@
+services:
+  agent:
+    image: newrelic/infrastructure@sha256:6f9fcaa8007e5a5aa932e381714e605cdca89308aa1928947ea61b8f37f5fddb
+    container_name: snippet-observability-dev-agent
+    hostname: vm-snippet-dev
+    network_mode: host
+    pid: host
+    cgroup: host
+    privileged: true
+    cap_add: [SYS_PTRACE]
+    restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/snippet-observability/dev/agent.json:/etc/newrelic-infra.yml:ro
+      - /opt/snippet-observability/dev/runtime-v1:/opt/runtime:ro
+      - /opt/snippet-observability/dev/runtime-v1/integrations.json:/etc/newrelic-infra/integrations.d/snippet.json.yml:ro
+      - /opt/snippet-observability/dev/runtime-v1/docker-config.yml:/etc/newrelic-infra/integrations.d/docker-config.yml:ro
+      - snippet-observability-dev-agent-state:/var/db/newrelic-infra/data
+    mem_limit: 384m
+    cpus: 0.50
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "2"}
+    labels:
+      environment: dev
+      service: infrastructure-agent
+      version: sni82-runtime-v1
+volumes:
+  snippet-observability-dev-agent-state:
+    name: snippet-observability-dev-agent-state

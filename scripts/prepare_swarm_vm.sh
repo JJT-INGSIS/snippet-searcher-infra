@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Ejecutar dentro de la VM. No inicializa otro Swarm ni modifica contraseñas existentes.
 readonly ENVIRONMENT="${1:?Indicar dev o prod}"
 case "$ENVIRONMENT" in dev|prod) ;; *) echo 'Ambiente inválido' >&2; exit 1 ;; esac
 [[ "$(hostname)" == "vm-snippet-$ENVIRONMENT" ]] || { echo 'VM equivocada' >&2; exit 1; }
@@ -10,8 +9,6 @@ command -v python3 >/dev/null
 command -v openssl >/dev/null
 command -v flock >/dev/null
 readonly NODE="$(docker info --format '{{.Swarm.NodeID}}')"
-# Comprobar ambos casos antes de crear secretos: nunca inventar una contraseña
-# para una base con datos que fue inicializada con una contraseña anterior.
 for service in snippets permissions; do
   if ! docker secret inspect "${service}_db_password" >/dev/null 2>&1 &&
      docker volume inspect "snippet-searcher-${ENVIRONMENT}_${service}_data" >/dev/null 2>&1; then

@@ -51,6 +51,10 @@ services:
     environment:
       <<: *http-destinations
       SPRING_PROFILES_ACTIVE: dev
+      AUTH_MODE: ${AUTH_MODE:-dev}
+      AUTH_ISSUER: ${AUTH_ISSUER:-}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
+      SNIPPETS_CORS_ALLOWED_ORIGINS: ${SNIPPETS_CORS_ALLOWED_ORIGINS:-}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
       STORAGE_ASSET_BASE_URL: ${STORAGE_ASSET_BASE_URL:-http://asset-service:8080}
       STORAGE_ASSET_CONTAINER: ${STORAGE_ASSET_CONTAINER:-snippets}
@@ -142,7 +146,6 @@ services:
       printscript-service:
         condition: service_started
 
-  # Opt-in runtime. Merely starting these services does not switch existing data.
   asset-service:
     profiles: [assets]
     image: ghcr.io/austral-ingsis/snippet-asset-service@sha256:eacad54bf95717c5483619ad1fe45a9b4a0012a37b451c37baf13e6f43200656

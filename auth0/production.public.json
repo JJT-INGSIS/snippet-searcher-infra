@@ -1,0 +1,26 @@
+{
+  "environment": "prod",
+  "status": "ADMIN_CONFIRMED_READY_FOR_ROLLOUT",
+  "domain": "jjt-snippet-searcher.us.auth0.com",
+  "issuer": "https://jjt-snippet-searcher.us.auth0.com/",
+  "applicationName": "snippet-searcher-prod-ui",
+  "applicationType": "spa",
+  "clientId": "3WzM34S00lsCGU0p4hYImgs2xCuPgejW",
+  "apiName": "snippet-searcher-prod-api",
+  "audience": "https://jjt-snippets-prod.duckdns.org/api",
+  "callbacks": [
+    "https://jjt-snippets-prod.duckdns.org/auth/callback"
+  ],
+  "logoutUrls": [
+    "https://jjt-snippets-prod.duckdns.org/"
+  ],
+  "origins": [
+    "https://jjt-snippets-prod.duckdns.org"
+  ],
+  "grantTypes": [
+    "authorization_code"
+  ],
+  "offlineAccess": false,
+  "signingAlgorithm": "RS256",
+  "confirmedBy": "Thiago, 2026-11-20; SPA URLs and delegated API access confirmed"
+}

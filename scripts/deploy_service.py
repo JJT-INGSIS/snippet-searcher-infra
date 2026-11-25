@@ -45,7 +45,6 @@ def remote_log(state, identity, owner):
 @contextmanager
 def deployment_lock(state):
     import fcntl
-    # Require the bootstrap directories; CD must not silently bootstrap a VM.
     if not (state / 'release.json').is_file():
         raise ValueError('Falta bootstrap y release.json confirmado')
     with (state / 'deploy.lock').open('a') as lock:
@@ -96,7 +95,6 @@ class Swarm:
             raise ValueError('Imagen incompatible con las VMs x64')
 
     def update(self, service, image):
-        # Public GHCR: no registry credentials or runtime secret modifications.
         subprocess.run(['docker', 'service', 'update', '--detach', '--image', image,
                         f'{self.stack}_{service}'], check=True, timeout=180)
 
@@ -113,7 +111,15 @@ class Swarm:
 
     def apply_infrastructure(self, release):
         from stack_runtime import apply_release
-        apply_release(release, docker_json)
+        actual = self.images()
+        redis_transition = ('redis' in actual) != ('redis' in expected_images(release))
+        if redis_transition:
+            if (set(actual) ^ set(expected_images(release))) - {'redis'}:
+                raise ValueError('El corte Redis no instala ni retira otros servicios')
+            for name, image in actual.items():
+                if name != 'redis' and expected_images(release).get(name) != image:
+                    raise ValueError('El corte Redis no combina cambios a otras imágenes')
+        apply_release(release, docker_json, redis_transition=redis_transition)
 
     def remove_components(self, names):
         if not set(names) <= set(INFRA_PACKAGES) | {'ui'}:
@@ -173,8 +179,6 @@ def finish(state, operation, release, outcome):
     changed = {**release, 'deployed_at': receipt['verified-at'],
                'checks': CHECKS if receipt['checks'] else {'recovery': 'failed'},
                'deployments': {**release.get('deployments', {}), operation['request']['service']: receipt}}
-    # Journal first: if the process stops between files, reconciliation can finish
-    # the release write without resubmitting the Docker update.
     final = {**operation, 'receipt': receipt, 'state': outcome, 'confirmed-release': changed}
     save_operation(state, final)
     confirm_release(state, operation_id(operation['request']), changed)
@@ -204,7 +208,6 @@ def settle(state, operation, swarm):
         swarm.verify(previous, service)
         return finish(state, operation, previous, 'recovered')
     except FAILURES:
-        # Do not label the old release healthy or clear the pending recovery.
         observed = swarm.images()
         failed = {**previous, 'images': {name: observed[name] for name in previous['images']},
                   'checks': {'recovery': 'failed'}}
@@ -226,8 +229,6 @@ def reconcile(state, swarm):
         raise ValueError('Identificador de operación pendiente inválido')
     operation = read_json(state / 'operations' / f'{identity}.json')
     if operation.get('state') in ('verified', 'recovered'):
-        # Still check actual convergence; a finalized journal is not proof of
-        # current state after an interruption between journal and release writes.
         release = operation['confirmed-release']
         require_images(swarm, release)
         swarm.verify(release, operation['request']['service'])
@@ -267,11 +268,10 @@ def deploy_locked(state, request, swarm, authorize, verify_evidence):
     if last and (request['run-id'], request['run-attempt']) < (last['run-id'], last['run-attempt']):
         raise ValueError('Ejecución anterior a la última operación registrada')
     authorize(request)
-    verify_evidence(request)  # Historical proof once; current authorization is checked again below.
+    verify_evidence(request)
     require_images(swarm, previous)
-    swarm.verify(previous, request['service'])  # Establish the actually working rollback baseline.
+    swarm.verify(previous, request['service'])
     swarm.pull(request['image-ref'])
-    # Recheck authorization after slow pulls/checks, still inside deploy.lock.
     authorize(request)
     candidate = update_service(previous, request['service'], request['image-ref'])
     operation = {'request': request, 'previous': previous, 'candidate': candidate,
@@ -282,14 +282,12 @@ def deploy_locked(state, request, swarm, authorize, verify_evidence):
         if previous['images'][request['service']] != request['image-ref']:
             swarm.update(request['service'], request['image-ref'])
     except FAILURES:
-        # A timeout may have happened after Docker accepted the update.
         pass
     return settle(state, operation, swarm)
 
 
 def main():
     import pwd
-    # Ordinary SSH loss must not abort a submitted operation halfway through.
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     envelope = json.load(sys.stdin)
     request = envelope['request']
@@ -298,8 +296,6 @@ def main():
     del envelope
     owner = pwd.getpwnam(os.environ.get('SUDO_USER') or pwd.getpwuid(os.getuid()).pw_name)
     state = Path(owner.pw_dir) / f'.local/state/snippet-searcher/{request["environment"]}'
-    # Docker/verifier output goes to a VM log, not the SSH pipe: a closed client
-    # must not turn healthy verification into a broken-pipe failure and rollback.
     if not state.is_dir():
         raise ValueError('Falta el directorio de estado del bootstrap')
     remote_log(state, operation_id(request), owner)
@@ -312,7 +308,6 @@ def main():
             if os.geteuid() == 0:
                 for path in (state, *state.rglob('*')):
                     os.chown(path, owner.pw_uid, owner.pw_gid)
-    # SSH transports only the exit status. The durable journal is the receipt source.
     return 0 if receipt['outcome'] == 'verified' else 1
 
 

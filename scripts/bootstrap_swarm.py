@@ -14,20 +14,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from stack_release import (APPLICATIONS, CERTIFICATES, DATABASE_SERVICES, database_image, expected_images, infrastructure,
-                           nginx_files, upgrade_release, write_record, validate_manifest, select_release, update_service,
-                           validate_promotion)
+from stack_release import (APPLICATIONS, BACKGROUND_FLAGS, CERTIFICATES, DATABASE_SERVICES, background_flags,
+                           database_image, expected_images, infrastructure, nginx_files, upgrade_release, write_record,
+                           validate_manifest, select_release, update_service, validate_promotion)
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def plan_release(previous, hostname=None, install_assets=False, config_version=1, ui_image=None, ui_actor=None, tls=False):
+def plan_release(previous, hostname=None, install_assets=False, config_version=1, ui_image=None, ui_actor=None, tls=False,
+                 install_redis=False):
     """Read-only candidate, from actual references rather than historical YAML digests."""
     from validate_asset_config import render
     from validate_nginx_config import NGINX_IMAGE
     if tls and not hostname:
         raise ValueError('TLS requiere --nginx-host explícito')
     planned = upgrade_release(previous)
+    if install_redis:
+        from redis_runtime import specification
+        planned['infrastructure'].setdefault('redis', specification(previous['environment'], config_version))
     planned.pop('checks', None)
     if hostname:
         configs = {}
@@ -77,6 +81,10 @@ def preflight(manifest, environment):
         raise ValueError('Azurite requiere el nodo con volumen original y asset_storage=true; no etiquetar automáticamente')
     for secret in ("snippets_db_password", "permissions_db_password"):
         docker_json("secret", "inspect", secret)
+    if 'redis' in infrastructure(manifest):
+        from redis_preflight import require_capacity
+        docker_json('secret', 'inspect', 'redis_password')
+        require_capacity(info['DockerRootDir'])
     require_certificate(manifest)
     if manifest.get('schema_version') == 2:
         from stack_runtime import render_release, require_configs, validate_rendered
@@ -85,8 +93,6 @@ def preflight(manifest, environment):
     else:
         subprocess.run(["docker", "stack", "config", "-c", str(ROOT / "swarm/stack.yaml")],
                        check=True, env=environment, stdout=subprocess.DEVNULL, timeout=30)
-    # Pull antes de modificar el stack: detecta falta de permiso, digest ausente
-    # o arquitectura incompatible sin reconstruir nada en la VM.
     for image in set(expected_images(manifest).values()):
         subprocess.run(["docker", "pull", "--platform", "linux/amd64", image], check=True, timeout=600)
         pulled = docker_json("image", "inspect", image)[0]
@@ -118,6 +124,14 @@ def reconcile_infrastructure(state, swarm):
     previous, candidate = operation['previous'], operation['candidate']
     validate_manifest(previous)
     validate_manifest(candidate)
+    if operation.get('scope'):
+        from scoped_deploy import SCOPES, ScopedSwarm
+        scope = operation['scope']
+        if scope not in SCOPES:
+            raise ValueError('Alcance de infraestructura desconocido')
+        SCOPES[scope][1](previous, candidate)
+        if getattr(swarm, 'scope', None) != scope:
+            swarm = ScopedSwarm(swarm.environment, previous, scope)
     swarm.check_manager()
     if operation.get('kind') != 'infrastructure' or previous['environment'] != candidate['environment'] \
             or candidate['environment'] != swarm.environment:
@@ -151,7 +165,6 @@ def reconcile_infrastructure(state, swarm):
             pass
         else:
             return finish_infrastructure(state, identity, operation, previous, 'recovered')
-    # Recover only known infra changes, never downgrade an application or database.
     swarm.require_recoverable_infrastructure(previous, candidate)
     try:
         swarm.apply_infrastructure(previous)
@@ -177,8 +190,10 @@ def deploy_infrastructure(state, requested, swarm, gate):
     if previous.get('checks') != {'convergence': 'passed', 'sql_and_internal_http': 'passed'}:
         raise ValueError('La base anterior no está confirmada; reconciliar antes del corte')
     candidate = select_release(requested, previous, change_infrastructure=True)
+    if getattr(swarm, 'scope', None):
+        swarm.rule(previous, candidate)
     if recovered_operation and candidate == previous:
-        return recovered_operation  # Reconciliation already verified this exact state.
+        return recovered_operation
     require_images(swarm, previous)
     swarm.verify(previous)
     preflight(candidate, {**os.environ, **validate_manifest(candidate)})
@@ -194,19 +209,20 @@ def deploy_infrastructure(state, requested, swarm, gate):
             evidence = select_evidence(api, name, tree, image)
             target = api.request('/branches/main')['commit']['sha']
             require_authorized_head(api, {**evidence, 'environment': 'prod', 'target-sha': target})
-    gate(candidate['environment'])  # Latest callers and active runs, under the shared lock.
+    gate(candidate['environment'])
     identity = 'infra-' + uuid4().hex
     operation = {'kind': 'infrastructure', 'state': 'updating', 'previous': upgrade_release(previous),
                  'candidate': candidate, 'started_at': datetime.now(timezone.utc).isoformat()}
+    if getattr(swarm, 'scope', None):
+        operation['scope'] = swarm.scope
     (state / 'operations').mkdir(mode=0o700, exist_ok=True)
     write_record(state / 'operations' / f'{identity}.json', operation)
     write_record(state / 'pending.json', {'operation': identity})
-    # Fence old Actions BEFORE applying any expanded resource; never restore v1 on rollback.
     write_record(state / 'release.json', upgrade_release(previous))
     try:
         swarm.apply_infrastructure(candidate)
     except (ValueError, RuntimeError, OSError, subprocess.SubprocessError):
-        pass  # Docker may have accepted the request before a transport timeout.
+        pass
     receipt = reconcile_infrastructure(state, swarm)
     if receipt['outcome'] != 'verified':
         raise RuntimeError('Cambio de infraestructura falló y fue recuperado; operación en rojo')
@@ -244,6 +260,11 @@ def execute(manifest, environment, state):
     print(f"Release confirmado: {state / 'release.json'}")
 
 
+def switched_background(release, **choices):
+    current = background_flags(release)
+    return {name: current[name] if choices[name] is None else choices[name] == 'on' for name in BACKGROUND_FLAGS}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("plan", "check", "preflight", "deploy"))
@@ -253,18 +274,54 @@ def main():
     parser.add_argument('--nginx-host', help='Sólo plan: hostname explícito del proxy')
     parser.add_argument('--tls', action='store_true', help='Sólo plan: publicar 443 con el certificado ya emitido')
     parser.add_argument('--install-assets', action='store_true', help='Sólo plan: instalar runtime sin activar proveedor')
+    parser.add_argument('--install-redis', action='store_true', help='Sólo plan: incorporar Redis sin activar workers')
     parser.add_argument('--config-version', type=int, default=1, help='Sólo plan: revisión para configs cuyo contenido cambió')
     parser.add_argument('--ui-image', help='Sólo plan: incorporar UI por su digest real; no actualiza una UI instalada')
     parser.add_argument('--ui-dev-actor', help='Sólo plan: actor público explícito de dev; vacío deshabilita identidad')
     parser.add_argument('--dev-record', type=Path, help='Registro confirmado de dev para promocionar los mismos digests')
+    parser.add_argument('--proxy-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar configs de NGINX y desplegar únicamente ese servicio')
+    parser.add_argument('--apm-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar apm y desplegar únicamente los servicios Java')
+    parser.add_argument('--apm', choices=('on', 'off'), help='Sólo plan: activar o desactivar APM en los servicios Java')
+    parser.add_argument('--background-only', action='store_true',
+                        help='Con --infrastructure: sólo cambiar background y desplegar únicamente Snippets y PrintScript')
+    parser.add_argument('--publisher', choices=('on', 'off'), help='Sólo plan: publicador del outbox')
+    parser.add_argument('--consumer', choices=('on', 'off'), help='Sólo plan: consumidor de eventos')
+    parser.add_argument('--auth-only', action='store_true',
+                        help='Con --infrastructure: cambiar sólo identidad de Snippets y UI del ambiente registrado')
+    parser.add_argument('--auth0-dev', action='store_true', help='Sólo plan: parámetros públicos Auth0 DEV verificados')
+    parser.add_argument('--auth0-prod', action='store_true', help='Sólo plan: parámetros públicos Auth0 PROD confirmados')
     args = parser.parse_args()
+    scopes = [name for name, chosen in (('proxy', args.proxy_only), ('apm', args.apm_only),
+                                         ('background', args.background_only), ('auth', args.auth_only)) if chosen]
+    if len(scopes) > 1:
+        parser.error('Los alcances proxy-only, apm-only, background-only y auth-only no se combinan')
+    scope = scopes[0] if scopes else None
+    if scope and not (args.mode == 'deploy' and args.infrastructure):
+        parser.error('Los alcances parciales sólo acompañan a deploy --infrastructure')
+    if (args.apm or args.publisher or args.consumer) and args.mode != 'plan':
+        parser.error('--apm, --publisher y --consumer sólo acompañan a plan')
+    if args.auth0_dev and args.auth0_prod:
+        parser.error('Seleccionar un único ambiente Auth0')
+    if (args.auth0_dev or args.auth0_prod) and (args.mode != 'plan' or args.apm or args.ui_dev_actor is not None):
+        parser.error('Auth0 sólo acompaña a plan sin otros cambios de identidad/APM')
     manifest = json.loads(args.manifest.read_text())
     selected = validate_manifest(manifest)
     if args.mode == 'plan':
         if args.config_version < 1:
             raise ValueError('La revisión de config debe ser positiva')
-        print(json.dumps(plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
-                                      args.ui_image, args.ui_dev_actor, args.tls), indent=2))
+        planned = plan_release(manifest, args.nginx_host, args.install_assets, args.config_version,
+                               args.ui_image, args.ui_dev_actor, args.tls, args.install_redis)
+        if args.apm:
+            planned['apm'] = {'enabled': args.apm == 'on'}
+        if args.publisher or args.consumer:
+            planned['background'] = switched_background(planned, publisher=args.publisher, consumer=args.consumer)
+        if args.auth0_dev or args.auth0_prod:
+            from auth_rollout import plan_identity
+            planned = plan_identity(planned, 'prod' if args.auth0_prod else 'dev')
+        validate_manifest(planned)
+        print(json.dumps(planned, indent=2))
         return
     if args.mode == "check":
         print(json.dumps(selected, indent=2))
@@ -275,14 +332,11 @@ def main():
         return
     owner = pwd.getpwnam(os.environ.get("SUDO_USER") or pwd.getpwuid(os.getuid()).pw_name)
     state = Path(owner.pw_dir) / f".local/state/snippet-searcher/{manifest['environment']}"
-    # Crear cada directorio por separado: mkdir(parents=True) bajo sudo dejaría
-    # .local/state a nombre de root en una cuenta recién creada.
     for path in (state.parents[2], state.parents[1], state.parent, state):
         if not path.exists():
             path.mkdir(mode=0o700)
             if os.geteuid() == 0:
                 os.chown(path, owner.pw_uid, owner.pw_gid)
-    # El mismo lock que usa el borrador de CD, para evitar despliegues simultáneos.
     with (state / "deploy.lock").open("a") as lock:
         deadline = time.monotonic() + 1800
         while True:
@@ -313,8 +367,12 @@ def main():
             if args.infrastructure:
                 if previous is None or args.service:
                     raise ValueError('Infra requiere bootstrap confirmado y no combina --service')
+                if scope:
+                    from scoped_deploy import ScopedSwarm
+                    swarm = ScopedSwarm(manifest['environment'], previous, scope)
                 deploy_infrastructure(state, manifest, swarm,
-                    lambda target: require_updated_callers(target, include_ui='ui' in manifest['images']))
+                    lambda target: require_updated_callers(target, include_ui='ui' in manifest['images'],
+                                                          redis='redis' in infrastructure(manifest)))
                 return
             selected_manifest = select_release(manifest, previous)
             if args.service:
@@ -330,7 +388,6 @@ def main():
                 validate_promotion(selected_manifest, dev_record)
             execute(selected_manifest, {**os.environ, **validate_manifest(selected_manifest)}, state)
         finally:
-            # sudo no debe dejar el registro inaccesible para azureuser/CD.
             if os.geteuid() == 0:
                 for path in (state.parent, state, *state.rglob("*")):
                     os.chown(path, owner.pw_uid, owner.pw_gid)

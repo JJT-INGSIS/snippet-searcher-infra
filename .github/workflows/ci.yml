@@ -12,6 +12,28 @@ permissions:
   contents: read
 
 jobs:
+  auth0-contract:
+    name: Validate Auth0 preparation (no tenant)
+    runs-on: ubuntu-24.04
+    env:
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.5
+          terraform_wrapper: false
+      - name: Validate and test with a mocked provider
+        run: |
+          terraform -chdir=auth0 init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=auth0 fmt -check -recursive
+          terraform -chdir=auth0 validate -no-color
+          terraform -chdir=auth0 test -no-color
+
   validate:
     name: Validate infrastructure
     runs-on: ubuntu-24.04
@@ -44,12 +66,22 @@ jobs:
           sh -n nginx/validate-env.sh
           python3 -B scripts/validate_nginx_config.py
           python3 -B scripts/validate_expanded_stack.py
+          sh -n redis/entrypoint.sh
+          sh -n redis/healthcheck.sh
+          sh -n redis/cli.sh
+          python3 -B scripts/validate_redis.py
 
       - name: Test HTTP verification, evidence and deployment recovery
         run: python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
 
+      - name: Verify native dependency collectors and isolated storage faults (no New Relic account)
+        run: python3 -B scripts/verify_observability.py --architecture amd64 --evidence "$RUNNER_TEMP/sni82-evidence.json"
+
       - name: Verify real Asset and Azurite persistence in an isolated project
         run: python3 -B scripts/verify_asset_persistence.py
+
+      - name: Verify Redis authentication, persistence, restore, OOM and full AOF filesystem
+        run: python3 -B scripts/verify_redis_persistence.py
 
       - name: Verify real NGINX transport, upstream recovery and bounded timeout
         run: python3 -B scripts/verify_nginx.py

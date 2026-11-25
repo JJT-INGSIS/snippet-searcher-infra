@@ -1,0 +1,45 @@
+{
+  "ticket": "SNI-82",
+  "date": "2026-11-17",
+  "status": "ACCEPTANCE_CONSOLIDATED",
+  "environment": "dev",
+  "criteria": {
+    "distinguishableLiveIngestion": {
+      "result": "PASS",
+      "source": "docs/evidence/sni82-ingestion-2026-11-16.json",
+      "afterCdSource": "docs/evidence/sni82-cd-pilot-2026-11-16.json",
+      "scope": "Two PostgreSQL instances, Redis and the active LOCAL storage with exact-content fixture"
+    },
+    "isolatedFaultAndRecoveryByType": {
+      "result": "PASS",
+      "source": "docs/evidence/sni82-faults-2026-11-16.json",
+      "scope": "Isolated real collectors: PostgreSQL lock/outage recovery, Redis outage/AOF-full recovery, local readonly recovery and Azurite backend interruption/recovery",
+      "notClaimed": "These local faults were not ingested as incidents in the shared DEV account"
+    },
+    "configurationPermissionsAndQueries": {
+      "result": "PASS",
+      "sources": [
+        "observability/README.md",
+        "observability/runtime/README.md",
+        "observability/runtime/dependencies-dev.nrql"
+      ],
+      "scope": "Environment-specific secrets, bounded collection and dedicated monitor permissions"
+    }
+  },
+  "jdbcPoolHandoff": {
+    "sourceTicket": "SNI-81",
+    "source": "docs/observability/sni-81-apm-traces.md",
+    "sourceTicketStateObserved": "Done",
+    "metricNamespace": "Database Connection/HikariCP/",
+    "jdbcSpanNamespace": "Datastore/statement/Postgres/",
+    "independentlyRequeriedByThisConsolidation": false
+  },
+  "remainingOutsideThisTicket": [
+    "SNI-86 dashboard, SLO and alert conditions",
+    "SNI-87 shared DEV fault, actual notification and recovery acceptance",
+    "SNI-88 PROD adaptation, deployment and acceptance"
+  ],
+  "prodActivated": false,
+  "newFaultInjected": false,
+  "newCredentialOrPermissionCreated": false
+}

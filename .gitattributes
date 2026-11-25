@@ -5,3 +5,4 @@
 
 # Byte-for-byte historical validator fixture, including on Windows checkouts.
 tests/legacy/v0.5.1-stack_release.txt -text
+tests/legacy/v0.6.2-stack_release.txt -text

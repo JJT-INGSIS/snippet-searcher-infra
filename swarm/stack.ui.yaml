@@ -1,5 +1,3 @@
-# Runtime contract only. SNI-42 supplies the real UI image and runtime configuration.
-# No default/dummy digest; not selected until UI is explicitly installed in the release.
 version: "3.8"
 services:
   ui:
@@ -7,6 +5,9 @@ services:
     environment:
       APP_ENV: ${DEPLOY_ENV:?Definir DEPLOY_ENV}
       UI_DEV_ACTOR: ${UI_DEV_ACTOR:-}
+      UI_AUTH_DOMAIN: ${UI_AUTH_DOMAIN:-}
+      UI_AUTH_CLIENT_ID: ${UI_AUTH_CLIENT_ID:-}
+      UI_AUTH_AUDIENCE: ${UI_AUTH_AUDIENCE:-}
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
       interval: 5s

@@ -1,0 +1,50 @@
+version: "3.8"
+services:
+  collector:
+    image: python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+    command: [python3, -c, "import time; time.sleep(2147483647)"]
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    networks: [application, redis]
+    volumes:
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 33554432
+      - /opt/snippet-observability/dev/runtime-v1:/opt/runtime:ro
+      - /opt/snippet-observability/dev/runtime-v1/probes:/opt/probes:ro
+      - /opt/snippet-observability/dev/runtime-v1/bin:/opt/bin:ro
+      - snippets-content:/observed/snippets-content
+      - snippets-data:/observed/snippets-db:ro
+      - permissions-data:/observed/permissions-db:ro
+      - redis-data:/observed/redis:ro
+    secrets:
+      - obs_snippets_db_password
+      - obs_permissions_db_password
+      - obs_redis_password
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.hostname == vm-snippet-dev]
+      resources:
+        limits: {memory: 256M, cpus: "0.50"}
+        reservations: {memory: 32M}
+      update_config: {order: stop-first, failure_action: rollback}
+      restart_policy: {condition: any, delay: 10s}
+    labels: {environment: dev, service: dependency-collector, version: sni82-runtime-v1}
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+networks:
+  application: {external: true, name: snippet-searcher-dev_default}
+  redis: {external: true, name: snippet-searcher-dev_redis_internal}
+volumes:
+  snippets-content: {external: true, name: snippet-searcher-dev_snippets_content}
+  snippets-data: {external: true, name: snippet-searcher-dev_snippets_data}
+  permissions-data: {external: true, name: snippet-searcher-dev_permissions_data}
+  redis-data: {external: true, name: snippet-searcher-dev_redis_data}
+secrets:
+  obs_snippets_db_password: {external: true}
+  obs_permissions_db_password: {external: true}
+  obs_redis_password: {external: true}

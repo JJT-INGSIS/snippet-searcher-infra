@@ -62,7 +62,6 @@ def request(base, path, method="GET", body=None, timeout=5, accept="application/
     outgoing = Request(base + path, data=body, headers=headers, method=method)
     try:
         try:
-            # Internal service discovery must not be sent through a host proxy.
             incoming = build_opener(ProxyHandler({}), NoRedirects()).open(outgoing, timeout=timeout)
         except HTTPError as error:
             incoming = error
@@ -71,7 +70,6 @@ def request(base, path, method="GET", body=None, timeout=5, accept="application/
             require(len(raw) <= MAX_RESPONSE, "Asset response exceeded probe limit")
             return Response(incoming.status, incoming.headers.get_content_type(), raw)
     except (URLError, OSError, TimeoutError) as error:
-        # Do not print a transport exception that could contain response content.
         raise ProbeFailure(f"{method} {path}: transport failure; write/delete outcome may be uncertain") from error
 
 
@@ -133,7 +131,6 @@ def prepare(base):
         result = request(base, path, "PUT", envelope(code))
         require(result.status == 201, f"Asset creation returned HTTP {result.status}")
     verify(base, manifest)
-    # Only test identifiers and hashes, never real snippet code or credentials.
     return manifest
 
 
@@ -144,8 +141,6 @@ def verify(base, manifest):
         require(result.status == 200, f"Asset read returned HTTP {result.status}")
         require(result.media_type in ("application/octet-stream", "text/plain"), "Unexpected Asset media type")
         require(result.body == envelope(code), "Asset did not preserve exact UTF-8 envelope bytes")
-        # Equal bytes already prove empty/Unicode/newlines survived; decode as a
-        # second contract check without implementing another production codec.
         decoded = json.loads(result.body)
         require(hashlib.sha256(decoded["code"].encode("utf-8")).hexdigest() == entry["sha256"],
                 "Decoded code fingerprint changed")
@@ -165,8 +160,6 @@ def unavailable(base, manifest):
     try:
         result = request(base, path_for(manifest, manifest["objects"][0]))
     except ProbeFailure:
-        # With the backend deliberately stopped, a timeout is technical failure,
-        # not evidence that the referenced object is missing.
         return
     require(result.status >= 500, f"Backend outage must be technical failure, not HTTP {result.status}")
 

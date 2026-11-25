@@ -67,7 +67,6 @@ def select_artifact(api):
         raise ValueError('La selección corresponde únicamente a prod')
     tree = api.request(f'/git/commits/{os.environ["GITHUB_SHA"]}')['tree']['sha']
     evidence = select_evidence(api, validate_repository(os.environ['GITHUB_REPOSITORY']), tree)
-    # Authorization against the current branch is checked inside the VM lock.
     return {key: evidence[key] for key in ARTIFACT_FIELDS}
 
 
