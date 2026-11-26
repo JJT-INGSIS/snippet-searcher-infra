@@ -25,6 +25,15 @@ def sql(stack, service, query):
     return result.strip()
 
 
+def verify_snippets_jdbc(stack):
+    # The startup record may precede thousands of request logs. Read retained
+    # logs of the running container, never a tail or historical Swarm tasks.
+    current = container(stack, 'snippets-service')
+    logs = subprocess.check_output(['docker', 'logs', current], stderr=subprocess.STDOUT, text=True, timeout=30)
+    if 'jdbc:postgresql://snippets-db:5432/snippets' not in logs:
+        raise RuntimeError('Falta evidencia JDBC/Flyway de Snippets en el contenedor actual')
+
+
 def verify(stack):
     if stack not in ('snippet-searcher-dev', 'snippet-searcher-prod'):
         raise ValueError('Stack inesperado')
@@ -50,9 +59,7 @@ def verify(stack):
                         'test "$(id -u)" = 10001 && test -w "$STORAGE_LOCAL_DIRECTORY"'], check=True, timeout=30)
         print('PASS storage local montado y escribible para uid 10001', flush=True)
     if application != 'ui':
-        logs = subprocess.check_output(['docker', 'service', 'logs', '--tail', '200', f'{stack}_snippets-service'], stderr=subprocess.STDOUT, text=True, timeout=30)
-        if 'jdbc:postgresql://snippets-db:5432/snippets' not in logs:
-            raise RuntimeError('Falta evidencia JDBC/Flyway de Snippets')
+        verify_snippets_jdbc(stack)
     scripts = Path(__file__).resolve().parent
     probe = f'sni24-http-{uuid4().hex[:12]}'
     command = ['docker', 'service', 'create', '--detach', '--name', probe,
