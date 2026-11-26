@@ -4,9 +4,24 @@ from unittest.mock import patch
 
 from deploy_service import Swarm
 from test_expanded_release import expanded
+from verify_stack import verify_snippets_jdbc
 
 
 class SwarmVerificationTests(unittest.TestCase):
+    def test_jdbc_startup_evidence_survives_more_than_200_request_logs(self):
+        logs = 'Flyway jdbc:postgresql://snippets-db:5432/snippets\n' + 'request completed\n' * 5500
+        with patch('verify_stack.container', return_value='current-container') as current, \
+                patch('verify_stack.subprocess.check_output', return_value=logs) as read:
+            verify_snippets_jdbc('snippet-searcher-prod')
+        current.assert_called_once_with('snippet-searcher-prod', 'snippets-service')
+        self.assertEqual(read.call_args.args[0], ['docker', 'logs', 'current-container'])
+
+    def test_current_container_without_jdbc_evidence_still_fails(self):
+        with patch('verify_stack.container', return_value='current-container'), \
+                patch('verify_stack.subprocess.check_output', return_value='request completed\n'), \
+                self.assertRaisesRegex(RuntimeError, 'contenedor actual'):
+            verify_snippets_jdbc('snippet-searcher-prod')
+
     def test_configuration_is_checked_again_after_convergence(self):
         order = []
         with patch('stack_runtime.verify_service_configuration', side_effect=lambda *args: order.append('configuration')), \

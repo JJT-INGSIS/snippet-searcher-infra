@@ -99,3 +99,10 @@ Los verificadores comprueban digests, estabilidad, réplicas, healthchecks y las
 dependencias internas pertinentes. Para un cambio de ingreso, verificá aparte
 DNS/TLS y acceso desde navegador. Para el formato, login y otras funciones,
 repetí los casos de aceptación del servicio afectado.
+
+La evidencia JDBC/Flyway de Snippets se busca en los logs retenidos del
+contenedor que está ejecutándose. Limitarla a las últimas 200 líneas daba un
+falso fallo después de suficiente tráfico; consultar logs del servicio completo
+también podría aceptar evidencia de una tarea anterior. Se conservan los
+controles SQL de migraciones y salud. Si Docker ya rotó toda la evidencia de
+arranque, la verificación sigue fallando explícitamente: no se omite el control.
